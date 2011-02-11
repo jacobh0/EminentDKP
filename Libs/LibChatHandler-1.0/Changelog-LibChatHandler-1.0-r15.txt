@@ -1,0 +1,21 @@
+------------------------------------------------------------------------
+r16 | pazza | 2010-04-21 14:59:15 +0000 (Wed, 21 Apr 2010) | 3 lines
+Changed paths:
+   A /tags/r15 (from /trunk:15)
+
+Tagging as r15
+
+Catch errors from mal-formed filter functions. (Caused by addons that haven't been updated in a long time).
+------------------------------------------------------------------------
+r15 | pazza | 2010-04-21 14:51:36 +0000 (Wed, 21 Apr 2010) | 1 line
+Changed paths:
+   M /trunk/LibChatHandler-1.0.lua
+
+catch error when event filter function is mal-formed.
+------------------------------------------------------------------------
+r14 | pazza | 2010-02-21 16:25:51 +0000 (Sun, 21 Feb 2010) | 1 line
+Changed paths:
+   M /trunk/LibChatHandler-1.0.lua
+
+Avoid memory leak.
+------------------------------------------------------------------------

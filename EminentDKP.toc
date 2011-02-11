@@ -1,0 +1,12 @@
+## Interface: 40000
+## Title: EminentDKP
+## Notes: DKP used by Eminent of Crushridge-US
+## Author: Thanah, Grioja
+## Version: 2.0
+## SavedVariables: EminentDKPDB, Standings
+## OptionalDeps: Ace3
+## X-Embeds: Ace3
+## X-Category: Interface Enhancements
+
+embeds.xml
+Core.lua
