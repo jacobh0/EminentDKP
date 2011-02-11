@@ -1,19 +1,11 @@
---[[
-  Written by Grioja of <Eminent> on Crushridge-US. All rights reserved.
-  Modifications may be made freely, however no re-distribution may be made without my express permission.
-  
-  -- Credits --
-  Thanah of <Eminent> on Crushridge-US (for the original mod)
-  Ace3 maintainers and contributors (your libraries kick ass)
-]]
-
 EminentDKP = LibStub("AceAddon-3.0"):NewAddon("EminentDKP", "AceComm-3.0", "AceEvent-3.0", "AceTimer-3.0", "AceConsole-3.0")
+local L = LibStub("AceLocale-3.0"):GetLocale("EminentDKP", false)
 local libCH = LibStub:GetLibrary("LibChatHandler-1.0")
 local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 
-VERSION = '2.0.1'
+VERSION = '2.1.0'
 local newest_version = ''
 local needs_update = false
 

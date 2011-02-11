@@ -2,11 +2,15 @@
 ## Title: EminentDKP
 ## Notes: DKP used by Eminent of Crushridge-US
 ## Author: Thanah, Grioja
-## Version: 2.0
-## SavedVariables: EminentDKPDB, Standings
+## Version: 2.1.0
+## SavedVariables: EminentDKPDB
 ## OptionalDeps: Ace3
 ## X-Embeds: Ace3
 ## X-Category: Interface Enhancements
 
 embeds.xml
+
+Locale\enUS.lua
+
 Core.lua
+GUI.lua
