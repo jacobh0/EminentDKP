@@ -107,6 +107,8 @@ local eligible_looters = {}
 
 local events_cache = {}
 
+local lastLootedName = nil
+
 local function GetTodayDateTime()
   local weekday, month, day, year = CalendarGetDate()
   local hour, minutes = GetGameTime()
@@ -283,6 +285,7 @@ function EminentDKP:OnEnable()
 	self:RegisterEvent("RAID_ROSTER_UPDATE") -- raid member list update
 	self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
 	self:RegisterEvent("GUILD_ROSTER_UPDATE") -- database conversion
+	self:RegisterEvent("UNIT_SPELLCAST_SENT") -- loot container tracker
 	self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
 	-- Sync methods
 	self:RegisterComm("EminentDKP-Proposal", "ProcessSyncProposal")
@@ -1031,6 +1034,14 @@ function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
 end
 
+-- Keep track of the last target we looted
+function EminentDKP:UNIT_SPELLCAST_SENT(unit, spell, rank, target)
+  if not self.amMasterLooter then return end
+  if unit == "player" and string.find(spell, WL_OPENING) then
+    lastLootedName = target;
+  end
+end
+
 -- Loot window closing means cancel auction
 function EminentDKP:LOOT_CLOSED()
   if UnitInRaid("player") and self.amMasterLooter and auction_active then
@@ -1049,8 +1060,11 @@ function EminentDKP:LOOT_OPENED()
   
   if UnitInRaid("player") then
     -- Query some info about this unit...
-    local guid = UnitGUID("target")
-    local unitName, unitRealm = UnitName("target")
+    local unitName = lastLootedName
+    local guid = 'container'
+    if UnitExists("target") then
+      guid = UnitGUID("target")
+    end
     if not recent_loots[guid] and GetNumLootItems() > 0 then
       local eligible_items = {}
       local eligible_slots = {}
@@ -1111,7 +1125,7 @@ function EminentDKP:GetStandings(stat)
   if next(players) == nil then
     players = self:GetPlayerPool()
   end
-  for id,data in pairs(self:GetPlayerPool()) do
+  for id,data in pairs(players) do
     local b = data.currentDKP
     if stat == 'earnedDKP' then
       b = data.earnedDKP
@@ -1329,6 +1343,7 @@ function EminentDKP:AuctionBidTimer()
       sendchat('The next auction will begin in 3 seconds.', "raid", "preset")
       self:ScheduleTimer("AdminStartAuction", 3)
     else
+      recent_loots[guid] = nil
       sendchat('No more loot found.', "raid", "preset")
     end
   else
