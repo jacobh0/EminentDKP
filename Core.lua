@@ -1035,10 +1035,10 @@ function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
 end
 
 -- Keep track of the last target we looted
-function EminentDKP:UNIT_SPELLCAST_SENT(unit, spell, rank, target)
+function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
   if not self.amMasterLooter then return end
-  if unit == "player" and string.find(spell, WL_OPENING) then
-    lastLootedName = target;
+  if unit == "player" and string.find(spell, "Opening") then
+    lastLootedName = target
   end
 end
 
