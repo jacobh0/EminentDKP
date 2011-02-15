@@ -1,7 +1,7 @@
 ## Interface: 40000
 ## Title: EminentDKP
 ## Notes: DKP used by Eminent of Crushridge-US
-## Author: Thanah, Grioja
+## Author: Grioja, Thanah
 ## Version: 2.1.0
 ## SavedVariables: EminentDKPDB
 ## OptionalDeps: Ace3
@@ -10,7 +10,11 @@
 
 embeds.xml
 
+Libs\SpecializedLibBars-1.0\SpecializedLibBars-1.0.lua
+
 Locale\enUS.lua
 
 Core.lua
+Options.lua
 GUI.lua
+Modes.lua
