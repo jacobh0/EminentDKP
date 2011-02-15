@@ -107,7 +107,7 @@ local eligible_looters = {}
 
 local events_cache = {}
 
-local lastLootedName = nil
+local lastContainerName = nil
 
 local function GetTodayDateTime()
   local weekday, month, day, year = CalendarGetDate()
@@ -1034,11 +1034,11 @@ function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
 end
 
--- Keep track of the last target we looted
+-- Keep track of the last container we opened
 function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
   if not self.amMasterLooter then return end
-  if unit == "player" and string.find(spell, "Opening") then
-    lastLootedName = target
+  if spell == "Opening" and unit == "player" then
+    lastContainerName = target
   end
 end
 
@@ -1060,9 +1060,10 @@ function EminentDKP:LOOT_OPENED()
   
   if UnitInRaid("player") then
     -- Query some info about this unit...
-    local unitName = lastLootedName
+    local unitName = lastContainerName
     local guid = 'container'
     if UnitExists("target") then
+      unitName = UnitName("target")
       guid = UnitGUID("target")
     end
     if not recent_loots[guid] and GetNumLootItems() > 0 then
