@@ -1094,7 +1094,7 @@ function EminentDKP:Bid(amount, from)
   if auction_active then
     if UnitInRaid(from) then
       if eligible_looters[from] then
-        local bid = math.floor(tonumber(amount))
+        local bid = math.floor(tonumber(amount) or 0)
         if bid > 0 then
           if self:PlayerHasDKP(from,bid) then
             self.bidItem.bids[from] = bid
@@ -1359,7 +1359,7 @@ end
 function EminentDKP:AdminDistributeBounty(percent,reason)
   -- todo: maybe offer a config option to automatically run this after a boss death?
   if not auction_active then
-    local p = math.floor(tonumber(percent))
+    local p = tonumber(percent) or 0
     if p <= 100 and p > 0 then
       sendchat('Distributing '.. percent ..'% of the bounty to the raid.', nil, 'self')
       
