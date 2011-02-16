@@ -1251,7 +1251,7 @@ function EminentDKP:AdminStartAuction()
     			  elapsed=0, 
     			  bids={}, 
     			  slotNum=slot,
-    			  srcGUID=UnitGUID("target")
+    			  srcGUID=guid
     			}
     			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
 			
@@ -1265,7 +1265,7 @@ function EminentDKP:AdminStartAuction()
         sendchat('There is no loot available to auction.', nil, 'self')
       end
     else
-      sendchat('You must be looting a corpse to start an auction.', nil, 'self')
+      sendchat('You must be looting to start an auction.', nil, 'self')
     end
   else
     sendchat('You must be the master looter to initiate an auction.', nil, 'self')
