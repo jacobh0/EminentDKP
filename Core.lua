@@ -1339,7 +1339,11 @@ function EminentDKP:AuctionBidTimer()
     
     -- Distribute the loot
     table.remove(recent_loots[guid].slots,1)
-    GiveMasterLoot(self.bidItem.slotNum, eligible_looters[looter])
+    if eligible_looters[looter] then
+      GiveMasterLoot(self.bidItem.slotNum, eligible_looters[looter])
+    else
+      GiveMasterLoot(self.bidItem.slotNum, eligible_looters[self.myName])
+    end
     self.bidItem = nil
     
     -- Re-run the auction routine...
