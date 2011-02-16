@@ -13,7 +13,7 @@ local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 
-VERSION = '2.0.2'
+VERSION = '2.0.3'
 local newest_version = ''
 local needs_update = false
 
@@ -1222,7 +1222,10 @@ end
 function EminentDKP:AdminStartAuction()
   if self.amMasterLooter then
     if GetNumLootItems() > 0 then
-      local guid = UnitGUID("target")
+      local guid = 'container'
+      if UnitExists("target") then
+        guid = UnitGUID("target")
+      end
       if #(recent_loots[guid].slots) > 0 then
         if not auction_active then
           -- Update eligibility list
