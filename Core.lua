@@ -1172,7 +1172,7 @@ function EminentDKP:WhisperTransfer(amount, to, from)
     if self:PlayerExistsInPool(from) then
       if self:PlayerExistsInPool(to) then
         if not auction_active then
-          local dkp = round(tonumber(amount),2)
+          local dkp = round(tonumber(amount) or 0,2)
           if dkp > 0 then
             if self:PlayerHasDKP(from,dkp) then
               self:CreateTransferSyncEvent(from,to,dkp)
