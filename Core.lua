@@ -1368,8 +1368,8 @@ function EminentDKP:AdminDistributeBounty(percent,reason)
       
       -- todo: solidify the process by which a "reason" is acquired
       local name = UnitName("target")
-      if name ~= nil then
-        if reason ~= nil then
+      if not name then
+        if not reason then
           name = "Default"
         else
           name = reason
