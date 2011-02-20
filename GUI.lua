@@ -156,13 +156,15 @@ function meter:ApplySettings(window)
 	end
 	
 	-- Spark.
-	for i, bar in pairs(g:GetBars()) do
-		if p.spark then
-			bar.spark:Show()
-		else
-			bar.spark:Hide()
-		end
-	end
+	if g:HasAnyBar() then
+  	for i, bar in pairs(g:GetBars()) do
+  		if p.spark then
+  			bar.spark:Show()
+  		else
+  			bar.spark:Hide()
+  		end
+  	end
+  end
 	
 	-- Header config button
 	g.optbutton:ClearAllPoints()
@@ -236,13 +238,14 @@ function meter:ApplySettings(window)
 	
 	-- Clickthrough
 	g:EnableMouse(not p.clickthrough)
-	for i, bar in pairs(g:GetBars()) do
-		bar:EnableMouse(not p.clickthrough)
+	if g:HasAnyBar() then
+  	for i, bar in pairs(g:GetBars()) do
+  		bar:EnableMouse(not p.clickthrough)
+  	end
 	end
 	
 	g:SortBars()
 end
-
 
 local function showmode(win, id, label, mode)
 	-- Add current mode to window traversal history.
@@ -263,11 +266,11 @@ local function BarClick(win, id, label, button)
 	local click3 = win.metadata.click3
 	
 	if button == "RightButton" and IsShiftKeyDown() then
-		EminentDKP:OpenMenu(win)
-	elseif win.metadata.click then
-		win.metadata.click(win, id, label, button)
+		--EminentDKP:OpenMenu(win)
 	elseif button == "RightButton" then
 		win:RightClick()
+	elseif win.metadata.click then
+		win.metadata.click(win, id, label, button)
 	elseif click2 and IsShiftKeyDown() then
 		showmode(win, id, label, click2)
 	elseif click3 and IsControlKeyDown() then
@@ -324,12 +327,10 @@ local function BarEnter(win, id, label)
 end
 
 local function BarLeave(win, id, label)
-  --[[
 	if ttactive then
 		GameTooltip:Hide()
 		ttactive = false
 	end
-	]]
 end
 
 local function getNumberOfBars(window)
@@ -366,11 +367,15 @@ function meter:Update(window)
 	if window.metadata.showspots then
 		table.sort(window.dataset, value_sort)
 	end
+	if window.metadata.sortfunc then
+	  table.sort(window.dataset, window.metadata.sortfunc)
+  end
 
 	-- If we are using "wipestale", we may have removed data
 	-- and we need to remove unused bars.
 	-- The Threat module uses this.
 	-- For each bar, mark bar as unchecked.
+	--[[
 	if window.metadata.wipestale then
 		local bars = window.bargroup:GetBars()
 		if bars then
@@ -379,8 +384,7 @@ function meter:Update(window)
 			end
 		end
 	end
-
-	local nr = 1
+  ]]
 	for i, data in ipairs(window.dataset) do
 		if data.id then
 			local barid = data.id
@@ -444,16 +448,17 @@ function meter:Update(window)
 			end
 			
 			if window.metadata.showspots and EminentDKP.db.profile.showranks then
-				bar:SetLabel(("%2u. %s"):format(nr, data.label))
+				bar:SetLabel(("%2u. %s"):format(i, data.label))
 			else
 				bar:SetLabel(data.label)
 			end
 			bar:SetTimerLabel(data.valuetext)
 			
+			--[[
 			if window.metadata.wipestale then
 				bar.checked = true
 			end
-	
+	    
 			-- Emphathized items - cache a flag saying it is done so it is not done again.
 			-- This is a little lame.
 			if data.emphathize and bar.emphathize_set ~= true then
@@ -463,7 +468,7 @@ function meter:Update(window)
 				bar:SetFont(nil,nil,"PLAIN")
 				bar.emphathize_set = false
 			end
-			
+			]]
 			-- Background texture color.
 			if data.backgroundcolor then
 				bar.bgtexture:SetVertexColor(data.backgroundcolor.r, data.backgroundcolor.g, data.backgroundcolor.b, data.backgroundcolor.a or 1)
@@ -476,12 +481,11 @@ function meter:Update(window)
 				bar.bgtexture:SetPoint("TOPLEFT")
 				bar.bgtexture:SetWidth(data.backgroundwidth * bar:GetLength())
 			end
-						
-			nr = nr + 1
 		end
 	end
 	
 	-- If we are using "wipestale", remove all unchecked bars.
+	--[[
 	if window.metadata.wipestale then
 		local bars = window.bargroup:GetBars()
 		for name, bar in pairs(bars) do
@@ -490,6 +494,7 @@ function meter:Update(window)
 			end
 		end
 	end
+	]]
 	
 	-- Adjust our background frame if background height is dynamic.
 	if window.bargroup.bgframe and window.settings.background.height == 0 then
@@ -506,9 +511,8 @@ function meter:Update(window)
 		window.bargroup:SortBars()
 	else
 		window.bargroup:SetSortFunction(nil)
-		window.bargroup:SortBars()
+	  window.bargroup:SortBars()
 	end
-	
 end
 
 function meter:AdjustBackgroundHeight(window)
@@ -525,7 +529,7 @@ end
 function meter:OnMouseWheel(window, frame, direction)
 	if direction == 1 and window.bargroup:GetBarOffset() > 0 then
 		window.bargroup:SetBarOffset(window.bargroup:GetBarOffset() - 1)
-	elseif direction == -1 and ((getNumberOfBars(win) - window.bargroup:GetMaxBars() - window.bargroup:GetBarOffset()) > 0) then
+	elseif direction == -1 and ((getNumberOfBars(window) - window.bargroup:GetMaxBars() - window.bargroup:GetBarOffset()) > 0) then
 		window.bargroup:SetBarOffset(window.bargroup:GetBarOffset() + 1)
 	end
 end
@@ -533,6 +537,438 @@ end
 function meter:CreateBar(window, name, label, value, maxvalue, icon, o)
 	local bar = window.bargroup:NewCounterBar(name, label, value, maxvalue, icon, o)
 	bar:EnableMouseWheel(true)
-	bar:SetScript("OnMouseWheel", function(f, d) meter:OnMouseWheel(win, f, d) end)
+	bar:SetScript("OnMouseWheel", function(f, d) meter:OnMouseWheel(window, f, d) end)
 	return bar
+end
+
+function meter:AddDisplayOptions(win, options)
+	local db = win.settings
+
+	options.baroptions = {
+		type = "group",
+		name = L["Bars"],
+		order=1,
+		args = {
+      barfont = {
+        type = 'select',
+        dialogControl = 'LSM30_Font',
+        name = L["Bar font"],
+        desc = L["The font used by all bars."],
+        values = AceGUIWidgetLSMlists.font,
+        get = function() return db.barfont end,
+        set = function(win,key)
+      		db.barfont = key
+      		EminentDKP:ApplySettings(win[2])
+        end,
+        order=10,
+      },
+			barfontsize = {
+				type="range",
+				name=L["Bar font size"],
+				desc=L["The font size of all bars."],
+				min=7,
+				max=40,
+				step=1,
+				get= function() return db.barfontsize end,
+				set= function(win, size)
+          db.barfontsize = size
+          EminentDKP:ApplySettings(win[2])
+        end,
+				order=11,
+			},
+	    bartexture = {
+        type = 'select',
+        dialogControl = 'LSM30_Statusbar',
+        name = L["Bar texture"],
+        desc = L["The texture used by all bars."],
+        values = AceGUIWidgetLSMlists.statusbar,
+        get = function() return db.bartexture end,
+        set = function(win,key)
+          db.bartexture = key
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=12,
+	    },
+			barspacing = {
+        type="range",
+        name=L["Bar spacing"],
+        desc=L["Distance between bars."],
+        min=0,
+        max=10,
+        step=1,
+        get=function() return db.barspacing end,
+        set=function(win, spacing)
+          db.barspacing = spacing
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=13,
+			},
+			barheight = {
+        type="range",
+        name=L["Bar height"],
+        desc=L["The height of the bars."],
+        min=10,
+        max=40,
+        step=1,
+        get=function() return db.barheight end,
+        set=function(win, height)
+          db.barheight = height
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=14,
+			},
+			barwidth = {
+        type="range",
+        name=L["Bar width"],
+        desc=L["The width of the bars."],
+        min=80,
+        max=400,
+        step=1,
+        get=function() return db.barwidth end,
+        set=function(win, width)
+          db.barwidth = width
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=15,
+			},
+			barmax = {
+        type="range",
+        name=L["Max bars"],
+        desc=L["The maximum number of bars shown."],
+        min=0,
+        max=100,
+        step=1,
+        get=function() return db.barmax end,
+        set=function(win, max)
+          db.barmax = max
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=16,
+			},
+			barorientation = {
+        type="select",
+        name=L["Bar orientation"],
+        desc=L["The direction the bars are drawn in."],
+        values=	function() return {[1] = L["Left to right"], [3] = L["Right to left"]} end,
+        get=function() return db.barorientation end,
+        set=function(win, orientation)
+          db.barorientation = orientation
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=17,
+			},
+			reversegrowth = {
+        type="toggle",
+        name=L["Reverse bar growth"],
+        desc=L["Bars will grow up instead of down."],
+        get=function() return db.reversegrowth end,
+        set=function(win) 
+          db.reversegrowth = not db.reversegrowth
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=18,
+			},
+			color = {
+        type="color",
+        name=L["Bar color"],
+        desc=L["Choose the default color of the bars."],
+        hasAlpha=true,
+        get=function(i) 
+          local c = db.barcolor
+          return c.r, c.g, c.b, c.a
+        end,
+        set=function(win, r,g,b,a) 
+          db.barcolor = {["r"] = r, ["g"] = g, ["b"] = b, ["a"] = a}
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=19,
+			},
+			altcolor = {
+        type="color",
+        name=L["Alternate color"],
+        desc=L["Choose the alternate color of the bars."],
+        hasAlpha=true,
+        get=function(i) 
+          local c = db.baraltcolor
+          return c.r, c.g, c.b, c.a
+        end,
+        set=function(win, r,g,b,a) 
+          db.baraltcolor = {["r"] = r, ["g"] = g, ["b"] = b, ["a"] = a}
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=20,
+			},
+			classcolorbars = {
+        type="toggle",
+        name=L["Class color bars"],
+        desc=L["When possible, bars will be colored according to player class."],
+        get=function() return db.classcolorbars end,
+        set=function(win) 
+          db.classcolorbars = not db.classcolorbars
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=21,
+			},
+			classcolortext = {
+        type="toggle",
+        name=L["Class color text"],
+        desc=L["When possible, bar text will be colored according to player class."],
+        get=function() return db.classcolortext end,
+        set=function(win) 
+          db.classcolortext = not db.classcolortext
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=22,
+			},
+			spark = {
+        type="toggle",
+        name=L["Show spark effect"],
+        get=function() return db.spark end,
+        set=function(win) 
+          db.spark = not db.spark
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=23,
+			},
+			clickthrough = {
+        type="toggle",
+        name=L["Clickthrough"],
+        desc=L["Disables mouse clicks on bars."],
+        order=20,
+        get=function() return db.clickthrough end,
+        set=function(win) 
+          db.clickthrough = not db.clickthrough
+          EminentDKP:ApplySettings(win[2])
+        end,
+			},
+		}
+	}
+   	
+  options.titleoptions = {
+    type = "group",
+    name = L["Title bar"],
+    order=2,
+    args = {
+      enable = {
+        type="toggle",
+        name=L["Enable"],
+        desc=L["Enables the title bar."],
+        get=function() return db.enabletitle end,
+        set=function(win) 
+          db.enabletitle = not db.enabletitle
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=0,
+      },
+      font = {
+        type = 'select',
+        dialogControl = 'LSM30_Font',
+        name = L["Bar font"],
+        desc = L["The font used by all bars."],
+        values = AceGUIWidgetLSMlists.font,
+        get = function() return db.title.font end,
+        set = function(win,key) 
+          db.title.font = key
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=1,
+      },
+        fontsize = {
+        type="range",
+        name=L["Bar font size"],
+        desc=L["The font size of all bars."],
+        min=7,
+        max=40,
+        step=1,
+        get=function() return db.title.fontsize end,
+        set=function(win, size)
+          db.title.fontsize = size
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=2,
+      },
+      texture = {
+        type = 'select',
+        dialogControl = 'LSM30_Statusbar',
+        name = L["Background texture"],
+        desc = L["The texture used as the background of the title."],
+        values = AceGUIWidgetLSMlists.statusbar,
+        get = function() return db.title.texture end,
+        set = function(win,key)
+          db.title.texture = key
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=3,
+      },						    
+        bordertexture = {
+        type = 'select',
+        dialogControl = 'LSM30_Border',
+        name = L["Border texture"],
+        desc = L["The texture used for the border of the title."],
+        values = AceGUIWidgetLSMlists.border,
+        get = function() return db.title.bordertexture end,
+        set = function(win,key)
+          db.title.bordertexture = key
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=4,
+      },
+      thickness = {
+        type="range",
+        name=L["Border thickness"],
+        desc=L["The thickness of the borders."],
+        min=0,
+        max=50,
+        step=0.5,
+        get=function() return db.title.borderthickness end,
+        set=function(win, val)
+          db.title.borderthickness = val
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=5,
+      },
+      margin = {
+        type="range",
+        name=L["Margin"],
+        desc=L["The margin between the outer edge and the background texture."],
+        min=0,
+        max=50,
+        step=0.5,
+        get=function() return db.title.margin end,
+        set=function(win, val)
+          db.title.margin = val
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=6,
+      },
+      color = {
+        type="color",
+        name=L["Background color"],
+        desc=L["The background color of the title."],
+        hasAlpha=true,
+        get=function(i) 
+          local c = db.title.color
+          return c.r, c.g, c.b, c.a
+        end,
+        set=function(win, r,g,b,a) 
+          db.title.color = {["r"] = r, ["g"] = g, ["b"] = b, ["a"] = a}
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=7,
+      },
+      menubutton = {
+        type="toggle",
+        name=L["Show menu button"],
+        desc=L["Shows a button for opening the menu in the window title bar."],
+        get=function() return db.title.menubutton == nil or db.title.menubutton end,
+        set=function(win)
+          db.title.menubutton = not db.title.menubutton
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=8,
+      },
+    }
+  }
+  
+	options.windowoptions = {
+    type = "group",
+    name = L["Background"],
+    order=2,
+    args = {
+      enablebackground = {
+        type="toggle",
+        name=L["Enable"],
+        desc=L["Adds a background frame under the bars. The height of the background frame determines how many bars are shown. This will override the max number of bars setting."],
+        get=function() return db.enablebackground end,
+        set=function(win) 
+          db.enablebackground = not db.enablebackground
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=0,
+      },
+      texture = {
+        type = 'select',
+        dialogControl = 'LSM30_Background',
+        name = L["Background texture"],
+        desc = L["The texture used as the background."],
+        values = AceGUIWidgetLSMlists.background,
+        get = function() return db.background.texture end,
+        set = function(win,key)
+          db.background.texture = key
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=1,
+      },
+      bordertexture = {
+        type = 'select',
+        dialogControl = 'LSM30_Border',
+        name = L["Border texture"],
+        desc = L["The texture used for the borders."],
+        values = AceGUIWidgetLSMlists.border,
+        get = function() return db.background.bordertexture end,
+        set = function(win,key)
+          db.background.bordertexture = key
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=2,
+      },
+      thickness = {
+        type="range",
+        name=L["Border thickness"],
+        desc=L["The thickness of the borders."],
+        min=0,
+        max=50,
+        step=0.5,
+        get=function() return db.background.borderthickness end,
+        set=function(win, val)
+          db.background.borderthickness = val
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=3,
+      },
+      margin = {
+        type="range",
+        name=L["Margin"],
+        desc=L["The margin between the outer edge and the background texture."],
+        min=0,
+        max=50,
+        step=0.5,
+        get=function() return db.background.margin end,
+        set=function(win, val)
+          db.background.margin = val
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=4,
+      },
+      height = {
+        type="range",
+        name=L["Window height"],
+        desc=L["The height of the window. If this is 0 the height is dynamically changed according to how many bars exist."],
+        min=0,
+        max=600,
+        step=1,
+        get=function() return db.background.height end,
+        set=function(win, height)
+          db.background.height = height
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=5,
+      },
+      color = {
+        type="color",
+        name=L["Background color"],
+        desc=L["The color of the background."],
+        hasAlpha=true,
+        get=function(i) 
+          local c = db.background.color
+          return c.r, c.g, c.b, c.a
+        end,
+        set=function(win, r,g,b,a)
+          db.background.color = {["r"] = r, ["g"] = g, ["b"] = b, ["a"] = a}
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order=6,
+      },
+    }
+	}
 end

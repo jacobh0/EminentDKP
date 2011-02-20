@@ -5,31 +5,198 @@ local EminentDKP = EminentDKP
 local balancemode = EminentDKP:NewModule(L["Earnings & Deductions"])
 local itemmode = EminentDKP:NewModule(L["Items Won"])
 
+local function Debug(message)
+  EminentDKP:Print(message)
+end
+
+local function item_tooltip(win, id, label, tooltip)
+  tooltip:SetHyperlink(label)
+end
+
+local function linkitem(win, id, label, button)
+  -- Send itemlink to the editbox
+  if button == "LeftButton" and IsShiftKeyDown() then
+    local edit_box = _G.ChatEdit_ChooseBoxForSend()
+    if edit_box:IsShown() then
+      edit_box:Insert(label)
+    else
+      _G.ChatEdit_ActivateChat(edit_box)
+      edit_box:Insert(label)
+    end
+  end
+end
+
+local function FormatValueText(...)
+  local textone, showone, texttwo, showtwo, textthree, showthree = ...
+  local texts = {}
+  if showone then table.insert(texts,textone) end
+  if showtwo then table.insert(texts,texttwo) end
+  if showthree then table.insert(texts,textthree) end
+  if #(texts) == 3 then
+    return texts[1].." ("..texts[2]..", "..texts[3]..")"
+  elseif #(texts) == 2 then
+    return texts[1].." ("..texts[2]..")"
+  else
+    return texts[1] or ""
+  end
+end
+
+local function find_player(set, playerid)
+  if set.sortnum == 1 then
+    -- This is the "all-time" set, so use the actual pool
+    return EminentDKP:GetPlayerByID(playerid)
+  end
+	for i, p in ipairs(set.players) do
+		if p.id == playerid then
+			return p
+		end
+	end
+	return nil
+end
+
+local function get_players(set)
+  if set.sortnum == 1 then
+	  -- This is the "all-time" set, so use the actual pool
+	  return EminentDKP:GetPlayerPool()
+  end
+  return set.players
+end
+
+-- Get relevant events depending on set
+local function get_events(set, playerid, typefilter)
+  local player = EminentDKP:GetPlayerByID(playerid)
+  local event_list = {}
+  if set.sortnum == 1 then
+    -- This is the "all-time" set, so use the actual pool
+    local eventcount = 0
+    local eventid = EminentDKP:GetEventCount()
+    while eventid > 0 and eventcount < EminentDKP.db.profile.maxevents do
+      local eid = tostring(eventid)
+      if player.deductions[eid] or player.earnings[eid] then
+        local e = EminentDKP:GetEvent(eid)
+        if typefilter(e,playerid) then
+          eventcount = eventcount + 1
+          table.insert(event_list,eid)
+        end
+      end
+      eventid = eventid - 1
+    end
+  else
+    for i, eid in ipairs(set.events) do
+      if player.deductions[eid] or player.earnings[eid] then
+        local e = EminentDKP:GetEvent(eid)
+        if typefilter(e,playerid) then
+          table.insert(event_list,eid)
+        end
+      end
+    end
+  end
+  return event_list
+end
+
+local function event_filter_balance(event,pid)
+  return (event.eventType ~= "vanityreset" and true or false)
+end
+
+local function event_filter_auction_won(event,pid)
+  if event.eventType == "auction" and event.target == pid then
+    return true
+  end
+  return false
+end
+
 local classModePrototype = { 
   OnEnable = function(self) 
-    self.metadata	        = {showspots = true, click1 = balancemode, click2 = itemmode, columns = {DKP = true, Percent = true}}
-  	balancemode.metadata	= {columns = {DKP = true, Percent = true}}
-  	itemmode.metadata   	= {tooltip = item_tooltip, columns = {DKP = true, Percent = true}}
+    self.metadata	        = {showspots = true, ordersort = true, click1 = itemmode, click2 = balancemode, columns = { DKP = true, Percent = true }}
+  	balancemode.metadata	= {showspots = false, ordersort = true, columns = { DKP = true, Source = true, Time = true }}
+  	itemmode.metadata   	= {showspots = false, ordersort = true, tooltip = item_tooltip, click = linkitem, columns = { DKP = true }}
     
   	EminentDKP:AddMode(self)
   end,
   OnDisable = function(self)
   	EminentDKP:RemoveMode(self)
   end,
-  GetSetSummary = function(set) return EminentDKP:FormatNumber(set.currentDKP) end,
-  Update = function(win, set) playerUpdate(win, set) end,
-  AddPlayerAttributes = function(player)
+  GetSetSummary = function(self, set) 
+    return set.modedata[self:GetName()].currentDKP
+  end,
+  CalculateData = function(self, set)
+    -- Ensure these calculations are only done once
+    if not set.changed then return end
+    local class_filter = { self:GetName() }
+    if set.sortnum == 1 then
+  	  -- This is the "all-time" set, so use the actual pool
+  	  for pid, player in pairs(EminentDKP:GetPlayerPool()) do
+        -- Iterate through the player's relevant events and calculate data!
+        if tContains(class_filter,player.class) then
+          set.modedata[self:GetName()].currentDKP = set.modedata[self:GetName()].currentDKP + player.currentDKP
+          set.modedata[self:GetName()].earnedDKP = set.modedata[self:GetName()].earnedDKP + player.earnedDKP
+        end
+      end
+      return
+    end
+    
+    for i, p in pairs(set.players) do
+      -- Iterate through the player's relevant events and calculate data!
+      if tContains(class_filter,p.class) then
+        for j, eid in ipairs(set.events) do
+          local event = EminentDKP:GetEvent(eid)
+          -- Vanity resets are of no concern
+          if event.eventType ~= 'vanityreset' then
+            local player = EminentDKP:GetPlayerByID(p.id)
+            -- Was there an earning?
+            if player.earnings[eid] then
+              p.modedata.currentDKP = p.modedata.currentDKP + player.earnings[eid]
+              p.modedata.earnedDKP = p.modedata.earnedDKP + player.earnings[eid]
+            end
+            -- Was there a deduction?
+            if player.deductions[eid] then 
+              p.modedata.currentDKP = p.modedata.currentDKP - player.deductions[eid]
+            end
+          end
+        end
+        set.modedata[self:GetName()].currentDKP = set.modedata[self:GetName()].currentDKP + p.modedata.currentDKP
+        set.modedata[self:GetName()].earnedDKP = set.modedata[self:GetName()].earnedDKP + p.modedata.earnedDKP
+      end
+    end
+  end,
+  PopulateData = function(self, win, set)
+    local class_filter = { self:GetName() }
+  	local max = 0
+  	local nr = 1
+    
+  	for pid, player in pairs(get_players(set)) do
+  		if tContains(class_filter,player.class) then
+  		  local earned = player.earnedDKP or player.modedata.earnedDKP
+  		  -- Only show people who have had any activity in the system...
+  		  if earned > 0 then
+  			  local d = win.dataset[nr] or {}
+    			win.dataset[nr] = d
+    			d.id = player.id or pid
+    			d.label = player.name or EminentDKP:GetPlayerNameByID(pid)
+    			d.value = player.currentDKP or player.modedata.currentDKP
+    			d.class = string.upper(string.gsub(player.class,"%s*",""))
+    			d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
+    			                              string.format("%02.1f%%", (d.value / self:GetSetSummary(set)) * 100), self.metadata.columns.Percent)
+    			if d.value > max then
+    				max = d.value
+    			end
+    			nr = nr + 1
+  			end
+  		end
+  	end
+  	win.metadata.maxvalue = max
+  end,
+  AddPlayerAttributes = function(self, player)
     -- Called when a new player is added to a set.
-    if not player.earnedDKP then
-  		player.earnedDKP = 0
-  		player.currentDKP = 0
+    if not player.modedata.currentDKP then
+      player.modedata.earnedDKP = 0
+      player.modedata.currentDKP = 0
   	end
   end,
-  AddSetAttributes = function(set)
+  AddSetAttributes = function(self, set)
     -- Called when a new set is created.
-    if not set.earnedDKP then
-  		set.earnedDKP = 0
-  		set.currentDKP = 0
+    if not set.modedata[self:GetName()] then
+      set.modedata[self:GetName()] = { earnedDKP = 0, currentDKP = 0 }
   	end
   end
 }
@@ -45,50 +212,79 @@ local rogueMode = EminentDKP:NewModule(L["Rogue"],classModePrototype)
 local shamanMode = EminentDKP:NewModule(L["Shaman"],classModePrototype)
 local warlockMode = EminentDKP:NewModule(L["Warlock"],classModePrototype)
 local warriorMode = EminentDKP:NewModule(L["Warrior"],classModePrototype)
-EminentDKP:EnableModule(L["Death Knight"])
-EminentDKP:EnableModule(L["Druid"])
-EminentDKP:EnableModule(L["Hunter"])
-EminentDKP:EnableModule(L["Mage"])
-EminentDKP:EnableModule(L["Paladin"])
-EminentDKP:EnableModule(L["Priest"])
-EminentDKP:EnableModule(L["Rogue"])
-EminentDKP:EnableModule(L["Shaman"])
-EminentDKP:EnableModule(L["Warlock"])
-EminentDKP:EnableModule(L["Warrior"])
 
-local function item_tooltip(win, id, label, tooltip)
-  tooltip:SetHyperlink(label)
+function balancemode:Enter(win, id, label)
+  self.playerid = id
+	self.title = label..L["'s Earnings & Deductions"]
 end
 
-local function playerUpdate(win, set)
+function itemmode:Enter(win, id, label)
+  self.playerid = id
+	self.title = L["Items won by"].." "..label
+end
+
+local green = {r = 0, g = 255, b = 0, a = 1}
+local red = {r = 255, g = 0, b = 0, a = 1}
+
+function balancemode:PopulateData(win, set) 
+  local player = find_player(set,self.playerid)
+  local playerData = (player.currentDKP and player or EminentDKP:GetPlayerByID(self.playerid))
   local nr = 1
-	local max = 0
   
-	for i, pid in ipairs(set.players) do
-	  local player = EminentDKP:GetPlayerByID(pid)
-		if player.currentDKP > 0 then
-			
-			local d = win.dataset[nr] or {}
-			win.dataset[nr] = d
-			
-			d.id = player.id
-			d.label = player.name
-			d.value = player.currentDKP
-			
-			d.valuetext = Skada:FormatValueText(
-											Skada:FormatNumber(player.healing), self.metadata.columns.Healing,
-											string.format("%02.1f", getHPS(set, player)), self.metadata.columns.HPS,
-											string.format("%02.1f%%", player.healing / set.healing * 100), self.metadata.columns.Percent
-										)
-			d.class = player.class
-			
-			if player.currentDKP > max then
-				max = player.currentDKP
-			end
-			
-			nr = nr + 1
-		end
-	end
-	
-	win.metadata.maxvalue = max
+  for i, eid in ipairs(get_events(set,self.playerid,event_filter_balance)) do
+    local event = EminentDKP:GetEvent(eid)
+    if event.eventType ~= 'vanityreset' then
+      if playerData.deductions[eid] then
+        local d = win.dataset[nr] or {}
+  			win.dataset[nr] = d
+  			d.id = "d:"..eid
+  			d.label = event.eventType:gsub("^%l", string.upper)
+  			d.value = playerData.deductions[eid]
+  			if event.eventType == 'transfer' then
+  			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
+  			                                EminentDKP:GetPlayerNameByID(event.source), self.metadata.columns.Source)
+			  else
+  			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
+  			                                event.source, self.metadata.columns.Source)
+		    end
+  			d.icon = select(3,GetSpellInfo(28084)) -- negative charge icon
+  			d.color = red
+  			nr = nr + 1
+      end
+      if playerData.earnings[eid] then
+        local d = win.dataset[nr] or {}
+  			win.dataset[nr] = d
+  			d.id = "e:"..eid
+  			d.label = event.eventType:gsub("^%l", string.upper)
+  			d.value = playerData.earnings[eid]
+  			if event.eventType == 'transfer' then
+  			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
+  			                                EminentDKP:GetPlayerNameByID(event.source), self.metadata.columns.Source)
+			  else
+  			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
+  			                                event.source, self.metadata.columns.Source)
+		    end
+  			d.icon = select(3,GetSpellInfo(28059)) -- positive charge icon
+  			d.color = green
+  			nr = nr + 1
+      end
+    end
+  end
+end
+function itemmode:PopulateData(win, set) 
+  local player = find_player(set,self.playerid)
+  local nr = 1
+  
+  for i, eid in ipairs(get_events(set,self.playerid,event_filter_auction_won)) do
+    local event = EminentDKP:GetEvent(eid)
+    local d = win.dataset[nr] or {}
+		win.dataset[nr] = d
+		d.id = eid
+		-- Because Blizzard is slow and doesn't always return the itemlink in time
+		d.label = select(2, GetItemInfo(event.extraInfo)) or "(Querying Item)"
+		d.value = event.value
+		d.valuetext = FormatValueText(event.value, self.metadata.columns.DKP)
+		d.icon = select(10, GetItemInfo(event.extraInfo))
+		nr = nr + 1
+  end
 end
