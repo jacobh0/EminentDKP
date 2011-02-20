@@ -51,7 +51,7 @@ EminentDKP.defaults = {
         playerCounter = 0,
         events = {},
         eventCounter = 0,
-        lastScan = '',
+        lastScan = 0,
         bounty = {
           size = 1000000,
           available = 1000000
@@ -139,7 +139,11 @@ EminentDKP.options = {
           type= "input",
           name= L["Create window"],
           desc= L["Enter the name for the new window."],
-          set= function(self, val) if val and val ~= "" then EminentDKP:CreateWindow(val) end end,
+          set= function(self, val)
+            if val and val ~= "" and not EminentDKP:GetWindow(val) then
+              EminentDKP:CreateWindow(val)
+            end
+          end,
           order= 1,
         },
         delete = {

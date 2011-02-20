@@ -2,6 +2,24 @@ local L = LibStub("AceLocale-3.0"):GetLocale("EminentDKP", false)
 
 local EminentDKP = EminentDKP
 
+local classFilter = {
+  [L["Death Knight"]] = { "DEATHKNIGHT" },
+  [L["Druid"]] = { "DRUID" },
+  [L["Hunter"]] = { "HUNTER" },
+  [L["Mage"]] = { "MAGE" },
+  [L["Paladin"]] = { "PALADIN" },
+  [L["Priest"]] = { "PRIEST" },
+  [L["Rogue"]] = { "ROGUE" },
+  [L["Shaman"]] = { "SHAMAN" },
+  [L["Warlock"]] = { "WARLOCK" },
+  [L["Warrior"]] = { "WARRIOR" },
+  [L["Conqueror"]] = { "PALADIN", "PRIEST", "WARLOCK" },
+  [L["Vanquisher"]] = { "DEATHKNIGHT", "DRUID", "MAGE", "ROGUE" },
+  [L["Protector"]] = { "HUNTER", "SHAMAN", "WARRIOR" },
+  [L["All Classes"]] = { "DEATHKNIGHT", "DRUID", "HUNTER", "MAGE", "PALADIN", 
+                         "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" },
+}
+
 local balancemode = EminentDKP:NewModule(L["Earnings & Deductions"])
 local itemmode = EminentDKP:NewModule(L["Items Won"])
 
@@ -105,7 +123,7 @@ local function event_filter_auction_won(event,pid)
   return false
 end
 
-local classModePrototype = { 
+local classModePrototype = {
   OnEnable = function(self) 
     self.metadata	        = {showspots = true, ordersort = true, click1 = itemmode, click2 = balancemode, columns = { DKP = true, Percent = true }}
   	balancemode.metadata	= {showspots = false, ordersort = true, columns = { DKP = true, Source = true, Time = true }}
@@ -117,17 +135,16 @@ local classModePrototype = {
   	EminentDKP:RemoveMode(self)
   end,
   GetSetSummary = function(self, set) 
-    return set.modedata[self:GetName()].currentDKP
+    return EminentDKP:FormatNumber(set.modedata[self:GetName()].currentDKP)
   end,
   CalculateData = function(self, set)
     -- Ensure these calculations are only done once
     if not set.changed then return end
-    local class_filter = { self:GetName() }
     if set.sortnum == 1 then
   	  -- This is the "all-time" set, so use the actual pool
   	  for pid, player in pairs(EminentDKP:GetPlayerPool()) do
         -- Iterate through the player's relevant events and calculate data!
-        if tContains(class_filter,player.class) then
+        if tContains(classFilter[self:GetName()],player.class) then
           set.modedata[self:GetName()].currentDKP = set.modedata[self:GetName()].currentDKP + player.currentDKP
           set.modedata[self:GetName()].earnedDKP = set.modedata[self:GetName()].earnedDKP + player.earnedDKP
         end
@@ -137,7 +154,7 @@ local classModePrototype = {
     
     for i, p in pairs(set.players) do
       -- Iterate through the player's relevant events and calculate data!
-      if tContains(class_filter,p.class) then
+      if tContains(classFilter[self:GetName()],p.class) then
         for j, eid in ipairs(set.events) do
           local event = EminentDKP:GetEvent(eid)
           -- Vanity resets are of no concern
@@ -160,12 +177,11 @@ local classModePrototype = {
     end
   end,
   PopulateData = function(self, win, set)
-    local class_filter = { self:GetName() }
   	local max = 0
   	local nr = 1
     
   	for pid, player in pairs(get_players(set)) do
-  		if tContains(class_filter,player.class) then
+  		if tContains(classFilter[self:GetName()],player.class) then
   		  local earned = player.earnedDKP or player.modedata.earnedDKP
   		  -- Only show people who have had any activity in the system...
   		  if earned > 0 then
@@ -175,8 +191,13 @@ local classModePrototype = {
     			d.label = player.name or EminentDKP:GetPlayerNameByID(pid)
     			d.value = player.currentDKP or player.modedata.currentDKP
     			d.class = string.upper(string.gsub(player.class,"%s*",""))
+    			-- Never show percent unless it is the alltime set, the percents are meaningless on individual days
+    			local showpercent = self.metadata.columns.Percent
+    			if set.sortnum ~= 1 then
+    			  showpercent = false
+  			  end
     			d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
-    			                              string.format("%02.1f%%", (d.value / self:GetSetSummary(set)) * 100), self.metadata.columns.Percent)
+    			                              EminentDKP:StdNumber((d.value / set.modedata[self:GetName()].currentDKP) * 100), showpercent)
     			if d.value > max then
     				max = d.value
     			end
@@ -213,6 +234,12 @@ local shamanMode = EminentDKP:NewModule(L["Shaman"],classModePrototype)
 local warlockMode = EminentDKP:NewModule(L["Warlock"],classModePrototype)
 local warriorMode = EminentDKP:NewModule(L["Warrior"],classModePrototype)
 
+local conqMode = EminentDKP:NewModule(L["Conqueror"],classModePrototype)
+local vanqMode = EminentDKP:NewModule(L["Vanquisher"],classModePrototype)
+local protMode = EminentDKP:NewModule(L["Protector"],classModePrototype)
+
+local allMode = EminentDKP:NewModule(L["All Classes"],classModePrototype)
+
 function balancemode:Enter(win, id, label)
   self.playerid = id
 	self.title = label..L["'s Earnings & Deductions"]
@@ -234,38 +261,30 @@ function balancemode:PopulateData(win, set)
   for i, eid in ipairs(get_events(set,self.playerid,event_filter_balance)) do
     local event = EminentDKP:GetEvent(eid)
     if event.eventType ~= 'vanityreset' then
-      if playerData.deductions[eid] then
+      local debits = {}
+      debits.e = playerData.earnings[eid]
+      debits.d = playerData.deductions[eid]
+      for debitType, amount in pairs(debits) do
         local d = win.dataset[nr] or {}
   			win.dataset[nr] = d
-  			d.id = "d:"..eid
+  			d.id = debitType..":"..eid
   			d.label = event.eventType:gsub("^%l", string.upper)
-  			d.value = playerData.deductions[eid]
-  			if event.eventType == 'transfer' then
+  			d.value = amount
+  			if event.eventType == 'transfer' or event.eventType == 'addplayer' then
+  			  local source = (debitType == 'd' and event.target or event.source)
   			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
-  			                                EminentDKP:GetPlayerNameByID(event.source), self.metadata.columns.Source)
+  			                                EminentDKP:GetPlayerNameByID(source), self.metadata.columns.Source)
 			  else
   			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
   			                                event.source, self.metadata.columns.Source)
 		    end
-  			d.icon = select(3,GetSpellInfo(28084)) -- negative charge icon
-  			d.color = red
-  			nr = nr + 1
-      end
-      if playerData.earnings[eid] then
-        local d = win.dataset[nr] or {}
-  			win.dataset[nr] = d
-  			d.id = "e:"..eid
-  			d.label = event.eventType:gsub("^%l", string.upper)
-  			d.value = playerData.earnings[eid]
-  			if event.eventType == 'transfer' then
-  			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
-  			                                EminentDKP:GetPlayerNameByID(event.source), self.metadata.columns.Source)
-			  else
-  			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
-  			                                event.source, self.metadata.columns.Source)
-		    end
-  			d.icon = select(3,GetSpellInfo(28059)) -- positive charge icon
-  			d.color = green
+		    if debitType == 'e' then
+		      d.color = green
+		      d.icon = select(3,GetSpellInfo(28059)) -- positive charge icon
+		    elseif debitType == 'd' then
+		      d.color = red
+		      d.icon = select(3,GetSpellInfo(28084)) -- negative charge icon
+	      end
   			nr = nr + 1
       end
     end

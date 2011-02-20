@@ -1,6 +1,7 @@
 EminentDKP = LibStub("AceAddon-3.0"):NewAddon("EminentDKP", "AceComm-3.0", "AceEvent-3.0", "AceTimer-3.0", "AceConsole-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("EminentDKP", false)
 local libCH = LibStub:GetLibrary("LibChatHandler-1.0")
+local media = LibStub("LibSharedMedia-3.0")
 libCH:Embed(EminentDKP)
 local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
@@ -11,24 +12,22 @@ local newest_version = ''
 local needs_update = false
 
 local function Debug(message)
-  EminentDKP:Print(message)
+  if false then
+    EminentDKP:Print(message)
+  end
 end
 
 --[[
 
 TODO:
 
-0. Move sets into corresponding pool, not profile
-1. Convert all dates into timestamps
- -- Day difference will be math.floor((timestamp1 - timestamp2) / 86400) 
-2. Convert permission level checks into hooks
+1. Convert permission level checks into hooks
  -- Simplify permissions, and refactor checks for less code overhead
-3. Cleanup meter display code and organize
-4. Get rid of numstring() in favor of FormatNumber
-5. Rip out boss detection code from Skada, use it as default bounty reason
-6. Rip out combat detection code from Skada, use it to unhide meter display
-7. Convert all static messages into localized messages
-8. Rebuild internal whisper functions to support either addon whispers or player whispers
+2. Cleanup meter display code and organize
+3. Rip out boss detection code from Skada, use it as default bounty reason
+4. Rip out combat detection code from Skada, use it to unhide meter display
+5. Convert all static messages into localized messages
+6. Rebuild internal whisper functions to support either addon whispers or player whispers
 
 
 ]]
@@ -74,7 +73,7 @@ end
 local function GetDaysSince(timestamp)
   return GetDaysBetween(time(),timestamp)
 end
-
+--[[
 local function GetTodayDateTime()
   local weekday, month, day, year = CalendarGetDate()
   local hour, minutes = GetGameTime()
@@ -91,6 +90,7 @@ local function GetDayDifference(date_one,date_two)
   return GetDayNumber(date_one) - GetDayNumber(date_two)
 end
 
+
 local function round(val, decimal)
   if (decimal) then
     return math.floor( (val * 10^decimal) + 0.5) / (10^decimal)
@@ -98,7 +98,7 @@ local function round(val, decimal)
     return math.floor(val+0.5)
   end
 end
-
+]]
 -- Formats a number into human readable form.
 function EminentDKP:FormatNumber(number)
 	if number then
@@ -109,12 +109,12 @@ function EminentDKP:FormatNumber(number)
 				return ("%02.1fK"):format(number / 1000)
 			end
 		else
-			return number
+			return self:StdNumber(number)
 		end
 	end
 end
 
-local function numstring(number)
+function EminentDKP:StdNumber(number)
   return string.format('%.02f', number)
 end
 
@@ -259,10 +259,9 @@ function Window:AddOptions()
         desc= L["Enter the name for the window."],
         get= function() return settings.name end,
         set= function(win, val)
-          if val ~= settings.name and val ~= "" then
+          if val ~= settings.name and val ~= "" and not EminentDKP:GetWindow(val) then
             settings.name = val
           end
-          EminentDKP:ApplySettings(win[2])
         end,
         order= 1,
       },
@@ -409,31 +408,12 @@ function Window:DisplayModes(setid)
 
 	self.metadata.title = L["EminentDKP: Modes"]
 
-	-- Find the selected set
-	-- todo: is this needed?
-	-- i imagine this is to check if we're loading into a set that doesn't exist anymore
+	-- Verify the selected set
 	if sets[setid] then
 	  self.selectedset = setid
   else
     self.selectedset = "alltime"
   end
-  --[[
-	if settime == "alltime" or settime == "today" then
-		self.selectedset = settime
-	else
-		for i, set in ipairs(sets) do
-			if tostring(set.starttime) == settime then
-				if set.name == L["Today"] then
-					self.selectedset = "today"
-				elseif set.name == L["All-time"] then
-					self.selectedset = "alltime"
-				else
-					self.selectedset = i
-				end
-			end
-		end
-	end
-	]]
 	
 	-- Save for posterity.
 	self.settings.mode = self.selectedmode
@@ -479,9 +459,11 @@ function Window:DisplaySets()
 	
 	self.metadata = {}
 	
-	self.selectedplayer = nil
 	self.selectedmode = nil
 	self.selectedset = nil
+	
+	self.settings.mode = self.selectedmode
+	self.settings.set = self.selectedset
 
 	self.metadata.title = L["EminentDKP: Days"]
 
@@ -593,6 +575,22 @@ function EminentDKP:CreateWindow(name, settings)
   end
 end
 
+-- Deleted named window from our windows table, and also from db.
+function EminentDKP:DeleteWindow(name)
+	for i, win in ipairs(windows) do
+		if win.settings.name == name then
+			win:destroy()
+			wipe(table.remove(windows, i))
+		end
+	end
+	for i, win in ipairs(self.db.profile.windows) do
+		if win.name == name then
+			table.remove(self.db.profile.windows, i)
+		end
+	end
+	self.options.args.windows.args[name] = nil
+end
+
 local function MarkPlayersSeen(seen, set, event)
   local sources = { event.source, event.target, event.beneficiary }
   
@@ -615,8 +613,10 @@ local function MarkPlayersSeen(seen, set, event)
       -- Seen this player in this set?
       if not seen[set.name][pid] then
         local player = EminentDKP:GetPlayerByID(pid)
-        table.insert(set.players, {id=pid,name=EminentDKP:GetPlayerNameByID(pid),class=player.class,modedata={}})
-        seen[set.name][pid] = true
+        if player.active then
+          table.insert(set.players, {id=pid,name=EminentDKP:GetPlayerNameByID(pid),class=player.class,modedata={}})
+          seen[set.name][pid] = true
+        end
       end
     end
   end
@@ -644,7 +644,7 @@ function EminentDKP:ReloadSettings()
 	-- if the day ends up being later than "today" then we move today to it's own new set
 	-- and start a new "today" with the event
 	-- for the total set... well... just re-fetch the data from the database, done.
-	if not next(sets) then
+	if not sets or not next(sets) then
 	  Debug("creating sets")
 	  local today = GetTodayDate()
 	  sets.alltime = createSet(L["All-time"])
@@ -657,22 +657,21 @@ function EminentDKP:ReloadSettings()
 	  for eventid = self:GetEventCount(), 1, -1 do
 	    local eid = tostring(eventid)
 	    local event = self:GetEvent(eid)
-	    local eventtime = convertToTimestamp(event.datetime)
-	    local diff = GetDaysSince(eventtime)
+	    local diff = GetDaysSince(event.datetime)
 	    if eventid > 0 and diff <= self.db.profile.daystoshow then
-	      local date = GetDate(eventtime)
+	      local date = GetDate(event.datetime)
 	      if sets.today.date == date then
 	        table.insert(sets.today.events,eid)
-          sets.today.starttime = eventtime
+          sets.today.starttime = event.datetime
           MarkPlayersSeen(eventHash, sets.today, event)
         elseif sets[date] then
           table.insert(sets[date].events,eid)
-          sets[date].starttime = eventtime
+          sets[date].starttime = event.datetime
           MarkPlayersSeen(eventHash, sets[date], event)
         else
           Debug("creating set: "..date)
           local set = createSet(date)
-          set.endtime = eventtime
+          set.endtime = event.datetime
           table.insert(set.events, eid)
 	        sets[date] = set
 	        MarkPlayersSeen(eventHash, set, event)
@@ -844,39 +843,6 @@ function EminentDKP:UpdateDisplay(force)
 	meterChanged = false
 end
 
--- Attempts to restore a view (set and mode).
--- Set is either the set name ("total", "current"), or an index.
--- Mode is the name of a mode.
---[[
-function EminentDKP:RestoreView(win, theset, themode)
-	-- Set the... set. If no such set exists, set to current.
-	if theset and type(theset) == "string" and (theset == "today" or theset == "alltime" or theset == "last") then
-		win.selectedset = theset
-	elseif theset and type(theset) == "number" and theset <= #(sets) then
-		win.selectedset = theset
-	else
-		win.selectedset = "alltime"
-	end
-	
-	-- Force an update.
-	meterChanged = true
-	
-	-- Find the mode. The mode may not actually be available.
-	if themode then
-		local mymode = find_mode(themode)
-	
-		-- If the mode exists, switch to this mode.
-		-- If not, show modes.
-		if mymode then
-			win:DisplayMode(mymode)
-		else
-			win:DisplayModes(win.selectedset)
-		end
-	else
-		win:DisplayModes(win.selectedset)
-	end
-end
-]]
 local function scan_for_columns(mode)
 	-- Only process if not already scanned.
 	if not mode.scanned then
@@ -1003,6 +969,29 @@ end
 
 -- Setup basic info and get database from saved variables
 function EminentDKP:OnInitialize()
+  -- Register the SharedMedia
+	media:Register("font", "Adventure",				[[Interface\Addons\EminentDKP\fonts\Adventure.ttf]])
+	media:Register("font", "ABF",					[[Interface\Addons\EminentDKP\fonts\ABF.ttf]])
+	media:Register("font", "Vera Serif",			[[Interface\Addons\EminentDKP\fonts\VeraSe.ttf]])
+	media:Register("font", "Diablo",				[[Interface\Addons\EminentDKP\fonts\Avqest.ttf]])
+	media:Register("font", "Accidental Presidency",	[[Interface\Addons\EminentDKP\fonts\Accidental Presidency.ttf]])
+	media:Register("statusbar", "Aluminium",		[[Interface\Addons\EminentDKP\statusbar\Aluminium]])
+	media:Register("statusbar", "Armory",			[[Interface\Addons\EminentDKP\statusbar\Armory]])
+	media:Register("statusbar", "BantoBar",			[[Interface\Addons\EminentDKP\statusbar\BantoBar]])
+	media:Register("statusbar", "Glaze2",			[[Interface\Addons\EminentDKP\statusbar\Glaze2]])
+	media:Register("statusbar", "Gloss",			[[Interface\Addons\EminentDKP\statusbar\Gloss]])
+	media:Register("statusbar", "Graphite",			[[Interface\Addons\EminentDKP\statusbar\Graphite]])
+	media:Register("statusbar", "Grid",				[[Interface\Addons\EminentDKP\statusbar\Grid]])
+	media:Register("statusbar", "Healbot",			[[Interface\Addons\EminentDKP\statusbar\Healbot]])
+	media:Register("statusbar", "LiteStep",			[[Interface\Addons\EminentDKP\statusbar\LiteStep]])
+	media:Register("statusbar", "Minimalist",		[[Interface\Addons\EminentDKP\statusbar\Minimalist]])
+	media:Register("statusbar", "Otravi",			[[Interface\Addons\EminentDKP\statusbar\Otravi]])
+	media:Register("statusbar", "Outline",			[[Interface\Addons\EminentDKP\statusbar\Outline]])
+	media:Register("statusbar", "Perl",				[[Interface\Addons\EminentDKP\statusbar\Perl]])
+	media:Register("statusbar", "Smooth",			[[Interface\Addons\EminentDKP\statusbar\Smooth]])
+	media:Register("statusbar", "Round",			[[Interface\Addons\EminentDKP\statusbar\Round]])
+	media:Register("statusbar", "TukTex",			[[Interface\Addons\EminentDKP\statusbar\normTex]])
+  
   -- DB
 	self.db = LibStub("AceDB-3.0"):New("EminentDKPDB", self.defaults, "Default")
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("EminentDKP", self.options)
@@ -1045,11 +1034,34 @@ function EminentDKP:OnInitialize()
     GuildRoster()
   end
   
+  self:DatabaseUpdate()
   self:ReloadSettings()
   
   -- Since SharedMedia doesn't finish loading until after this executes, we need to re-apply
   -- the settings again to ensure everything is how it should be, an unfortunate work-around...
   self:ScheduleTimer("ApplySettingsAll", 2)
+end
+
+-- DATABASE UPDATES
+function EminentDKP:DatabaseUpdate()
+  for name, pool in pairs(self.db.factionrealm.pools) do
+    if not pool.revision or pool.revision < 1 then
+      self:Print("Applying database revision 1 to pool: "..name)
+      -- Convert player classes to English classes
+      -- Convert all datetimes to timestamps
+      for pid, playerdata in pairs(pool.players) do
+        self.db.factionrealm.pools[name].players[pid].class = select(2,UnitClass(self:GetPlayerNameByID(pid))) or string.upper(string.gsub(playerdata.class,"%s*",""))
+        self.db.factionrealm.pools[name].players[pid].lastRaid = convertToTimestamp(playerdata.lastRaid)
+      end
+      for eid, eventdata in pairs(pool.events) do
+        self.db.factionrealm.pools[name].events[eid].datetime = convertToTimestamp(eventdata.datetime)
+      end
+      if self.db.factionrealm.pools[name].lastScan ~= 0 then
+        self.db.factionrealm.pools[name].lastScan = convertToTimestamp(self.db.factionrealm.pools[name].lastScan)
+      end
+      pool.revision = 1
+    end
+  end
 end
 
 -- DATABASE CONVERSION UPDATE FOR VERSIONS < 2.0.0
@@ -1063,7 +1075,7 @@ function EminentDKP:GUILD_ROSTER_UPDATE()
         if name == nil then
           break
         elseif Standings[name] then
-          classes[name]  = class
+          classes[name] = select(2,UnitClass(name))
         end
       end
   
@@ -1072,7 +1084,7 @@ function EminentDKP:GUILD_ROSTER_UPDATE()
           sendchat('Could not import '..name..' (they do not exist in the guild)',nil,'self')
         else
           sendchat('Importing '..name..'...',nil,'self')
-          self:CreateAddPlayerEvent(name,classes[name],data["CurrentDKP"],data["LifetimeDKP"],GetTodayDateTime())
+          self:CreateAddPlayerEvent(name,classes[name],data["CurrentDKP"],data["LifetimeDKP"],time())
         end
       end
       sendchat('Conversion complete.',nil,'self')
@@ -1491,7 +1503,7 @@ function EminentDKP:GetAvailableBounty()
 end
 
 function EminentDKP:GetAvailableBountyPercent()
-  return round((self:GetAvailableBounty()/self:GetTotalBounty())*100,2)
+  return self:StdNumber((self:GetAvailableBounty()/self:GetTotalBounty())*100)
 end
 
 -- Construct list of players currently in the raid
@@ -1582,7 +1594,7 @@ function EminentDKP:SyncEvent(eventID)
 end
 
 function EminentDKP:CreateAddPlayerSyncEvent(name,className)
-  self:SyncEvent(self:CreateAddPlayerEvent(name,className,0,0,GetTodayDateTime()))
+  self:SyncEvent(self:CreateAddPlayerEvent(name,className,0,0,time()))
 end
 
 -- Add a player to the active pool
@@ -1617,13 +1629,13 @@ function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
   if vanitydkp > 0 and vanitydkp > dkp then
     self:CreatePlayerEarning(pid,cid,vanitydkp,true)
     if dkp > 0 then
-      self:CreatePlayerDeduction(pid,cid,round((vanitydkp-dkp),2))
+      self:CreatePlayerDeduction(pid,cid,(vanitydkp-dkp))
     end
     self:DecreaseAvailableBounty(dkp)
   elseif vanitydkp > 0 and vanitydkp <= dkp then
     self:CreatePlayerEarning(pid,cid,dkp,true)
     if vanitydkp < dkp then
-      self:CreatePlayerVanityDeduction(pid,cid,round((dkp-vanitydkp),2))
+      self:CreatePlayerVanityDeduction(pid,cid,(dkp-vanitydkp))
     end
     self:DecreaseAvailableBounty(vanitydkp)
   elseif vanitydkp == 0 and dkp > 0 then
@@ -1635,7 +1647,7 @@ function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
 end
 
 function EminentDKP:CreateBountySyncEvent(players,amount,srcName)
-  self:SyncEvent(self:CreateBountyEvent(players,amount,srcName,GetTodayDateTime()))
+  self:SyncEvent(self:CreateBountyEvent(players,amount,srcName,time()))
 end
 
 function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
@@ -1646,7 +1658,7 @@ function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
   self:DecreaseAvailableBounty(amount)
   
   -- Then create all the necessary earnings for players
-  local dividend = round((amount/#(players)),2)
+  local dividend = (amount/#(players))
   for i,pid in ipairs(players) do
     self:CreatePlayerEarning(pid,cid,dividend,true)
     self:UpdateLastPlayerRaid(pid,dtime)
@@ -1656,7 +1668,7 @@ function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
 end
 
 function EminentDKP:CreateAuctionSyncEvent(players,to,amount,srcName,srcExtra)
-  self:SyncEvent(self:CreateAuctionEvent(players,to,amount,srcName,srcExtra,GetTodayDateTime()))
+  self:SyncEvent(self:CreateAuctionEvent(players,to,amount,srcName,srcExtra,time()))
 end
 
 function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
@@ -1671,7 +1683,7 @@ function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
   self:UpdateLastPlayerRaid(pid,dtime)
   
   -- Then create all the necessary earnings for players
-  local dividend = round((amount/#(players)),2)
+  local dividend = (amount/#(players))
   for i,rpid in ipairs(players) do
     self:CreatePlayerEarning(rpid,cid,dividend,true)
     self:UpdateLastPlayerRaid(rpid,dtime)
@@ -1681,7 +1693,7 @@ function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
 end
 
 function EminentDKP:CreateTransferSyncEvent(from,to,amount)
-  self:SyncEvent(self:CreateTransferEvent(from,to,amount,GetTodayDateTime()))
+  self:SyncEvent(self:CreateTransferEvent(from,to,amount,time()))
 end
 
 function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
@@ -1702,7 +1714,7 @@ function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
 end
 
 function EminentDKP:CreateExpirationSyncEvent(player)
-  self:SyncEvent(self:CreateExpirationEvent(player,GetTodayDateTime()))
+  self:SyncEvent(self:CreateExpirationEvent(player,time()))
 end
 
 function EminentDKP:CreateExpirationEvent(player,dtime)
@@ -1728,7 +1740,7 @@ function EminentDKP:CreateExpirationEvent(player,dtime)
 end
 
 function EminentDKP:CreateVanityResetSyncEvent(player)
-  self:SyncEvent(self:CreateVanityResetEvent(player,GetTodayDateTime()))
+  self:SyncEvent(self:CreateVanityResetEvent(player,time()))
 end
 
 function EminentDKP:CreateVanityResetEvent(player,dtime)
@@ -1749,7 +1761,7 @@ function EminentDKP:CreateVanityResetEvent(player,dtime)
 end
 
 function EminentDKP:CreateRenameSyncEvent(from,to)
-  self:SyncEvent(self:CreateRenameEvent(from,to,GetTodayDateTime()))
+  self:SyncEvent(self:CreateRenameEvent(from,to,time()))
 end
 
 function EminentDKP:CreateRenameEvent(from,to,dtime)
@@ -1806,15 +1818,15 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
   if self.db.profile.hidecombat then self:ToggleMeters(false) end
   
   if self:AmOfficer() and self.amMasterLooter then
-    if self:GetLastScan() == '' or GetDayDifference(self:GetLastScan(),GetTodayDateTime()) < 0 then
+    if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) < 0 then
       sendchat('Performing database scan...', nil, 'self')
       for pid,data in pairs(self.db.factionrealm.pools[self.db.profile.activepool].players) do
         if data.active then
-          local days = math.floor(GetDayDifference(GetTodayDateTime(),data.lastRaid))
+          local days = math.floor(GetDaysSince(data.lastRaid))
           if days >= self.db.profile.expiretime then
             -- If deemed inactive then reset their DKP and vanity DKP
             local name = self:GetPlayerNameByID(pid)
-            sendchat('The DKP for '..name..' has expired. Bounty has increased by '..numstring(data.currentDKP)..' DKP.', "raid", "preset")
+            sendchat('The DKP for '..name..' has expired. Bounty has increased by '..self:StdNumber(data.currentDKP)..' DKP.', "raid", "preset")
             self:CreateExpirationSyncEvent(name)
           end
         end
@@ -1822,8 +1834,8 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
       if self:GetAvailableBountyPercent() > 50 then
         sendchat('There is more than 50% of the bounty available, you should distribute some.', nil, 'self')
       end
-      sendchat('Current bounty is '..numstring(self:GetAvailableBounty())..' DKP.', "raid", "preset")
-      self.db.factionrealm.pools[self.db.profile.activepool].lastScan = GetTodayDateTime()
+      sendchat('Current bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
+      self.db.factionrealm.pools[self.db.profile.activepool].lastScan = time()
       self:PrintStandings()
     end
   end
@@ -1839,7 +1851,7 @@ function EminentDKP:RAID_ROSTER_UPDATE()
   for d = 1, GetNumRaidMembers() do
 		name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(d)
 		if not self:PlayerExistsInPool(name) then
-		  self:CreateAddPlayerSyncEvent(name,class)
+		  self:CreateAddPlayerSyncEvent(name,select(2,UnitClass(name)))
 		end
 	end
 end
@@ -1949,7 +1961,7 @@ function EminentDKP:PrintStandings()
   
   sendchat('Current DKP standings:', "raid", "preset")
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..numstring(data.dkp), "raid", "preset")
+    sendchat(rank..'. '..data.n..' - '..self:StdNumber(data.dkp), "raid", "preset")
   end
 end
 
@@ -1958,7 +1970,7 @@ function EminentDKP:WhisperStandings(to)
   
   sendchat('Current DKP standings:', to, 'whisper')
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..numstring(data.dkp), to, 'whisper')
+    sendchat(rank..'. '..data.n..' - '..self:StdNumber(data.dkp), to, 'whisper')
   end
 end
 
@@ -1967,7 +1979,7 @@ function EminentDKP:WhisperLifetime(to)
   
   sendchat('Lifetime Earned DKP standings:', to, 'whisper')
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..numstring(data.dkp), to, 'whisper')
+    sendchat(rank..'. '..data.n..' - '..self:StdNumber(data.dkp), to, 'whisper')
   end
 end
 
@@ -2005,17 +2017,17 @@ function EminentDKP:WhisperTransfer(amount, to, from)
 end
 
 function EminentDKP:WhisperBounty(to)
-  sendchat('The current bounty is '..numstring(self:GetAvailableBounty())..' DKP.', to, 'whisper')
+  sendchat('The current bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', to, 'whisper')
 end
 
 function EminentDKP:WhisperCheck(who, to)
   if self:PlayerExistsInPool(who) then
     local data = self:GetPlayer(who)
-    local days =  math.floor(GetDayDifference(GetTodayDateTime(),data.lastRaid))
+    local days =  math.floor(GetDaysSince(data.lastRaid))
     sendchat('Player Report for '..who, to, 'whisper')
-    sendchat('Current DKP: '..numstring(data.currentDKP), to, 'whisper')
-    sendchat('Lifetime DKP: '..numstring(data.earnedDKP), to, 'whisper')
-    sendchat('Vanity DKP: '..numstring(data.currentVanityDKP), to, 'whisper')
+    sendchat('Current DKP: '..self:StdNumber(data.currentDKP), to, 'whisper')
+    sendchat('Lifetime DKP: '..self:StdNumber(data.earnedDKP), to, 'whisper')
+    sendchat('Vanity DKP: '..self:StdNumber(data.currentVanityDKP), to, 'whisper')
     sendchat('Last Raid: '..days..' day(s) ago.', to, 'whisper')
   else
     sendchat(who.." does not exist in the DKP pool.", to, 'whisper')
@@ -2132,11 +2144,11 @@ function EminentDKP:AuctionBidTimer()
       
       -- Construct list of players to receive dkp
       local players = self:GetCurrentRaidMembersIDs()
-      local dividend = round((secondHighestBid/#(players)),2)
+      local dividend = (secondHighestBid/#(players))
       
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
       sendchat(looter..' has won '..GetLootSlotLink(self.bidItem.slotNum)..' for '..secondHighestBid..' DKP!', "raid", "preset")
-      sendchat('Each player has received '..dividend..' DKP.', "raid", "preset")
+      sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
     end
     
     -- Distribute the loot
@@ -2176,13 +2188,13 @@ function EminentDKP:AdminDistributeBounty(percent,reason)
           name = reason
         end
       end
-      local amount = round((self:GetAvailableBounty() * (p/100)),2)
-      local dividend = round((amount/#(players)),2)
+      local amount = (self:GetAvailableBounty() * (p/100))
+      local dividend = (amount/#(players))
       
       self:CreateBountySyncEvent(players,amount,name)
-      sendchat('A bounty of '..amount..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
-      sendchat('Each player has received '..dividend..' DKP.', "raid", "preset")
-      sendchat('New bounty is '..numstring(self:GetAvailableBounty())..' DKP.', "raid", "preset")
+      sendchat('A bounty of '..self:StdNumber(amount)..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
+      sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
+      sendchat('New bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
     else
       sendchat('You must enter a percent between 0 and 100.', nil, 'self')
     end
