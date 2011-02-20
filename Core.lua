@@ -1,4 +1,4 @@
-EminentDKP = LibStub("AceAddon-3.0"):NewAddon("EminentDKP", "AceComm-3.0", "AceEvent-3.0", "AceTimer-3.0", "AceConsole-3.0")
+EminentDKP = LibStub("AceAddon-3.0"):NewAddon("EminentDKP", "AceComm-3.0", "AceEvent-3.0", "AceTimer-3.0", "AceConsole-3.0", "AceHook-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("EminentDKP", false)
 local libCH = LibStub:GetLibrary("LibChatHandler-1.0")
 local media = LibStub("LibSharedMedia-3.0")
@@ -45,11 +45,6 @@ local modes = {}
 -- todo: this probably isn't needed anymore
 local meterChanged = true
 
-local officer_cmds = { bounty = true, auction = true, rename = true,
-                     reset = true, vanity = true, transfer = true,
-                     bid = true }
-local ml_cmds = { bid = true, auction = true, transfer = true, rename = true }
-
 local auction_active = false
 
 local recent_loots = {}
@@ -58,12 +53,12 @@ local eligible_looters = {}
 
 local events_cache = {}
 
-local function GetTodayDate()
-  return date("%x")
-end
-
 local function GetDate(timestamp)
   return date("%x",timestamp)
+end
+
+local function GetTodayDate()
+  return GetDate(time())
 end
 
 local function GetDaysBetween(this,that)
@@ -73,32 +68,7 @@ end
 local function GetDaysSince(timestamp)
   return GetDaysBetween(time(),timestamp)
 end
---[[
-local function GetTodayDateTime()
-  local weekday, month, day, year = CalendarGetDate()
-  local hour, minutes = GetGameTime()
-  return hour .. ":" .. minutes .. " " .. month .. "/" .. day .. "/" .. year
-end
 
-local function GetDayNumber(datetime)
-  local time, date = strsplit(' ',datetime)
-  local month, day, year = strsplit('/',date)
-  return ((year-2010)*365.25)+((month-1)*30.4375)+day
-end
-
-local function GetDayDifference(date_one,date_two)
-  return GetDayNumber(date_one) - GetDayNumber(date_two)
-end
-
-
-local function round(val, decimal)
-  if (decimal) then
-    return math.floor( (val * 10^decimal) + 0.5) / (10^decimal)
-  else
-    return math.floor(val+0.5)
-  end
-end
-]]
 -- Formats a number into human readable form.
 function EminentDKP:FormatNumber(number)
 	if number then
@@ -381,7 +351,7 @@ function Window:DisplayMode(mode)
 	self.settings.mode = name
 	self.metadata.title = name
 
-	EminentDKP:UpdateDisplay(true)
+	EminentDKP:UpdateDisplay(self,true)
 end
 
 local function click_on_mode(win, id, label, button)
@@ -423,7 +393,7 @@ function Window:DisplayModes(setid)
 	self.metadata.maxvalue = 1
 	--self.metadata.sortfunc = function(a,b) return a.name < b.name end
 
-	EminentDKP:UpdateDisplay(true)
+	EminentDKP:UpdateDisplay(self,true)
 end
 
 local function click_on_set(win, id, label, button)
@@ -475,18 +445,18 @@ function Window:DisplaySets()
     return a.starttime > b.starttime
   end
 	
-	EminentDKP:UpdateDisplay(true)
+	EminentDKP:UpdateDisplay(self,true)
 end
 
 function Window:get_selected_set()
-  return sets[self.selectedset] and sets[self.selectedset] or sets.alltime
+  if sets[self.selectedset] then
+    return sets[self.selectedset]
+  end
+  return sets.alltime
 end
 
 -- Ask a mode to verify the contents of a set.
 local function verify_set(mode, set)
-	if mode.AddSetAttributes ~= nil then
-		mode:AddSetAttributes(set)
-	end
 	for j, player in ipairs(set.players) do
 		if mode.AddPlayerAttributes ~= nil then
 			mode:AddPlayerAttributes(player)
@@ -681,15 +651,7 @@ function EminentDKP:ReloadSettings()
       end
     end
     
-    -- For each set, give each mode a chance to calculate the data they need
-    -- todo: find a better place to call the verification
-    for setid, set in pairs(sets) do
-      for j, mode in ipairs(modes) do
-        Debug("verifying mode: "..mode:GetName().." with set: "..set.name)
-        verify_set(mode, set)
-			end
-			set.changed = false
-    end
+    self:VerifyAllSets()
   else
     Debug("checking if todayset is actually today")
     -- verify sets (check if Today is actually today)
@@ -706,10 +668,7 @@ function EminentDKP:ReloadSettings()
     	  sets.today.date = today
     	  sets.today.sortnum = 2
   	  
-        for j, mode in ipairs(modes) do
-          verify_set(mode, sets.today)
-  			end
-  			sets.today.changed = false
+  	    self:VerifySet(sets.today)
   		else
   		  sets.today.date = date
 		  end
@@ -722,6 +681,21 @@ function EminentDKP:ReloadSettings()
 	  Debug("creating window: "..win.name)
 		self:CreateWindow(win.name, win)
 	end
+end
+
+-- For a set, give each mode a chance to calculate the data they need
+function EminentDKP:VerifySet(set)
+  for j, mode in ipairs(modes) do
+    verify_set(mode, set)
+	end
+	set.changed = false
+end
+
+-- For every set, have each mode verify their data
+function EminentDKP:VerifyAllSets()
+  for setid, set in pairs(sets) do
+    self:VerifySet(set)
+  end
 end
 
 function EminentDKP:ApplySettingsAll()
@@ -751,7 +725,7 @@ function EminentDKP:ApplySettings(win)
 		end
 	end
   
-	self:UpdateDisplay(true)
+	self:UpdateDisplay(win,true)
 end
 
 -- Called before dataset is updated.
@@ -761,7 +735,13 @@ function Window:UpdateInProgress()
 	end
 end
 
-function EminentDKP:UpdateDisplay(force)
+function EminentDKP:UpdateAllDisplays(force)
+  for i, win in ipairs(windows) do
+    self:UpdateDisplay(win, force)
+  end
+end
+
+function EminentDKP:UpdateDisplay(win, force)
   Debug("entering UpdateDisplay")
   -- Force an update by setting our "changed" flag to true.
 	if force then
@@ -772,71 +752,69 @@ function EminentDKP:UpdateDisplay(force)
 	if not meterChanged then
 		return
 	end
-
-	for i, win in ipairs(windows) do
-		if win.selectedmode then
-		  Debug("showing a selectedmode: "..win.selectedmode:GetName())
-			local set = win:get_selected_set()
-			
-			-- If we have a set, go on.
-			-- todo: do we need to check for a set?
-			if set then
-				-- Inform window that a data update will take place.
-				-- todo: is this needed?
-				win:UpdateInProgress()
-			
-				-- Let mode update data.
-				if win.selectedmode.PopulateData then
-					win.selectedmode:PopulateData(win, set)
-				else
-					self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
-				end
-				
-				-- Let window display the data.
-				win:UpdateDisplay()
+  
+	if win.selectedmode then
+	  Debug("showing a selectedmode: "..win.selectedmode:GetName())
+		local set = win:get_selected_set()
+		
+		-- If we have a set, go on.
+		-- todo: do we need to check for a set?
+		if set then
+			-- Inform window that a data update will take place.
+			-- todo: is this needed?
+			win:UpdateInProgress()
+		
+			-- Let mode update data.
+			if win.selectedmode.PopulateData then
+				win.selectedmode:PopulateData(win, set)
+			else
+				self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
 			end
-		elseif win.selectedset then
-		  Debug("showing a selectedset: "..win.selectedset)
-			local set = win:get_selected_set()
 			
-			-- View available modes.
-			for i, mode in ipairs(modes) do
-				local d = win.dataset[i] or {}
-				win.dataset[i] = d
-				d.id = mode:GetName()
-				d.label = mode:GetName()
-				d.value = 1
-				if set and mode.GetSetSummary ~= nil then
-					d.valuetext = mode:GetSetSummary(set)
-				end
-			end
-			-- Tell window to sort by our data order. Our modes are in alphabetical order already.
-			win.metadata.ordersort = true
-			-- Let window display the data.
-			win:UpdateDisplay()
-		else
-			-- View available sets.
-			local nr = 0
-			
-			Debug("showing all sets")
-      
-			for setid, set in pairs(sets) do
-				nr = nr + 1
-				local d = win.dataset[nr] or {}
-				win.dataset[nr] = d
-				d.id = setid
-				d.label = set.name
-				d.value = 1
-				d.sortnum = set.sortnum
-				d.starttime = set.starttime
-				if set.starttime > 0 then
-				  d.valuetext = date("%H:%M",set.starttime).." - "..date("%H:%M",set.endtime)
-			  end
-			end
-			win.metadata.ordersort = true
 			-- Let window display the data.
 			win:UpdateDisplay()
 		end
+	elseif win.selectedset then
+	  Debug("showing a selectedset: "..win.selectedset)
+		local set = win:get_selected_set()
+		
+		-- View available modes.
+		for i, mode in ipairs(modes) do
+			local d = win.dataset[i] or {}
+			win.dataset[i] = d
+			d.id = mode:GetName()
+			d.label = mode:GetName()
+			d.value = 1
+			if set and mode.GetSetSummary ~= nil then
+				d.valuetext = mode:GetSetSummary(set)
+			end
+		end
+		-- Tell window to sort by our data order. Our modes are in alphabetical order already.
+		win.metadata.ordersort = true
+		-- Let window display the data.
+		win:UpdateDisplay()
+	else
+		-- View available sets.
+		local nr = 0
+		
+		Debug("showing all sets")
+    
+		for setid, set in pairs(sets) do
+			nr = nr + 1
+			local d = win.dataset[nr] or {}
+			win.dataset[nr] = d
+			d.id = setid
+			d.label = set.name
+			d.value = 1
+			d.sortnum = set.sortnum
+			d.starttime = set.starttime
+			if set.starttime > 0 then
+			  d.valuetext = date("%H:%M",set.starttime).." - "..date("%H:%M",set.endtime)
+		  end
+		end
+		win.metadata.ordersort = true
+		-- Let window display the data.
+		win:UpdateDisplay()
 	end
 	
 	-- Mark as unchanged.
@@ -887,7 +865,7 @@ function EminentDKP:AddMode(mode)
 	end
 	
 	-- Sort modes.
-	table.sort(modes, function(a, b) return a.name < b.name end)
+	table.sort(modes, function(a, b) return a.sortnum < b.sortnum or (not (b.sortnum < a.sortnum) and a.name < b.name) end)
 end
 
 -- Unregister a mode.
@@ -1030,10 +1008,6 @@ function EminentDKP:OnInitialize()
   self.requestedEvents = {}
   self.requestCooldown = false
   
-  if self:GetEventCount() == 0 and Standings then
-    GuildRoster()
-  end
-  
   self:DatabaseUpdate()
   self:ReloadSettings()
   
@@ -1064,37 +1038,6 @@ function EminentDKP:DatabaseUpdate()
   end
 end
 
--- DATABASE CONVERSION UPDATE FOR VERSIONS < 2.0.0
-function EminentDKP:GUILD_ROSTER_UPDATE()
-  if self:GetEventCount() == 0 and Standings then
-    if self:AmOfficer() then
-      sendchat('Older database found, attempting to convert...',nil,'self')
-      classes = {}
-      for i = 1, 1000 do
-        local name, rank, rankIndex, level, class = GetGuildRosterInfo(i)
-        if name == nil then
-          break
-        elseif Standings[name] then
-          classes[name] = select(2,UnitClass(name))
-        end
-      end
-  
-      for name,data in pairs(Standings) do
-        if not classes[name] then
-          sendchat('Could not import '..name..' (they do not exist in the guild)',nil,'self')
-        else
-          sendchat('Importing '..name..'...',nil,'self')
-          self:CreateAddPlayerEvent(name,classes[name],data["CurrentDKP"],data["LifetimeDKP"],time())
-        end
-      end
-      sendchat('Conversion complete.',nil,'self')
-      Standings = nil
-    else
-      Standings = nil
-    end
-  end
-end
-
 function EminentDKP:OnEnable()
 	self:RegisterEvent("PLAYER_ENTERING_WORLD") -- version broadcast
 	self:RegisterChatEvent("CHAT_MSG_WHISPER") -- whisper commands received
@@ -1104,7 +1047,6 @@ function EminentDKP:OnEnable()
 	self:RegisterEvent("PARTY_LOOT_METHOD_CHANGED") -- masterloot change
 	self:RegisterEvent("RAID_ROSTER_UPDATE") -- raid member list update
 	self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
-	self:RegisterEvent("GUILD_ROSTER_UPDATE") -- database conversion
 	self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
 	-- Sync methods
 	self:RegisterComm("EminentDKP-Proposal", "ProcessSyncProposal")
@@ -1112,6 +1054,51 @@ function EminentDKP:OnEnable()
 	self:RegisterComm("EminentDKP-Request", "ProcessSyncRequest")
 	self:RegisterComm("EminentDKP-Version", "ProcessSyncVersion")
 	self:RegisterComm("EminentDKP", "ProcessSyncEvent")
+	-- Permission Hooks
+	self:RawHook(self,"AdminStartAuction","EnsureMasterlooter")
+	self:RawHook(self,"AdminDistributeBounty","EnsureOfficership")
+	self:RawHook(self,"AdminVanityReset","EnsureOfficership")
+	self:RawHook(self,"AdminVanityRoll","EnsureOfficership")
+	self:RawHook(self,"AdminRename","EnsureOfficership")
+	
+	-- need hook for:
+	-- self:Bid(arg1,from)
+	-- self:WhisperTransfer(arg1,arg2,from)
+	--[[
+	if self.lootMethod ~= 'master' then
+    sendchat("Master looting must be enabled.", from, 'whisper')
+    return
+  end
+  if self.masterLooterPartyID ~= 0 then
+    sendchat("That command must be sent to the master looter.", from, 'whisper')
+    return
+  end
+	]]
+end
+
+function EminentDKP:EnsureOfficership(...)
+  -- Check if the command can only be used by an officer
+  if not self:AmOfficer() then
+    sendchat("That command can only be used by an officer.", nil, 'self')
+    return
+  end
+  self.hooks["EnsureOfficership"](...)
+end
+
+function EminentDKP:EnsureMasterlooter(...)
+  if not self:AmOfficer() then
+    sendchat("That command can only be used by an officer.", nil, 'self')
+    return
+  end
+  if self.lootMethod ~= 'master' then
+    sendchat("Master looting must be enabled.", nil, 'self')
+    return
+  end
+  if not self.amMasterLooter then
+    sendchat("Only the master looter can use this command.", nil, 'self')
+    return
+  end
+  self.hooks["EnsureMasterlooter"](...)
 end
 
 function EminentDKP:OnDisable()
@@ -1438,7 +1425,7 @@ end
 
 -- Return the data for a given player
 function EminentDKP:GetPlayer(name)
-  local pid = self:GetPlayerID(name)
+  local pid = self:GetPlayerIDByName(name)
   if pid then
     return self.db.factionrealm.pools[self.db.profile.activepool].players[pid]
   end
@@ -1449,8 +1436,16 @@ function EminentDKP:GetPlayerByID(pid)
   return self.db.factionrealm.pools[self.db.profile.activepool].players[pid]
 end
 
+function EminentDKP:GetPlayerByName(name)
+  local pid = self:GetPlayerIDByName(name)
+  if pid then
+    return self:GetPlayerByID(pid)
+  end
+  return nil
+end
+
 -- Get a player's ID
-function EminentDKP:GetPlayerID(name)
+function EminentDKP:GetPlayerIDByName(name)
   if self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[name] then
     return self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[name]
   end
@@ -1469,7 +1464,7 @@ end
 
 -- Check whether or not a player exists in the currently active pool
 function EminentDKP:PlayerExistsInPool(player)
-  if self:GetPlayerID(player) then
+  if self:GetPlayerIDByName(player) then
     return true
   end
   return false
@@ -1483,11 +1478,29 @@ end
 
 -- Check if a player has a certain amount of DKP
 function EminentDKP:PlayerHasDKP(player,amount)
-  local pid = self:GetPlayerID(player)
+  local pid = self:GetPlayerIDByName(player)
   if self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP >= amount then
     return true
   end
   return false
+end
+
+function EminentDKP:GetMyCurrentDKP()
+  local player = self:GetPlayerByName(self.myName)
+  if player then
+    return player.currentDKP
+  end
+  return nil
+end
+
+function EminentDKP:GetOtherPlayersNames()
+  local list = {}
+  for name,id in pairs(self.db.factionrealm.pools[self.db.profile.activepool].playerIDs) do
+    if name ~= self.myName then
+      list[name] = name
+    end
+  end
+  return list
 end
 
 function EminentDKP:GetPlayerPool()
@@ -1512,7 +1525,7 @@ function EminentDKP:GetCurrentRaidMembers()
   for spot = 1, 40 do
     local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(spot);
 		if name then
-		  players[self:GetPlayerID(name)] = self:GetPlayer(name)
+		  players[self:GetPlayerIDByName(name)] = self:GetPlayer(name)
 		end
   end
   return players
@@ -1524,7 +1537,7 @@ function EminentDKP:GetCurrentRaidMembersIDs()
   for spot = 1, 40 do
     local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(spot);
 		if name then
-		  table.insert(players,self:GetPlayerID(name))
+		  table.insert(players,self:GetPlayerIDByName(name))
 		end
   end
   return players
@@ -1672,7 +1685,7 @@ function EminentDKP:CreateAuctionSyncEvent(players,to,amount,srcName,srcExtra)
 end
 
 function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
-  local pid = self:GetPlayerID(to)
+  local pid = self:GetPlayerIDByName(to)
   -- Create the event
   local cid = self:CreateEvent(srcName,"auction",srcExtra,pid,implode(',',players),amount,dtime)
   
@@ -1697,8 +1710,8 @@ function EminentDKP:CreateTransferSyncEvent(from,to,amount)
 end
 
 function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
-  local pfid = self:GetPlayerID(from)
-  local ptid = self:GetPlayerID(to)
+  local pfid = self:GetPlayerIDByName(from)
+  local ptid = self:GetPlayerIDByName(to)
   
   -- Create the event
   local cid = self:CreateEvent(pfid,"transfer","",ptid,"",amount,dtime)
@@ -1718,7 +1731,7 @@ function EminentDKP:CreateExpirationSyncEvent(player)
 end
 
 function EminentDKP:CreateExpirationEvent(player,dtime)
-  local pid = self:GetPlayerID(player)
+  local pid = self:GetPlayerIDByName(player)
   local pdata = self:GetPlayer(player)
   local dkpAmt = pdata.currentDKP
   local vanityAmt = pdata.currentVanityDKP
@@ -1744,7 +1757,7 @@ function EminentDKP:CreateVanityResetSyncEvent(player)
 end
 
 function EminentDKP:CreateVanityResetEvent(player,dtime)
-  local pid = self:GetPlayerID(player)
+  local pid = self:GetPlayerIDByName(player)
   local pdata = self:GetPlayer(player)
   local amount = pdata.currentVanityDKP
   
@@ -1765,7 +1778,7 @@ function EminentDKP:CreateRenameSyncEvent(from,to)
 end
 
 function EminentDKP:CreateRenameEvent(from,to,dtime)
-  local pfid = self:GetPlayerID(from)
+  local pfid = self:GetPlayerIDByName(from)
   
   -- Create the event
   local cid = self:CreateEvent(pfid,"rename",from,"","",to,dtime)
@@ -1816,28 +1829,27 @@ end
 -- This ensures nobody is accidently expired and everybody sees the announcements
 function EminentDKP:PLAYER_REGEN_DISABLED()
   if self.db.profile.hidecombat then self:ToggleMeters(false) end
+  if not self:AmOfficer() or not self.amMasterLooter then return end
   
-  if self:AmOfficer() and self.amMasterLooter then
-    if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) < 0 then
-      sendchat('Performing database scan...', nil, 'self')
-      for pid,data in pairs(self.db.factionrealm.pools[self.db.profile.activepool].players) do
-        if data.active then
-          local days = math.floor(GetDaysSince(data.lastRaid))
-          if days >= self.db.profile.expiretime then
-            -- If deemed inactive then reset their DKP and vanity DKP
-            local name = self:GetPlayerNameByID(pid)
-            sendchat('The DKP for '..name..' has expired. Bounty has increased by '..self:StdNumber(data.currentDKP)..' DKP.', "raid", "preset")
-            self:CreateExpirationSyncEvent(name)
-          end
+  if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) < 0 then
+    sendchat('Performing database scan...', nil, 'self')
+    for pid,data in pairs(self.db.factionrealm.pools[self.db.profile.activepool].players) do
+      if data.active then
+        local days = math.floor(GetDaysSince(data.lastRaid))
+        if days >= self.db.profile.expiretime then
+          -- If deemed inactive then reset their DKP and vanity DKP
+          local name = self:GetPlayerNameByID(pid)
+          sendchat('The DKP for '..name..' has expired. Bounty has increased by '..self:StdNumber(data.currentDKP)..' DKP.', "raid", "preset")
+          self:CreateExpirationSyncEvent(name)
         end
       end
-      if self:GetAvailableBountyPercent() > 50 then
-        sendchat('There is more than 50% of the bounty available, you should distribute some.', nil, 'self')
-      end
-      sendchat('Current bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
-      self.db.factionrealm.pools[self.db.profile.activepool].lastScan = time()
-      self:PrintStandings()
     end
+    if self:GetAvailableBountyPercent() > 50 then
+      sendchat('There is more than 50% of the bounty available, you should distribute some.', nil, 'self')
+    end
+    sendchat('Current bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
+    self.db.factionrealm.pools[self.db.profile.activepool].lastScan = time()
+    self:PrintStandings()
   end
 end
 
@@ -2257,30 +2269,10 @@ end
 function EminentDKP:ProcessSlashCmd(input)
   local command, arg1, arg2, e = self:GetArgs(input, 3)
   
-  -- Check if the command can only be used by an officer
-  if officer_cmds[command] and not self:AmOfficer() then
-    sendchat("This command can only be used by an officer.", nil, 'self')
-    return
-  end
-  
-  -- Check if the command can only be used by the masterlooter
-  if ml_cmds[command] then
-    if self.lootMethod ~= 'master' then
-      sendchat("Master looting must be enabled.", nil, 'self')
-      return
-    end
-    if self.masterLooterPartyID ~= 0 then
-      sendchat("Only the master looter can use this command.", nil, 'self')
-      return
-    end
-  end
-  
   if command == 'auction' then
     self:AdminStartAuction()
   elseif command == 'bounty' then
     self:AdminDistributeBounty(arg1,arg2)
-  elseif command == 'reset' then
-    self:AdminReset(arg1)
   elseif command == 'vanity' then
     if arg1 then
       self:AdminVanityReset(arg1)
@@ -2325,18 +2317,6 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
   local a, command, arg1, arg2 = strsplit(" ", message, 4)
 	if a ~= "$" then return end
 	
-	-- Check if the command can only be used by the masterlooter
-  if ml_cmds[command] then
-    if self.lootMethod ~= 'master' then
-      sendchat("Master looting must be enabled.", from, 'whisper')
-      return
-    end
-    if self.masterLooterPartyID ~= 0 then
-      sendchat("That command must be sent to the master looter.", from, 'whisper')
-      return
-    end
-  end
-  
   if command == 'bid' then
     self:Bid(arg1,from)
   elseif command == 'balance' then

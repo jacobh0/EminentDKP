@@ -233,12 +233,24 @@ local rogueMode = EminentDKP:NewModule(L["Rogue"],classModePrototype)
 local shamanMode = EminentDKP:NewModule(L["Shaman"],classModePrototype)
 local warlockMode = EminentDKP:NewModule(L["Warlock"],classModePrototype)
 local warriorMode = EminentDKP:NewModule(L["Warrior"],classModePrototype)
+deathknightMode.sortnum = 3
+druidMode.sortnum = 3
+hunterMode.sortnum = 3
+mageMode.sortnum = 3
+paladinMode.sortnum = 3
+priestMode.sortnum = 3
+rogueMode.sortnum = 3
+shamanMode.sortnum = 3
+warlockMode.sortnum = 3
+warriorMode.sortnum = 3
 
 local conqMode = EminentDKP:NewModule(L["Conqueror"],classModePrototype)
 local vanqMode = EminentDKP:NewModule(L["Vanquisher"],classModePrototype)
 local protMode = EminentDKP:NewModule(L["Protector"],classModePrototype)
+conqMode.sortnum, vanqMode.sortnum, protMode.sortnum = 2, 2, 2
 
 local allMode = EminentDKP:NewModule(L["All Classes"],classModePrototype)
+allMode.sortnum = 1
 
 function balancemode:Enter(win, id, label)
   self.playerid = id

@@ -1,4 +1,5 @@
 local L = LibStub("AceLocale-3.0"):GetLocale("EminentDKP", false)
+local AceGUI = LibStub("AceGUI-3.0")
 
 local EminentDKP = EminentDKP
 
@@ -24,9 +25,86 @@ EminentDKP.classColors = RAID_CLASS_COLORS
 meter.name = "Meter display"
 EminentDKP.displays["meter"] = meter
 
---[[
+--[[-------------------------------------------------------------------
+  Meter Window Functions
+---------------------------------------------------------------------]]
+
+--[[-------------------------------------------------------------------
+  Action Panel Functions
+---------------------------------------------------------------------]]
+
+-- Show the tab responsible for transfers
+local function CreateTransferTab(container)
+  local recip = AceGUI:Create("Dropdown")
+  recip:SetText("Receipient")
+  recip:SetList(EminentDKP:GetOtherPlayersNames())
+  container:AddChild(recip)
+  
+  local amount = AceGUI:Create("Slider")
+  amount:SetLabel("Amount")
+  amount:SetSliderValues(1,EminentDKP:GetMyCurrentDKP(),1)
+  container:AddChild(amount)
+  
+  local send = AceGUI:Create("Button")
+  send:SetText("Send")
+  send:SetWidth(200)
+  send:SetCallback("OnClick",function(what)
+    -- todo: send addon msg to ML (we have the name since we're in a raid)
+    EminentDKP:Print(recip:GetValue())
+    EminentDKP:Print(amount:GetValue())
+  end)
+  container:AddChild(send)
+end
+
+-- function that draws the widgets for the second tab
+local function DrawGroup2(container)
+
+end
+
+-- Callback function for OnGroupSelected
+local function SelectGroup(container, event, group)
+  container:ReleaseChildren()
+  if group == "transfer" then
+    CreateTransferTab(container)
+  elseif group == "tab2" then
+    DrawGroup2(container)
+  end
+end
+
+function EminentDKP:CreateActionPanel()
+  if self.actionpanel then
+    AceGUI:Release(self.actionpanel)
+    self.actionpanel = nil
+  end
+  self.actionpanel = AceGUI:Create("EminentDKPFrame")
+  self.actionpanel:SetWidth(400)
+  self.actionpanel:SetHeight(400)
+  self.actionpanel:SetTitle("EminentDKP Action Panel")
+  self.actionpanel:SetStatusText("AceGUI-3.0 Example Container Frame")
+  self.actionpanel:SetCallback("OnClose", function(widget)
+    AceGUI:Release(widget)
+    EminentDKP.actionpanel = nil
+  end)
+  self.actionpanel:SetLayout("Fill")
+  
+  -- Create the TabGroup
+  local tab =  AceGUI:Create("TabGroup")
+  tab:SetLayout("Flow")
+  -- Setup which tabs to show
+  tab:SetTabs({{text="Transfer", value="transfer"}, {text="Tab 2", value="tab2"}})
+  -- Register callback
+  tab:SetCallback("OnGroupSelected", SelectGroup)
+  -- Set initial Tab (this will fire the OnGroupSelected callback)
+  tab:SelectTab("transfer")
+
+  -- add to the frame container
+  self.actionpanel:AddChild(tab)
+end
+
+
+--[[-------------------------------------------------------------------
   Display functions for the meter listing
---]]
+---------------------------------------------------------------------]]
 
 -- Called when a EminentDKP window starts using this display provider.
 function meter:Create(window)
@@ -43,7 +121,7 @@ function meter:Create(window)
 	window.bargroup.window = window
 	window.bargroup.RegisterCallback(meter, "AnchorMoved")
 	window.bargroup.RegisterCallback(meter, "AnchorClicked")
-	--window.bargroup.RegisterCallback(meter, "ConfigClicked")
+	window.bargroup.RegisterCallback(meter, "ConfigClicked")
 	window.bargroup:EnableMouse(true)
 	window.bargroup:SetScript("OnMouseDown", function(win, button) if button == "RightButton" then win:RightClick() end end)
 	window.bargroup:HideIcon()
@@ -81,6 +159,10 @@ function meter:Wipe(window)
 	
 	-- Clean up.
 	window.bargroup:SortBars()
+end
+
+function meter:ConfigClicked(cbk, group, button)
+	EminentDKP:CreateActionPanel()
 end
 
 function meter:AnchorClicked(cbk, group, button)
@@ -185,9 +267,7 @@ function meter:ApplySettings(window)
 			g.bgframe:EnableMouse()
 			g.bgframe:EnableMouseWheel()
 			g.bgframe:SetScript("OnMouseDown", function(frame, btn) 
-													if IsShiftKeyDown() then
-														--EminentDKP:OpenMenu(win)
-													elseif btn == "RightButton" then 
+													if btn == "RightButton" then 
 														window:RightClick()
 													end
 												end)
