@@ -1032,6 +1032,7 @@ function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self.lootMethod, self.masterLooterPartyID, self.masterLooterRaidID = GetLootMethod()
   self.amMasterLooter = (self.lootMethod == 'master' and self.masterLooterPartyID == 0)
   self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
+  self:RAID_ROSTER_UPDATE()
 end
 
 -- Keep track of the last container we opened
