@@ -1381,6 +1381,14 @@ function EminentDKP:GetEventCount()
   return self:GetActivePool().eventCounter
 end
 
+function EminentDKP:IsPlayerFresh(name)
+  local player = (type(name) == "string" and self:GetPlayerByName(name) or name)
+  if player then
+    return (not next(player.earnings) and not next(player.deductions))
+  end
+  return nil
+end
+
 function EminentDKP:GetPlayerByID(pid)
   return self:GetActivePool().players[pid]
 end
@@ -1460,7 +1468,7 @@ end
 function EminentDKP:GetCurrentRaidMembers()
   local players = {}
   for spot = 1, 40 do
-    local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(spot);
+    local name = select(1,GetRaidRosterInfo(spot))
 		if name then
 		  players[self:GetPlayerIDByName(name)] = self:GetPlayerByName(name)
 		end
@@ -1472,7 +1480,7 @@ end
 function EminentDKP:GetCurrentRaidMembersIDs()
   local players = {}
   for spot = 1, 40 do
-    local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(spot);
+    local name = select(1,GetRaidRosterInfo(spot))
 		if name then
 		  table.insert(players,self:GetPlayerIDByName(name))
 		end
@@ -1712,13 +1720,19 @@ function EminentDKP:CreateRenameSyncEvent(from,to)
 end
 
 function EminentDKP:CreateRenameEvent(from,to,dtime)
+  -- This event assumes that the "to" player is fresh
   local pfid = self:GetPlayerIDByName(from)
+  local ptid = self:GetPlayerIDByName(to)
   
   -- Create the event
   local cid = self:CreateEvent(pfid,"rename",from,"","",to,dtime)
   
-  self:GetActivePool().playerIDs[to] = pfid
+  -- Delete the "to" person
+  self:GetPlayerByID(ptid) = nil
+  -- Delete the name for the "from" person
   self:GetActivePool().playerIDs[from] = nil
+  -- Re-route the "to" person to the "from" person
+  self:GetActivePool().playerIDs[to] = pfid
   
   return cid
 end
@@ -1826,7 +1840,7 @@ function EminentDKP:LOOT_OPENED()
   if UnitInRaid("player") then
     -- Query some info about this unit...
     local guid = UnitGUID("target")
-    local unitName, unitRealm = UnitName("target")
+    local unitName = select(1,UnitName("target"))
     if not recent_loots[guid] and GetNumLootItems() > 0 then
       local eligible_items = {}
       local eligible_slots = {}
@@ -1845,7 +1859,7 @@ function EminentDKP:LOOT_OPENED()
 		    end
 			end
 			-- Ensure that we only print once by keeping track of the GUID
-			recent_loots[guid] = { name=unitName, realm=unitRealm, slots=eligible_slots }
+			recent_loots[guid] = { name=unitName, slots=eligible_slots }
     end
   end
 end
@@ -1962,12 +1976,11 @@ end
 function EminentDKP:WhisperCheck(who, to)
   if self:PlayerExistsInPool(who) then
     local data = self:GetPlayerByName(who)
-    local days =  math.floor(GetDaysSince(data.lastRaid))
     sendchat('Player Report for '..who, to, 'whisper')
     sendchat('Current DKP: '..self:StdNumber(data.currentDKP), to, 'whisper')
     sendchat('Lifetime DKP: '..self:StdNumber(data.earnedDKP), to, 'whisper')
     sendchat('Vanity DKP: '..self:StdNumber(data.currentVanityDKP), to, 'whisper')
-    sendchat('Last Raid: '..days..' day(s) ago.', to, 'whisper')
+    sendchat('Last Raid: '..GetDaysSince(data.lastRaid)..' day(s) ago.', to, 'whisper')
   else
     sendchat(who.." does not exist in the DKP pool.", to, 'whisper')
   end
