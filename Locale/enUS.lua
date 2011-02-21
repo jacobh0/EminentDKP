@@ -67,6 +67,8 @@ L["Days to show"] = "Days to show"
 L["The number of days prior to today to show in the day listing."] = "The number of days prior to today to show in the day listing."
 L["Maximum Events"] = "Maximum Events"
 L["The maximum number of events to show for a specific player."] = "The maximum number of events to show for a specific player."
+L["Hide Raid Messages"] = "Hide Raid Messages"
+L["Prevents raid messages sent by EminentDKP from being shown."] = "Prevents raid messages sent by EminentDKP from being shown."
 
 L["Masterlooter Options"] = "Masterlooter Options"
 L["Disenchanter"] = "Disenchanter"

@@ -23,11 +23,12 @@ TODO:
 
 1. Convert permission level checks into hooks
  -- Simplify permissions, and refactor checks for less code overhead
-2. Cleanup meter display code and organize
+2. Organize meter display code and move to GUI.lua
 3. Rip out boss detection code from Skada, use it as default bounty reason
 4. Rip out combat detection code from Skada, use it to unhide meter display
 5. Convert all static messages into localized messages
 6. Rebuild internal whisper functions to support either addon whispers or player whispers
+7. Revisit helper functions and naming conventions
 
 ]]
 
@@ -490,7 +491,7 @@ function EminentDKP:tcopy(to, from)
 end
 
 function EminentDKP:GetMeterSets()
-  return self.db.factionrealm.pools[self.db.profile.activepool].sets
+  return self:GetActivePool().sets
 end
 
 -- Create a window and its db settings
@@ -1014,6 +1015,9 @@ function EminentDKP:OnEnable()
 	self:RegisterEvent("PLAYER_ENTERING_WORLD") -- version broadcast
 	self:RegisterChatEvent("CHAT_MSG_WHISPER") -- whisper commands received
 	self:RegisterChatEvent("CHAT_MSG_WHISPER_INFORM") -- whispers sent
+	self:RegisterChatEvent("CHAT_MSG_RAID") -- raid messages
+	self:RegisterChatEvent("CHAT_MSG_RAID_WARNING") -- raid warnings
+	
 	self:RegisterEvent("LOOT_OPENED") -- loot listing
 	self:RegisterEvent("LOOT_CLOSED") -- auction cancellation
 	self:RegisterEvent("PARTY_LOOT_METHOD_CHANGED") -- masterloot change
@@ -1379,33 +1383,37 @@ function EminentDKP:AmOfficer()
   return (self.guildRankIndex < 2)
 end
 
+function EminentDKP:GetActivePool()
+  return self.db.factionrealm.pools[self.db.profile.activepool]
+end
+
 function EminentDKP:GetLastScan()
-  return self.db.factionrealm.pools[self.db.profile.activepool].lastScan
+  return self:GetActivePool().lastScan
 end
 
 function EminentDKP:GetEventPool()
-  return self.db.factionrealm.pools[self.db.profile.activepool].events
+  return self:GetActivePool().events
 end
 
 function EminentDKP:GetEvent(eventID)
-  return self.db.factionrealm.pools[self.db.profile.activepool].events[eventID]
+  return self:GetActivePool().events[eventID]
 end
 
 function EminentDKP:GetEventCount()
-  return self.db.factionrealm.pools[self.db.profile.activepool].eventCounter
+  return self:GetActivePool().eventCounter
 end
 
 -- Return the data for a given player
 function EminentDKP:GetPlayer(name)
   local pid = self:GetPlayerIDByName(name)
   if pid then
-    return self.db.factionrealm.pools[self.db.profile.activepool].players[pid]
+    return self:GetActivePool().players[pid]
   end
   return nil
 end
 
 function EminentDKP:GetPlayerByID(pid)
-  return self.db.factionrealm.pools[self.db.profile.activepool].players[pid]
+  return self:GetActivePool().players[pid]
 end
 
 function EminentDKP:GetPlayerByName(name)
@@ -1418,15 +1426,12 @@ end
 
 -- Get a player's ID
 function EminentDKP:GetPlayerIDByName(name)
-  if self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[name] then
-    return self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[name]
-  end
-  return nil
+  return self:GetActivePool().playerIDs[name]
 end
 
 -- Get player name from player ID
 function EminentDKP:GetPlayerNameByID(pid)
-  for name,id in pairs(self.db.factionrealm.pools[self.db.profile.activepool].playerIDs) do
+  for name,id in pairs(self:GetActivePool().playerIDs) do
     if id == pid then
       return name
     end
@@ -1435,23 +1440,21 @@ function EminentDKP:GetPlayerNameByID(pid)
 end
 
 -- Check whether or not a player exists in the currently active pool
-function EminentDKP:PlayerExistsInPool(player)
-  if self:GetPlayerIDByName(player) then
-    return true
-  end
-  return false
+function EminentDKP:PlayerExistsInPool(name)
+  return (self:GetPlayerIDByName(name) ~= nil and true or false)
 end
 
 -- Update a player's last raid day
 function EminentDKP:UpdateLastPlayerRaid(pid,datetime)
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].lastRaid = datetime
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].active = true
+  local player = self:GetPlayerByID(pid)
+  player.lastRaid = datetime
+  player.active = true
 end
 
 -- Check if a player has a certain amount of DKP
-function EminentDKP:PlayerHasDKP(player,amount)
-  local pid = self:GetPlayerIDByName(player)
-  if self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP >= amount then
+function EminentDKP:PlayerHasDKP(name,amount)
+  local player = self:GetPlayerByName(name)
+  if player and player.currentDKP >= amount then
     return true
   end
   return false
@@ -1467,7 +1470,7 @@ end
 
 function EminentDKP:GetOtherPlayersNames()
   local list = {}
-  for name,id in pairs(self.db.factionrealm.pools[self.db.profile.activepool].playerIDs) do
+  for name,id in pairs(self:GetActivePool().playerIDs) do
     if name ~= self.myName then
       list[name] = name
     end
@@ -1476,15 +1479,15 @@ function EminentDKP:GetOtherPlayersNames()
 end
 
 function EminentDKP:GetPlayerPool()
-  return self.db.factionrealm.pools[self.db.profile.activepool].players
+  return self:GetActivePool().players
 end
 
 function EminentDKP:GetTotalBounty()
-  return self.db.factionrealm.pools[self.db.profile.activepool].bounty.size
+  return self:GetActivePool().bounty.size
 end
 
 function EminentDKP:GetAvailableBounty()
-  return self.db.factionrealm.pools[self.db.profile.activepool].bounty.available
+  return self:GetActivePool().bounty.available
 end
 
 function EminentDKP:GetAvailableBountyPercent()
@@ -1497,7 +1500,7 @@ function EminentDKP:GetCurrentRaidMembers()
   for spot = 1, 40 do
     local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(spot);
 		if name then
-		  players[self:GetPlayerIDByName(name)] = self:GetPlayer(name)
+		  players[self:GetPlayerIDByName(name)] = self:GetPlayerByName(name)
 		end
   end
   return players
@@ -1518,50 +1521,47 @@ end
 ---------- START EARNINGS + DEDUCTIONS FUNCTIONS ----------
 
 function EminentDKP:IncreaseAvailableBounty(amount)
-  self.db.factionrealm.pools[self.db.profile.activepool].bounty.available = self:GetAvailableBounty() + amount
+  self:GetActivePool().bounty.available = self:GetAvailableBounty() + amount
 end
 
 function EminentDKP:DecreaseAvailableBounty(amount)
-  self.db.factionrealm.pools[self.db.profile.activepool].bounty.available = self:GetAvailableBounty() - amount
+  self:GetActivePool().bounty.available = self:GetAvailableBounty() - amount
 end
 
 function EminentDKP:CreatePlayerVanityDeduction(pid,eventID,amount)
-  local vdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentVanityDKP
+  local player = self:GetPlayerByID(pid)
   
   -- Set the deduction for the player
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].deductions[eventID] = amount
+  player.deductions[eventID] = amount
   
   -- Update current Vanity DKP
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentVanityDKP = vdkp - amount
+  player.currentVanityDKP = player.currentVanityDKP - amount
 end
 
 function EminentDKP:CreatePlayerDeduction(pid,eventID,amount)
-  local cdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP
+  local player = self:GetPlayerByID(pid)
   
   -- Set the deduction for the player
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].deductions[eventID] = amount
+  player.deductions[eventID] = amount
   
   -- Update current DKP
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP = cdkp - amount
+  player.currentDKP = player.currentDKP - amount
 end
 
 function EminentDKP:CreatePlayerEarning(pid,eventID,amount,earnsVanity)
-  local cdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP
-  local vdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentVanityDKP
-  local edkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnedDKP
-  local evdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnedVanityDKP
+  local player = self:GetPlayerByID(pid)
   
   -- Set the earning for the player
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnings[eventID] = amount
+  player.earnings[eventID] = amount
   
   -- Update current DKP (normal and vanity)
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP = cdkp + amount
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnedDKP = edkp + amount
+  player.currentDKP = player.currentDKP + amount
+  player.earnedDKP = player.earnedDKP + amount
   
   -- Transfers do not earn vanity dkp (for obvious reasons)
   if earnsVanity then
-    self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentVanityDKP = vdkp + amount
-    self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnedVanityDKP = evdkp + amount
+    player.currentVanityDKP = player.currentVanityDKP + amount
+    player.earnedVanityDKP = player.earnedVanityDKP + amount
   end
 end
 
@@ -1585,14 +1585,14 @@ end
 -- Add a player to the active pool
 function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
   -- Get a new player ID
-  local pc = self.db.factionrealm.pools[self.db.profile.activepool].playerCounter
+  local pc = self:GetActivePool().playerCounter
   pc = pc + 1
-  self.db.factionrealm.pools[self.db.profile.activepool].playerCounter = pc
+  self:GetActivePool().playerCounter = pc
   local pid = tostring(pc)
-  self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[name] = pid
+  self:GetActivePool().playerIDs[name] = pid
   
   -- Create the new player data
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid] = { 
+  self:GetActivePool().players[pid] = { 
     class=className, 
     lastRaid=dtime,
     currentDKP=0,
@@ -1698,13 +1698,13 @@ function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
   return cid
 end
 
-function EminentDKP:CreateExpirationSyncEvent(player)
-  self:SyncEvent(self:CreateExpirationEvent(player,time()))
+function EminentDKP:CreateExpirationSyncEvent(name)
+  self:SyncEvent(self:CreateExpirationEvent(name,time()))
 end
 
-function EminentDKP:CreateExpirationEvent(player,dtime)
-  local pid = self:GetPlayerIDByName(player)
-  local pdata = self:GetPlayer(player)
+function EminentDKP:CreateExpirationEvent(name,dtime)
+  local pid = self:GetPlayerIDByName(name)
+  local pdata = self:GetPlayerByName(name)
   local dkpAmt = pdata.currentDKP
   local vanityAmt = pdata.currentVanityDKP
   
@@ -1719,18 +1719,18 @@ function EminentDKP:CreateExpirationEvent(player,dtime)
   self:IncreaseAvailableBounty(dkpAmt)
   
   -- Mark the player as inactive (to bypass future expiration checks)
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].active = false
+  pdata.active = false
   
   return cid
 end
 
-function EminentDKP:CreateVanityResetSyncEvent(player)
-  self:SyncEvent(self:CreateVanityResetEvent(player,time()))
+function EminentDKP:CreateVanityResetSyncEvent(name)
+  self:SyncEvent(self:CreateVanityResetEvent(name,time()))
 end
 
-function EminentDKP:CreateVanityResetEvent(player,dtime)
-  local pid = self:GetPlayerIDByName(player)
-  local pdata = self:GetPlayer(player)
+function EminentDKP:CreateVanityResetEvent(name,dtime)
+  local pid = self:GetPlayerIDByName(name)
+  local pdata = self:GetPlayerByName(name)
   local amount = pdata.currentVanityDKP
   
   -- Create the event
@@ -1755,25 +1755,25 @@ function EminentDKP:CreateRenameEvent(from,to,dtime)
   -- Create the event
   local cid = self:CreateEvent(pfid,"rename",from,"","",to,dtime)
   
-  self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[to] = pfid
-  self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[from] = nil
+  self:GetActivePool().playerIDs[to] = pfid
+  self:GetActivePool().playerIDs[from] = nil
   
   return cid
 end
 
 -- Creates an event and increments the event counter
-function EminentDKP:CreateEvent(src,etype,extra,t,b,amount,dtime)
-  local c = self.db.factionrealm.pools[self.db.profile.activepool].eventCounter
+function EminentDKP:CreateEvent(src,etype,extra,t,b,val,dtime)
+  local c = self:GetActivePool().eventCounter
   c = c + 1
-  self.db.factionrealm.pools[self.db.profile.activepool].eventCounter = c
+  self:GetActivePool().eventCounter = c
   local cid = tostring(c)
-  self.db.factionrealm.pools[self.db.profile.activepool].events[cid] = {
+  self:GetActivePool().events[cid] = {
     source = src,
     eventType = etype,
     extraInfo = extra,
     target = t,
     beneficiary = b,
-    value = amount,
+    value = val,
     datetime = dtime
   }
   
@@ -1805,7 +1805,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
   
   if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) < 0 then
     sendchat('Performing database scan...', nil, 'self')
-    for pid,data in pairs(self.db.factionrealm.pools[self.db.profile.activepool].players) do
+    for pid,data in pairs(self:GetActivePool().players) do
       if data.active then
         local days = math.floor(GetDaysSince(data.lastRaid))
         if days >= self.db.profile.expiretime then
@@ -1820,7 +1820,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
       sendchat('There is more than 50% of the bounty available, you should distribute some.', nil, 'self')
     end
     sendchat('Current bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
-    self.db.factionrealm.pools[self.db.profile.activepool].lastScan = time()
+    self:GetActivePool().lastScan = time()
     self:PrintStandings()
   end
 end
@@ -1926,12 +1926,7 @@ function EminentDKP:GetStandings(stat)
     players = self:GetPlayerPool()
   end
   for id,data in pairs(players) do
-    local b = data.currentDKP
-    if stat == 'earnedDKP' then
-      b = data.earnedDKP
-    else
-      b = data.currentDKP
-    end
+    local b = (data[stat] ~= nil and data[stat] or data.currentDKP)
 		table.insert(a, { n=self:GetPlayerNameByID(id), dkp=b })
 	end
   table.sort(a, function(a,b) return a.dkp>b.dkp end)
@@ -2004,7 +1999,7 @@ end
 
 function EminentDKP:WhisperCheck(who, to)
   if self:PlayerExistsInPool(who) then
-    local data = self:GetPlayer(who)
+    local data = self:GetPlayerByName(who)
     local days =  math.floor(GetDaysSince(data.lastRaid))
     sendchat('Player Report for '..who, to, 'whisper')
     sendchat('Current DKP: '..self:StdNumber(data.currentDKP), to, 'whisper')
@@ -2193,7 +2188,7 @@ function EminentDKP:AdminVanityRoll()
     for r = 1, GetNumRaidMembers() do
   		name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(r)
   		if name then
-  		  local data = self:GetPlayer(name)
+  		  local data = self:GetPlayerByName(name)
   			if data.currentVanityDKP > 0 then
   			  local roll = math.random(math.floor(data.currentVanityDKP))/1000
   			  table.insert(ranks, { n=name, v=data.currentVanityDKP, r=roll })
@@ -2235,7 +2230,7 @@ end
 
 ------------- END ADMIN FUNCTIONS -------------
 
--- Handle slash commands (currently accepts only admin commands)
+-- Handle slash commands
 function EminentDKP:ProcessSlashCmd(input)
   local command, arg1, arg2, e = self:GetArgs(input, 3)
   
@@ -2265,6 +2260,20 @@ function EminentDKP:ProcessSlashCmd(input)
 	  sendchat("'/edkp rename X Y' to rename a player from X to Y (Y must not already exist)", nil, 'self')
 	else
 	  sendchat("Unrecognized command. Type '/edkp admin' for a list of valid commands.", nil, 'self')
+  end
+end
+
+function EminentDKP:CHAT_MSG_RAID_CONTROLLER(eventController, message, from, ...)
+  -- Ensure all correspondence from the addon is hidden (option)
+  if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
+    eventController:BlockFromChatFrame()
+  end
+end
+
+function EminentDKP:CHAT_MSG_RAID_WARNING_CONTROLLER(eventController, message, from, ...)
+  -- Ensure all correspondence from the addon is hidden (option)
+  if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
+    eventController:BlockFromChatFrame()
   end
 end
 
