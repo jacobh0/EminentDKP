@@ -188,7 +188,7 @@ local classModePrototype = {
   			  local d = win.dataset[nr] or {}
     			win.dataset[nr] = d
     			d.id = player.id or pid
-    			d.label = player.name or EminentDKP:GetPlayerNameByID(pid)
+    			d.label = EminentDKP:GetPlayerNameByID(d.id)
     			d.value = player.currentDKP or player.modedata.currentDKP
     			d.class = string.upper(string.gsub(player.class,"%s*",""))
     			-- Never show percent unless it is the alltime set, the percents are meaningless on individual days

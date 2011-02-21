@@ -26,14 +26,12 @@ EminentDKP.windowdefaults = {
 	background = {margin=0, height=150, texture="None", bordertexture="None", borderthickness=0, color = {r=0,g=0,b=0.5,a=0.5}},
 
 	reversegrowth=false,
-	modeincombat="",
-	returnaftercombat=false,
 	
 	hidden = false,
 	enabletitle = true, 
 	enablebackground = false,
 	
-	set = "alltime",
+	set = nil,
 	mode = nil,
 	
 	display = "meter",
@@ -57,6 +55,7 @@ EminentDKP.defaults = {
           available = 1000000
         },
         sets = {},
+        revision = 1,
       }
     }
   },
@@ -236,7 +235,11 @@ EminentDKP.options = {
           max= 30,
           step= 1,
           get= function() return EminentDKP.db.profile.daystoshow end,
-          set= function(self, val) EminentDKP.db.profile.daystoshow = val end,
+          set= function(self, val)
+            EminentDKP.db.profile.daystoshow = val
+            --EminentDKP:ReloadSets()
+            EminentDKP:Print("setting days to show")
+          end,
           order= 9,
 				},
 				maxevents = {
