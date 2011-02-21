@@ -7,15 +7,6 @@ local meter = EminentDKP:NewModule("MeterDisplay", "SpecializedLibBars-1.0")
 local libwindow = LibStub("LibWindow-1.1")
 local media = LibStub("LibSharedMedia-3.0")
 
--- The today set
-EminentDKP.todaySet = nil
-
--- The alltime set
-EminentDKP.alltimeSet = nil
-
--- The last set
-EminentDKP.lastSet = nil
-
 -- Our display providers.
 EminentDKP.displays = {}
 
@@ -266,11 +257,7 @@ function meter:ApplySettings(window)
 			g.bgframe:SetFrameStrata("BACKGROUND")
 			g.bgframe:EnableMouse()
 			g.bgframe:EnableMouseWheel()
-			g.bgframe:SetScript("OnMouseDown", function(frame, btn) 
-													if btn == "RightButton" then 
-														window:RightClick()
-													end
-												end)
+			g.bgframe:SetScript("OnMouseDown", function(frame, btn) if btn == "RightButton" then window:RightClick() end end)
 			g.bgframe:SetScript("OnMouseWheel", window.OnMouseWheel)
 		end
 
@@ -450,21 +437,7 @@ function meter:Update(window)
 	if window.metadata.sortfunc then
 	  table.sort(window.dataset, window.metadata.sortfunc)
   end
-
-	-- If we are using "wipestale", we may have removed data
-	-- and we need to remove unused bars.
-	-- The Threat module uses this.
-	-- For each bar, mark bar as unchecked.
-	--[[
-	if window.metadata.wipestale then
-		local bars = window.bargroup:GetBars()
-		if bars then
-			for name, bar in pairs(bars) do
-				bar.checked = false
-			end
-		end
-	end
-  ]]
+  
 	for i, data in ipairs(window.dataset) do
 		if data.id then
 			local barid = data.id
@@ -534,21 +507,6 @@ function meter:Update(window)
 			end
 			bar:SetTimerLabel(data.valuetext)
 			
-			--[[
-			if window.metadata.wipestale then
-				bar.checked = true
-			end
-	    
-			-- Emphathized items - cache a flag saying it is done so it is not done again.
-			-- This is a little lame.
-			if data.emphathize and bar.emphathize_set ~= true then
-				bar:SetFont(nil,nil,"OUTLINE")
-				bar.emphathize_set = true
-			elseif not data.emphathize and bar.emphathize_set ~= false then
-				bar:SetFont(nil,nil,"PLAIN")
-				bar.emphathize_set = false
-			end
-			]]
 			-- Background texture color.
 			if data.backgroundcolor then
 				bar.bgtexture:SetVertexColor(data.backgroundcolor.r, data.backgroundcolor.g, data.backgroundcolor.b, data.backgroundcolor.a or 1)
@@ -563,18 +521,6 @@ function meter:Update(window)
 			end
 		end
 	end
-	
-	-- If we are using "wipestale", remove all unchecked bars.
-	--[[
-	if window.metadata.wipestale then
-		local bars = window.bargroup:GetBars()
-		for name, bar in pairs(bars) do
-			if not bar.checked then
-				window.bargroup:RemoveBar(bar)
-			end
-		end
-	end
-	]]
 	
 	-- Adjust our background frame if background height is dynamic.
 	if window.bargroup.bgframe and window.settings.background.height == 0 then
