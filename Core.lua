@@ -28,7 +28,7 @@ TODO:
 4. Rip out combat detection code from Skada, use it to unhide meter display
 5. Convert all static messages into localized messages
 6. Rebuild internal whisper functions to support either addon whispers or player whispers
-7. Revisit helper functions and naming conventions
+7. Investigate bar recycling (specifically when wiping the window, etc)
 
 ]]
 
@@ -441,7 +441,7 @@ end
 -- Ask a mode to verify the contents of a set.
 local function verify_set(mode, set)
 	for j, player in ipairs(set.players) do
-		if mode.AddPlayerAttributes ~= nil then
+		if mode.AddPlayerAttributes then
 			mode:AddPlayerAttributes(player)
 		end
 	end
@@ -455,7 +455,7 @@ local function createSet(setname)
   
 	-- Tell each mode to apply its needed attributes.
 	for i, mode in ipairs(modes) do 
-	  if mode.AddSetAttributes ~= nil then
+	  if mode.AddSetAttributes then
   		mode:AddSetAttributes(set)
   	end
   end
@@ -733,23 +733,17 @@ function EminentDKP:UpdateDisplay(win)
 	if win.selectedmode then
 		local set = win:get_selected_set()
 		
-		-- If we have a set, go on.
-		-- todo: do we need to check for a set?
-		if set then
-			-- Inform window that a data update will take place.
-			-- todo: is this needed?
-			win:UpdateInProgress()
-		
-			-- Let mode update data.
-			if win.selectedmode.PopulateData then
-				win.selectedmode:PopulateData(win, set)
-			else
-				self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
-			end
-			
-			-- Let window display the data.
-			win:UpdateDisplay()
+		-- Inform window that a data update will take place.
+		win:UpdateInProgress()
+	
+		-- Let mode update data.
+		if win.selectedmode.PopulateData then
+			win.selectedmode:PopulateData(win, set)
+		else
+			self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
 		end
+		-- Let window display the data.
+		win:UpdateDisplay()
 	elseif win.selectedset then
 		local set = win:get_selected_set()
 		
@@ -757,10 +751,8 @@ function EminentDKP:UpdateDisplay(win)
 		for i, mode in ipairs(modes) do
 			local d = win.dataset[i] or {}
 			win.dataset[i] = d
-			d.id = mode:GetName()
-			d.label = mode:GetName()
-			d.value = 1
-			if set and mode.GetSetSummary ~= nil then
+			d.id, d.label, d.value = mode:GetName(), mode:GetName() 1
+			if mode.GetSetSummary then
 				d.valuetext = mode:GetSetSummary(set)
 			end
 		end
@@ -776,11 +768,7 @@ function EminentDKP:UpdateDisplay(win)
 			nr = nr + 1
 			local d = win.dataset[nr] or {}
 			win.dataset[nr] = d
-			d.id = setid
-			d.label = set.name
-			d.value = 1
-			d.sortnum = set.sortnum
-			d.starttime = set.starttime
+			d.id, d.label, d.value, d.sortnum, d.starttime = setid, set.name, 1, set.sortnum, set.starttime
 			if set.starttime > 0 then
 			  d.valuetext = date("%H:%M",set.starttime).." - "..date("%H:%M",set.endtime)
 		  end
@@ -1086,10 +1074,7 @@ end
 
 function EminentDKP:GetNewestVersion()
   -- todo: reset newest version if our eventcounter increases
-  if newest_version ~= '' then
-    return newest_version
-  end
-  return self:GetVersion()
+  return (newest_version ~= '' and newest_version or self:GetVersion())
 end
 
 ---------- START SYNC FUNCTIONS ----------
@@ -1128,12 +1113,9 @@ end
 -- Request the missing events
 function EminentDKP:RequestMissingEvents(cooldown)
   if cooldown then
-    if self.requestCooldown then
-      return
-    else
-      self.requestCooldown = true
-      self:ScheduleTimer("ClearRequestCooldown", 10)
-    end
+    if self.requestCooldown then return end
+    self.requestCooldown = true
+    self:ScheduleTimer("ClearRequestCooldown", 10)
   end
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
@@ -1372,15 +1354,11 @@ end
 
 function EminentDKP:IsAnOfficer(who)
   local guildName, guildRankName, guildRankIndex = GetGuildInfo(who)
-  if guildRankIndex < 2 then
-    return true
-  end
-  return false
+  return (guildRankIndex < 2)
 end
 
 function EminentDKP:AmOfficer()
-  self.guildName, self.guildRankName, self.guildRankIndex = GetGuildInfo("player")
-  return (self.guildRankIndex < 2)
+  return self:IsAnOfficer("player")
 end
 
 function EminentDKP:GetActivePool()
@@ -1403,25 +1381,13 @@ function EminentDKP:GetEventCount()
   return self:GetActivePool().eventCounter
 end
 
--- Return the data for a given player
-function EminentDKP:GetPlayer(name)
-  local pid = self:GetPlayerIDByName(name)
-  if pid then
-    return self:GetActivePool().players[pid]
-  end
-  return nil
-end
-
 function EminentDKP:GetPlayerByID(pid)
   return self:GetActivePool().players[pid]
 end
 
 function EminentDKP:GetPlayerByName(name)
   local pid = self:GetPlayerIDByName(name)
-  if pid then
-    return self:GetPlayerByID(pid)
-  end
-  return nil
+  return (pid ~= nil and self:GetPlayerByID(pid) or nil)
 end
 
 -- Get a player's ID
@@ -1441,7 +1407,7 @@ end
 
 -- Check whether or not a player exists in the currently active pool
 function EminentDKP:PlayerExistsInPool(name)
-  return (self:GetPlayerIDByName(name) ~= nil and true or false)
+  return (self:GetPlayerIDByName(name) ~= nil)
 end
 
 -- Update a player's last raid day
@@ -1454,20 +1420,16 @@ end
 -- Check if a player has a certain amount of DKP
 function EminentDKP:PlayerHasDKP(name,amount)
   local player = self:GetPlayerByName(name)
-  if player and player.currentDKP >= amount then
-    return true
-  end
-  return false
+  return (player ~= nil and player.currentDKP >= amount)
 end
 
+-- Get the your current DKP
 function EminentDKP:GetMyCurrentDKP()
   local player = self:GetPlayerByName(self.myName)
-  if player then
-    return player.currentDKP
-  end
-  return nil
+  return (player ~= nil and player.currentDKP or nil)
 end
 
+-- Get the names of everybody else in the pool
 function EminentDKP:GetOtherPlayersNames()
   local list = {}
   for name,id in pairs(self:GetActivePool().playerIDs) do
