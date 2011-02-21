@@ -29,6 +29,7 @@ TODO:
 5. Convert all static messages into localized messages
 6. Rebuild internal whisper functions to support either addon whispers or player whispers
 7. Investigate bar recycling (specifically when wiping the window, etc)
+8. Address database integrity issues surrounding officer capabilities
 
 ]]
 
@@ -628,6 +629,7 @@ function EminentDKP:ReloadWindows()
 end
 
 function EminentDKP:ReloadSets(updatedisplays)
+  sets = self:GetMeterSets() or {}
   wipe(sets)
   
   local today = GetTodayDate()
@@ -730,11 +732,12 @@ end
 
 -- Update a given window's display
 function EminentDKP:UpdateDisplay(win)
+  win:Wipe()
 	if win.selectedmode then
 		local set = win:get_selected_set()
 		
 		-- Inform window that a data update will take place.
-		win:UpdateInProgress()
+		--win:UpdateInProgress()
 	
 		-- Let mode update data.
 		if win.selectedmode.PopulateData then
@@ -751,7 +754,7 @@ function EminentDKP:UpdateDisplay(win)
 		for i, mode in ipairs(modes) do
 			local d = win.dataset[i] or {}
 			win.dataset[i] = d
-			d.id, d.label, d.value = mode:GetName(), mode:GetName() 1
+			d.id, d.label, d.value = mode:GetName(), mode:GetName(), 1
 			if mode.GetSetSummary then
 				d.valuetext = mode:GetSetSummary(set)
 			end
@@ -771,7 +774,9 @@ function EminentDKP:UpdateDisplay(win)
 			d.id, d.label, d.value, d.sortnum, d.starttime = setid, set.name, 1, set.sortnum, set.starttime
 			if set.starttime > 0 then
 			  d.valuetext = date("%H:%M",set.starttime).." - "..date("%H:%M",set.endtime)
-		  end
+		  else
+		    d.valuetext = nil
+	    end
 		end
 		-- Tell window to sort by our data order.
 		win.metadata.ordersort = true
@@ -1728,7 +1733,8 @@ function EminentDKP:CreateRenameEvent(from,to,dtime)
   local cid = self:CreateEvent(pfid,"rename",from,"","",to,dtime)
   
   -- Delete the "to" person
-  self:GetPlayerByID(ptid) = nil
+  local player = self:GetPlayerByID(ptid)
+  player = nil
   -- Delete the name for the "from" person
   self:GetActivePool().playerIDs[from] = nil
   -- Re-route the "to" person to the "from" person

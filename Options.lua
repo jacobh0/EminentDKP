@@ -55,7 +55,7 @@ EminentDKP.defaults = {
           available = 1000000
         },
         sets = {},
-        revision = 1,
+        revision = 0,
       }
     }
   },
@@ -238,8 +238,8 @@ EminentDKP.options = {
           get= function() return EminentDKP.db.profile.daystoshow end,
           set= function(self, val)
             EminentDKP.db.profile.daystoshow = val
-            --EminentDKP:ReloadSets()
-            EminentDKP:Print("setting days to show")
+            EminentDKP:CancelTimer(EminentDKP.setHistoryTimer, true)
+            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("ReloadSets",1,true)
           end,
           order= 9,
 				},

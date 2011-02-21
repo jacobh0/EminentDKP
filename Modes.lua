@@ -113,14 +113,11 @@ local function get_events(set, playerid, typefilter)
 end
 
 local function event_filter_balance(event,pid)
-  return (event.eventType ~= "vanityreset" and true or false)
+  return (event.eventType ~= "vanityreset" and event.eventType ~= "rename")
 end
 
 local function event_filter_auction_won(event,pid)
-  if event.eventType == "auction" and event.target == pid then
-    return true
-  end
-  return false
+  return (event.eventType == "auction" and event.target == pid)
 end
 
 local classModePrototype = {
