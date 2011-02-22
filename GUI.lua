@@ -24,6 +24,21 @@ EminentDKP.displays["meter"] = meter
   Action Panel Functions
 ---------------------------------------------------------------------]]
 
+--[[
+ Confirmation dialogs:
+ 
+ 	StaticPopupDialogs["ResetSkadaDialog"] = {
+						text = L["Do you want to reset Skada?"], 
+						button1 = ACCEPT, 
+						button2 = CANCEL,
+						timeout = 30, 
+						whileDead = 0, 
+						hideOnEscape = 1, 
+						OnAccept = function() Skada:Reset() end,
+					}
+	StaticPopup_Show("ResetSkadaDialog")
+]]
+
 -- Show the tab responsible for transfers
 local function CreateTransferTab(container)
   local recip = AceGUI:Create("Dropdown")
@@ -34,6 +49,7 @@ local function CreateTransferTab(container)
   local amount = AceGUI:Create("Slider")
   amount:SetLabel("Amount")
   amount:SetSliderValues(1,EminentDKP:GetMyCurrentDKP(),1)
+  amount:SetValue(1)
   container:AddChild(amount)
   
   local send = AceGUI:Create("Button")
@@ -47,9 +63,72 @@ local function CreateTransferTab(container)
   container:AddChild(send)
 end
 
--- function that draws the widgets for the second tab
-local function DrawGroup2(container)
+local function CreateVanityTab(container)
+  local resetgrp = AceGUI:Create("InlineGroup")
+  resetgrp:SetTitle("Reset Player Vanity DKP")
+  resetgrp:SetLayout("Flow")
+  resetgrp:SetWidth(200)
+  
+  local who = AceGUI:Create("Dropdown")
+  who:SetText("Player")
+  who:SetList(EminentDKP:GetPlayerNames())
+  who:SetWidth(150)
+  resetgrp:AddChild(who)
+  
+  local reset = AceGUI:Create("Button")
+  reset:SetText("Reset")
+  reset:SetWidth(150)
+  reset:SetCallback("OnClick",function(what)
+    -- todo: hookup functionality
+    EminentDKP:Print(who:GetValue())
+  end)
+  resetgrp:AddChild(reset)
+  container:AddChild(resetgrp)
+  
+  local rollgrp = AceGUI:Create("InlineGroup")
+  rollgrp:SetTitle("Vanity DKP Roll")
+  rollgrp:SetLayout("Flow")
+  
+  local roll = AceGUI:Create("Button")
+  roll:SetText("Roll")
+  roll:SetWidth(150)
+  roll:SetCallback("OnClick",function(what)
+    -- todo: hookup functionality
+  end)
+  rollgrp:AddChild(roll)
+  container:AddChild(rollgrp)
+end
 
+local function CreateRenameTab(container)
+  local renamegrp = AceGUI:Create("InlineGroup")
+  renamegrp:SetTitle("Rename Player")
+  renamegrp:SetLayout("Flow")
+  renamegrp:SetWidth(200)
+  
+  local newname = AceGUI:Create("Dropdown")
+  newname:SetLabel("New Name")
+  newname:SetWidth(150)
+  
+  local who = AceGUI:Create("Dropdown")
+  who:SetLabel("Player")
+  who:SetList(EminentDKP:GetPlayerNames())
+  who:SetCallback("OnValueChanged",function(data)
+    newname:SetText("")
+    newname:SetList(EminentDKP:GetPlayersOfClass(data.value))
+  end)
+  who:SetWidth(150)
+  renamegrp:AddChild(who)
+  renamegrp:AddChild(newname)
+  
+  local rename = AceGUI:Create("Button")
+  rename:SetText("Rename")
+  rename:SetWidth(150)
+  rename:SetCallback("OnClick",function(what)
+    -- todo: hookup functionality
+  end)
+  renamegrp:AddChild(rename)
+  
+  container:AddChild(renamegrp)
 end
 
 -- Callback function for OnGroupSelected
@@ -57,8 +136,12 @@ local function SelectGroup(container, event, group)
   container:ReleaseChildren()
   if group == "transfer" then
     CreateTransferTab(container)
-  elseif group == "tab2" then
-    DrawGroup2(container)
+  elseif group == "vanity" then
+    CreateVanityTab(container)
+  elseif group == "rename" then
+    CreateRenameTab(container)
+  elseif group == "bounty" then
+    CreateBountyTab(container)
   end
 end
 
@@ -68,7 +151,7 @@ function EminentDKP:CreateActionPanel()
     self.actionpanel = nil
   end
   self.actionpanel = AceGUI:Create("EminentDKPFrame")
-  self.actionpanel:SetWidth(400)
+  self.actionpanel:SetWidth(450)
   self.actionpanel:SetHeight(400)
   self.actionpanel:SetTitle("EminentDKP Action Panel")
   self.actionpanel:SetStatusText("AceGUI-3.0 Example Container Frame")
@@ -82,7 +165,11 @@ function EminentDKP:CreateActionPanel()
   local tab =  AceGUI:Create("TabGroup")
   tab:SetLayout("Flow")
   -- Setup which tabs to show
-  tab:SetTabs({{text="Transfer", value="transfer"}, {text="Tab 2", value="tab2"}})
+  tab:SetTabs({
+    {text="Transfer", value="transfer"},
+    {text="Vanity", value="vanity"},
+    {text="Rename", value="rename"}
+  })
   -- Register callback
   tab:SetCallback("OnGroupSelected", SelectGroup)
   -- Set initial Tab (this will fire the OnGroupSelected callback)

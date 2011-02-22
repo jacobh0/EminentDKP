@@ -24,12 +24,10 @@ TODO:
 1. Convert permission level checks into hooks
  -- Simplify permissions, and refactor checks for less code overhead
 2. Organize meter display code and move to GUI.lua
-3. Rip out boss detection code from Skada, use it as default bounty reason
-4. Rip out combat detection code from Skada, use it to unhide meter display
-5. Convert all static messages into localized messages
-6. Rebuild internal whisper functions to support either addon whispers or player whispers
-7. Investigate bar recycling (specifically when wiping the window, etc)
-8. Address database integrity issues surrounding officer capabilities
+3. Convert all static messages into localized messages
+4. Rebuild internal whisper functions to support either addon whispers or player whispers
+5. Investigate bar recycling (specifically when wiping the window, etc)
+6. Address database integrity issues surrounding officer capabilities
 
 ]]
 
@@ -42,10 +40,12 @@ local sets = {}
 -- Modes (see Modes.lua)
 local modes = {}
 
+local recent_achievements = {}
+local recent_deaths = {}
+
 local auction_active = false
 
 local recent_loots = {}
-
 local eligible_looters = {}
 
 local events_cache = {}
@@ -66,23 +66,22 @@ local function GetDaysSince(timestamp)
   return GetDaysBetween(time(),timestamp)
 end
 
--- Formats a number into human readable form.
-function EminentDKP:FormatNumber(number)
-	if number then
-		if self.db.profile.numberformat == 1 then
-			if number > 1000000 then
-				return ("%02.2fM"):format(number / 1000000)
-			else
-				return ("%02.1fK"):format(number / 1000)
+local function IsRaidInCombat()
+	if GetNumRaidMembers() > 0 then
+		-- We are in a raid.
+		for i = 1, GetNumRaidMembers(), 1 do
+			if UnitExists("raid"..i) and UnitAffectingCombat("raid"..i) then
+				return true
 			end
-		else
-			return self:StdNumber(number)
+		end
+	elseif GetNumPartyMembers() > 0 then
+		-- In party.
+		for i = 1, GetNumPartyMembers(), 1 do
+			if UnitExists("party"..i) and UnitAffectingCombat("party"..i) then
+				return true
+			end
 		end
 	end
-end
-
-function EminentDKP:StdNumber(number)
-  return string.format('%.02f', number)
 end
 
 local function implode(delim,list)
@@ -956,10 +955,6 @@ function EminentDKP:OnInitialize()
     end
   end
   
-  if type(CUSTOM_CLASS_COLORS) == "table" then
-		self.classColors = CUSTOM_CLASS_COLORS
-	end
-  
   self.myName = UnitName("player")
   
   -- Get the current loot info as a basis
@@ -1010,12 +1005,14 @@ function EminentDKP:OnEnable()
 	self:RegisterChatEvent("CHAT_MSG_WHISPER_INFORM") -- whispers sent
 	self:RegisterChatEvent("CHAT_MSG_RAID") -- raid messages
 	self:RegisterChatEvent("CHAT_MSG_RAID_WARNING") -- raid warnings
-	
+	self:RegisterEvent("ACHIEVEMENT_EARNED") -- achievement tracking
 	self:RegisterEvent("LOOT_OPENED") -- loot listing
 	self:RegisterEvent("LOOT_CLOSED") -- auction cancellation
 	self:RegisterEvent("PARTY_LOOT_METHOD_CHANGED") -- masterloot change
 	self:RegisterEvent("RAID_ROSTER_UPDATE") -- raid member list update
 	self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
+	self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
+	self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
 	self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
 	-- Sync methods
 	self:RegisterComm("EminentDKP-Proposal", "ProcessSyncProposal")
@@ -1029,6 +1026,10 @@ function EminentDKP:OnEnable()
 	self:RawHook(self,"AdminVanityReset","EnsureOfficership")
 	self:RawHook(self,"AdminVanityRoll","EnsureOfficership")
 	self:RawHook(self,"AdminRename","EnsureOfficership")
+	
+	if type(CUSTOM_CLASS_COLORS) == "table" then
+		self.classColors = CUSTOM_CLASS_COLORS
+	end
 	
 	-- need hook for:
 	-- self:Bid(arg1,from)
@@ -1357,6 +1358,25 @@ end
 
 ---------- END SYNC FUNCTIONS ----------
 
+-- Formats a number into human readable form.
+function EminentDKP:FormatNumber(number)
+	if number then
+		if self.db.profile.numberformat == 1 then
+			if number > 1000000 then
+				return ("%02.2fM"):format(number / 1000000)
+			else
+				return ("%02.1fK"):format(number / 1000)
+			end
+		else
+			return self:StdNumber(number)
+		end
+	end
+end
+
+function EminentDKP:StdNumber(number)
+  return string.format('%.02f', number)
+end
+
 function EminentDKP:IsAnOfficer(who)
   local guildName, guildRankName, guildRankIndex = GetGuildInfo(who)
   return (guildRankIndex < 2)
@@ -1445,8 +1465,29 @@ end
 -- Get the names of everybody else in the pool
 function EminentDKP:GetOtherPlayersNames()
   local list = {}
-  for name,id in pairs(self:GetActivePool().playerIDs) do
+  for name,pid in pairs(self:GetActivePool().playerIDs) do
     if name ~= self.myName then
+      list[name] = name
+    end
+  end
+  return list
+end
+
+function EminentDKP:GetPlayerNames()
+  local list = {}
+  for name,pid in pairs(self:GetActivePool().playerIDs) do
+    list[name] = name
+  end
+  return list
+end
+
+function EminentDKP:GetPlayersOfClass(name)
+  local playerid = self:GetPlayerIDByName(name)
+  local player = self:GetPlayerByID(playerid)
+  local list = {}
+  for pid,data in pairs(self:GetActivePool().players) do
+    if playerid ~= pid and data.class == player.class then
+      local name = self:GetPlayerNameByID(pid)
       list[name] = name
     end
   end
@@ -1774,23 +1815,59 @@ function EminentDKP:UpdateLootEligibility()
 	end
 end
 
+-- Keep track of any creature deaths
+function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
+  if not self:AmOfficer() and not UnitInRaid("player") then return end
+  if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
+    table.insert(recent_deaths,1,dstName)
+    if #(recent_deaths) > 10
+      tremove(recent_deaths)
+    end
+  end
+end
+
+-- Keep track of any earned achievements
+function EminentDKP:ACHIEVEMENT_EARNED(event, achievementID)
+  if not self:AmOfficer() and not UnitInRaid("player") then return end
+  table.insert(recent_achievements,1,select(2,GetAchievementInfo(achievementID)))
+  if #(recent_achievements) > 10
+    tremove(recent_achievements)
+  end
+end
+
 -- Broadcast version
 function EminentDKP:PLAYER_ENTERING_WORLD()
   self:BroadcastVersion()
 end
 
--- Announcements (and expirations) occur at the first entry of combat
--- This ensures nobody is accidently expired and everybody sees the announcements
+-- Check if we're not dead and raid is not in combat, then we're out of combat
+function EminentDKP:CheckCombatStatus()
+  if not UnitIsDead("player") and not IsRaidInCombat() then
+    self:CancelTimer(self.combatCheckTimer,true)
+    self:ToggleMeters(true)
+  end
+end
+
+-- Possibility we are out of combat
+function EminentDKP:PLAYER_REGEN_ENABLED()
+  if self.db.profile.hidecombat then
+    self.combatCheckTimer = self:ScheduleRepeatingTimer("CheckCombatStatus",1)
+  end
+end
+
+-- Announcements, prunes, and expirations occur at the first entry of combat
 function EminentDKP:PLAYER_REGEN_DISABLED()
-  if self.db.profile.hidecombat then self:ToggleMeters(false) end
+  if self.db.profile.hidecombat then
+    self:CancelTimer(self.combatCheckTimer,true)
+    self:ToggleMeters(false)
+  end
   if not self:AmOfficer() and not self.amMasterLooter then return end
   
-  if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) < 0 then
+  if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) > 0 then
     sendchat('Performing database scan...', nil, 'self')
     for pid,data in pairs(self:GetActivePool().players) do
       if data.active then
-        local days = math.floor(GetDaysSince(data.lastRaid))
-        if days >= self.db.profile.expiretime then
+        if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
           -- If deemed inactive then reset their DKP and vanity DKP
           local name = self:GetPlayerNameByID(pid)
           sendchat('The DKP for '..name..' has expired. Bounty has increased by '..self:StdNumber(data.currentDKP)..' DKP.', "raid", "preset")
