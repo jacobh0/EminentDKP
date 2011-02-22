@@ -992,7 +992,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
     if self:GetLastScan() == '' or GetDayDifference(self:GetLastScan(),GetTodayDateTime()) < 0 then
       sendchat('Performing database scan...', nil, 'self')
       for pid,data in pairs(self.db.factionrealm.pools[self.db.profile.activepool].players) do
-        if data.active then
+        if data.active and data.earnedDKP > 0 then
           local days = math.floor(GetDayDifference(GetTodayDateTime(),data.lastRaid))
           if days >= self.db.profile.raid.expiretime then
             -- If deemed inactive then reset their DKP and vanity DKP
