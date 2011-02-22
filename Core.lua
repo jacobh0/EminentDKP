@@ -13,7 +13,7 @@ local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 
-VERSION = '2.0.3'
+VERSION = '2.0.4'
 local newest_version = ''
 local needs_update = false
 
