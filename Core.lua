@@ -21,6 +21,7 @@ end
 
 TODO:
 
+0. Add purge event
 1. Convert permission level checks into hooks
  -- Simplify permissions, and refactor checks for less code overhead
 2. Organize meter display code and move to GUI.lua
@@ -28,6 +29,8 @@ TODO:
 4. Rebuild internal whisper functions to support either addon whispers or player whispers
 5. Investigate bar recycling (specifically when wiping the window, etc)
 6. Address database integrity issues surrounding officer capabilities
+7. Revamp version system
+8. Sync database scans (so officers don't run duplicate scans in a day)
 
 ]]
 
@@ -470,9 +473,9 @@ end
 -- Toggle visibility of all the meter displays
 function EminentDKP:ToggleMeters(visible)
 	for i, win in ipairs(windows) do
-	  if visible then
+	  if visible and not win:IsShown() then
 		  win:Show()
-	  else
+	  elseif not visible and win:IsShown() then
 	    win:Hide()
     end
 	end
@@ -1010,6 +1013,7 @@ function EminentDKP:OnEnable()
 	self:RegisterEvent("LOOT_CLOSED") -- auction cancellation
 	self:RegisterEvent("PARTY_LOOT_METHOD_CHANGED") -- masterloot change
 	self:RegisterEvent("RAID_ROSTER_UPDATE") -- raid member list update
+	self:RegisterEvent("PARTY_MEMBERS_CHANGED") -- party member list update
 	self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
 	self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
 	self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
@@ -1838,6 +1842,15 @@ end
 -- Broadcast version
 function EminentDKP:PLAYER_ENTERING_WORLD()
   self:BroadcastVersion()
+  
+  -- Hide the meters if we're PVPing and we want it hidden
+  if self.db.profile.hidepvp then
+    if is_in_pvp() then
+      self:ToggleMeters(false)
+    else
+      self:ToggleMeters(true)
+    end
+  end
 end
 
 -- Check if we're not dead and raid is not in combat, then we're out of combat
@@ -1857,6 +1870,7 @@ end
 
 -- Announcements, prunes, and expirations occur at the first entry of combat
 function EminentDKP:PLAYER_REGEN_DISABLED()
+  -- Hide meters if we're in combat and want it hidden
   if self.db.profile.hidecombat then
     self:CancelTimer(self.combatCheckTimer,true)
     self:ToggleMeters(false)
@@ -1884,8 +1898,19 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
   end
 end
 
+-- Tracking for hide when solo option
+function EminentDKP:PARTY_MEMBERS_CHANGED()
+  if self.db.profile.hidesolo then
+		self:ToggleMeters(true)
+	end
+end
+
 -- Keep track of people in the raid
 function EminentDKP:RAID_ROSTER_UPDATE()
+  if self.db.profile.hidesolo then
+		self:ToggleMeters(true)
+	end
+  
   -- This only needs to be run by the masterlooter
   if not self:AmOfficer() and not self.amMasterLooter then return end
   
