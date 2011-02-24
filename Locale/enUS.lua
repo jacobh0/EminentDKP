@@ -161,3 +161,10 @@ L["ERROR: %s is not a fresh player."] = "ERROR: %s is not a fresh player."
 
 L["Successfully renamed %s to %s."] = "Successfully renamed %s to %s."
 L["Successfully reset vanity DKP for %s."] = "Successfully reset vanity DKP for %s."
+
+L["%s has transferred you"] = "%s has transferred you"
+L["You have received a bounty of"] = "You have received a bounty of"
+L["You've won an auction for"] = "You've won an auction for"
+L["You Have Just"] = "You Have Just"
+L["Won An Auction"] = "Won An Auction"
+L["has been won for %.02f DKP"] = "has been won for %.02f DKP"

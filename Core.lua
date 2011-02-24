@@ -21,7 +21,6 @@ end
 
 TODO:
 
-0. Add purge event
 1. Convert permission level checks into hooks
  -- Simplify permissions, and refactor checks for less code overhead
 2. Organize meter display code and move to GUI.lua
@@ -963,9 +962,6 @@ function EminentDKP:OnInitialize()
   -- Get the current loot info as a basis
   self:PARTY_LOOT_METHOD_CHANGED()
   
-  -- Broadcast version every 5 minutes
-  self:ScheduleRepeatingTimer("BroadcastVersion", 300)
-  
   -- Remember events we have recently sycned
   self.syncRequests = {}
   self.syncProposals = {}
@@ -1024,6 +1020,9 @@ function EminentDKP:OnEnable()
 	self:RegisterComm("EminentDKP-Request", "ProcessSyncRequest")
 	self:RegisterComm("EminentDKP-Version", "ProcessSyncVersion")
 	self:RegisterComm("EminentDKP", "ProcessSyncEvent")
+	-- Custom event notifications
+	self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
+	self:RawHook("LevelUpDisplay_AnimStep", "LevelUpDisplayFinished", true)
 	-- Permission Hooks
 	self:RawHook(self,"AdminStartAuction","EnsureMasterlooter")
 	self:RawHook(self,"AdminDistributeBounty","EnsureOfficership")
@@ -1034,6 +1033,9 @@ function EminentDKP:OnEnable()
 	if type(CUSTOM_CLASS_COLORS) == "table" then
 		self.classColors = CUSTOM_CLASS_COLORS
 	end
+	
+	-- Broadcast version every 5 minutes
+  self:ScheduleRepeatingTimer("BroadcastVersion", 300)
 	
 	-- need hook for:
 	-- self:Bid(arg1,from)
@@ -1048,6 +1050,72 @@ function EminentDKP:OnEnable()
     return
   end
 	]]
+end
+
+-- Hook the animation step function so we can change the font size of the flavor text
+function EminentDKP:LevelUpDisplayFinished(frame)
+  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" then
+    frame.spellFrame.flavorText:SetFontObject("GameFontNormalLarge")
+  end
+  self.hooks["LevelUpDisplay_AnimStep"](frame)
+end
+
+-- Overriding the default level up display to show custom messages
+-- todo: add sound notification option in settings
+function EminentDKP:LevelUpDisplayShow(frame)
+  local texcoords = {
+    dot = { 0.64257813, 0.68359375, 0.18750000, 0.23046875 },
+    goldBG = { 0.56054688, 0.99609375, 0.24218750, 0.46679688 },
+    gLine = { 0.00195313, 0.81835938, 0.01953125, 0.03320313 },
+    textTint = {0.67,0.93,0.45},
+  }
+  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" then
+    frame.currSpell = 2 -- currSpell > #(unlockList)
+    frame.unlockList = { }
+    if frame.type == "BOUNTY_RECEIVED" then
+      frame.levelFrame.reachedText:SetFormattedText(L["You have received a bounty of"])
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+    elseif frame.type == "TRANSFER_RECEIVED" then
+      frame.levelFrame.reachedText:SetFormattedText(L["%s has transferred you"],self.notifyDetails.src)
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+    elseif frame.type == "AUCTION_WON" then
+      table.insert(frame.unlockList,{ icon=select(10,GetItemInfo(self.notifyDetails.desc)),
+                                      subIcon=SUBICON_TEXCOOR_ARROW,
+                                      text=string.format(L["has been won for %.02f DKP"],self.notifyDetails.src),
+                                      subText=select(2,GetItemInfo(self.notifyDetails.desc)),
+                                      })
+      frame.currSpell = 1
+      frame.levelFrame.reachedText:SetFormattedText(L["You Have Just"])
+      frame.levelFrame.levelText:SetFormattedText(L["Won An Auction"])
+      texcoords.textTint = nil
+    end
+    frame.gLine:SetTexCoord(unpack(texcoords.gLine))
+    frame.gLine2:SetTexCoord(unpack(texcoords.gLine))
+    if (texcoords.tint) then
+        frame.gLine:SetVertexColor(unpack(texcoords.tint))
+        frame.gLine2:SetVertexColor(unpack(texcoords.tint))
+    else
+        frame.gLine:SetVertexColor(1, 1, 1);
+        frame.gLine2:SetVertexColor(1, 1, 1);
+    end
+    if (texcoords.textTint) then
+        frame.levelFrame.levelText:SetTextColor(unpack(texcoords.textTint))
+    else
+        frame.levelFrame.levelText:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+    end
+    frame.levelFrame.levelUp:Play()
+  else
+    self.hooks[frame].OnShow(frame)
+  end
+end
+
+function EminentDKP:NotifyOnScreen(...)
+  local eventType, received, source = ...
+  
+  LevelUpDisplay.type = eventType
+  self.notifyDetails = { src = source, desc = received }
+  LevelUpDisplay:Show()
+  LevelUpDisplaySide:Hide()
 end
 
 function EminentDKP:EnsureOfficership(...)
@@ -1339,6 +1407,9 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   elseif event.eventType == 'expiration' then
     local sname = self:GetPlayerNameByID(event.source)
     self:CreateExpirationEvent(sname,event.datetime)
+  elseif event.eventType == 'purge' then
+    local sname = self:GetPlayerNameByID(event.source)
+    self:CreatePurgeEvent(sname,event.datetime)
   elseif event.eventType == 'vanityreset' then
     local sname = self:GetPlayerNameByID(event.source)
     self:CreateVanityResetEvent(sname,event.datetime)
@@ -1419,12 +1490,15 @@ function EminentDKP:IsPlayerFresh(name)
 end
 
 function EminentDKP:GetPlayerByID(pid)
-  return self:GetActivePool().players[pid]
+  return self:GetActivePool().players[pid], self:GetPlayerNameByID(pid)
 end
 
 function EminentDKP:GetPlayerByName(name)
   local pid = self:GetPlayerIDByName(name)
-  return (pid ~= nil and self:GetPlayerByID(pid) or nil)
+  if pid ~= nil then
+    return self:GetPlayerByID(pid), pid
+  end
+  return nil
 end
 
 -- Get a player's ID
@@ -1520,7 +1594,8 @@ function EminentDKP:GetCurrentRaidMembers()
   for spot = 1, 40 do
     local name = select(1,GetRaidRosterInfo(spot))
 		if name then
-		  players[self:GetPlayerIDByName(name)] = self:GetPlayerByName(name)
+		  local player, pid = self:GetPlayerByName(name)
+		  players[pid] = player
 		end
   end
   return players
@@ -1718,13 +1793,29 @@ function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
   return cid
 end
 
+function EminentDKP:CreatePurgeSyncEvent(name)
+  self:SyncEvent(self:CreatePurgeEvent(name,time()))
+end
+
+-- This assumes the player is fresh
+function EminentDKP:CreatePurgeEvent(name,dtime)
+  local pid = self:GetPlayerIDByName(name)
+  
+  -- Create the event
+  local cid = self:CreateEvent(pid,"purge",name,"","",0,dtime)
+  
+  self:GetActivePool().playerIDs[name] = nil
+  self:GetActivePool().players[pid] = nil
+  
+  return cid
+end
+
 function EminentDKP:CreateExpirationSyncEvent(name)
   self:SyncEvent(self:CreateExpirationEvent(name,time()))
 end
 
 function EminentDKP:CreateExpirationEvent(name,dtime)
-  local pid = self:GetPlayerIDByName(name)
-  local pdata = self:GetPlayerByName(name)
+  local pdata, pid = self:GetPlayerByName(name)
   local dkpAmt = pdata.currentDKP
   local vanityAmt = pdata.currentVanityDKP
   
@@ -1749,8 +1840,7 @@ function EminentDKP:CreateVanityResetSyncEvent(name)
 end
 
 function EminentDKP:CreateVanityResetEvent(name,dtime)
-  local pid = self:GetPlayerIDByName(name)
-  local pdata = self:GetPlayerByName(name)
+  local pdata, pid = self:GetPlayerByName(name)
   local amount = pdata.currentVanityDKP
   
   -- Create the event
@@ -1880,10 +1970,13 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
   if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) > 0 then
     sendchat('Performing database scan...', nil, 'self')
     for pid,data in pairs(self:GetActivePool().players) do
-      if data.active then
-        if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
+      if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
+        local name = self:GetPlayerNameByID(pid)
+        if self:IsPlayerFresh(name) then
+          -- purge
+          self:CreatePurgeSyncEvent(name)
+        elseif data.active then
           -- If deemed inactive then reset their DKP and vanity DKP
-          local name = self:GetPlayerNameByID(pid)
           sendchat('The DKP for '..name..' has expired. Bounty has increased by '..self:StdNumber(data.currentDKP)..' DKP.', "raid", "preset")
           self:CreateExpirationSyncEvent(name)
         end
@@ -1980,30 +2073,67 @@ function EminentDKP:LOOT_OPENED()
   end
 end
 
+function EminentDKP:WhisperPlayer(addon,what,who)
+  if addon then
+    self:SendCommMessage('EminentDKP',what,'WHISPER',who,'ALERT')
+  else
+    sendchat(what, who, 'whisper')
+  end
+end
+
 -- Place a bid on an active auction
-function EminentDKP:Bid(amount, from)
+function EminentDKP:Bid(addon,amount,from)
   if auction_active then
-    if UnitInRaid(from) then
-      if eligible_looters[from] then
-        local bid = math.floor(tonumber(amount))
-        if bid > 0 then
-          if self:PlayerHasDKP(from,bid) then
-            self.bidItem.bids[from] = bid
-            sendchat('Your bid of '.. bid .. ' has been accepted.', from, 'whisper')
-          else
-            sendchat('The bid amount must not exceed your current DKP.', from, 'whisper')
-          end
+    if eligible_looters[from] then
+      local bid = math.floor(tonumber(amount))
+      if bid > 0 then
+        if self:PlayerHasDKP(from,bid) then
+          self.bidItem.bids[from] = bid
+          self:WhisperPlayer(addon,'Your bid of '.. bid .. ' has been accepted.', from)
         else
-          sendchat('Bid must be a number greater than 0.', from, 'whisper')
+          self:WhisperPlayer(addon,'The bid amount must not exceed your current DKP.', from)
         end
       else
-        sendchat('You are not eligible to receive loot.', from, 'whisper')
+        self:WhisperPlayer(addon,'Bid must be a number greater than 0.', from)
       end
     else
-      sendchat('You must be present in the raid.', from, 'whisper')
+      self:WhisperPlayer(addon,'You are not eligible to receive loot.', from)
     end
   else
-    sendchat("There is currently no auction active.", from, 'whisper')
+    self:WhisperPlayer(addon,"There is currently no auction active.", from)
+  end
+end
+
+-- Transfer DKP from one player to another
+function EminentDKP:WhisperTransfer(addon,amount,to,from)
+  if not auction_active then
+    if to ~= from then
+      if self:PlayerExistsInPool(from) then
+        if self:PlayerExistsInPool(to) then
+          local dkp = tonumber(amount)
+          if dkp > 0 then
+            if self:PlayerHasDKP(from,dkp) then
+              self:CreateTransferSyncEvent(from,to,dkp)
+              sendchat('Succesfully transferred '.. dkp ..' DKP to ' .. to .. '.', from, 'whisper')
+              sendchat(from .. ' just transferred '.. dkp .. ' DKP to you.', to, 'whisper')
+              sendchat(from .. " has transferred " .. dkp .. " DKP to " .. to .. ".", "raid", "preset")
+            else
+              sendchat('The DKP amount must not exceed your current DKP.', from, 'whisper')
+            end
+          else
+            sendchat('DKP amount must be a number greater than 0.', from, 'whisper')
+          end
+        else
+          sendchat(to.." does not exist in the DKP pool.", from, 'whisper')
+        end
+      else
+        sendchat("You do not exist in the DKP pool.", from, 'whisper')
+      end
+    else
+      sendchat("You cannot transfer DKP to yourself.", from, 'whisper')
+    end
+  else
+    sendchat("You cannot transfer DKP during an auction.", from, 'whisper')
   end
 end
 
@@ -2049,39 +2179,6 @@ function EminentDKP:WhisperLifetime(to)
   sendchat('Lifetime Earned DKP standings:', to, 'whisper')
   for rank,data in ipairs(a) do
     sendchat(rank..'. '..data.n..' - '..self:StdNumber(data.dkp), to, 'whisper')
-  end
-end
-
--- Transfer DKP from one player to another
-function EminentDKP:WhisperTransfer(amount, to, from)
-  if to ~= from then
-    if self:PlayerExistsInPool(from) then
-      if self:PlayerExistsInPool(to) then
-        if not auction_active then
-          local dkp = tonumber(amount)
-          if dkp > 0 then
-            if self:PlayerHasDKP(from,dkp) then
-              self:CreateTransferSyncEvent(from,to,dkp)
-              sendchat('Succesfully transferred '.. dkp ..' DKP to ' .. to .. '.', from, 'whisper')
-              sendchat(from .. ' just transferred '.. dkp .. ' DKP to you.', to, 'whisper')
-              sendchat(from .. " has transferred " .. dkp .. " DKP to " .. to .. ".", "raid", "preset")
-            else
-              sendchat('The DKP amount must not exceed your current DKP.', from, 'whisper')
-            end
-          else
-            sendchat('DKP amount must be a number greater than 0.', from, 'whisper')
-          end
-        else
-          sendchat("You cannot transfer DKP during an auction.", from, 'whisper')
-        end
-      else
-        sendchat(to.." does not exist in the DKP pool.", from, 'whisper')
-      end
-    else
-      sendchat("You do not exist in the DKP pool.", from, 'whisper')
-    end
-  else
-    sendchat("You cannot transfer DKP to yourself.", from, 'whisper')
   end
 end
 
@@ -2335,6 +2432,14 @@ function EminentDKP:ProcessSlashCmd(input)
   
   if command == 'auction' then
     self:AdminStartAuction()
+  elseif command == 'test' then
+    --self:NotifyOnScreen("AUCTION_WON","5000")
+    --self:NotifyOnScreen("TRANSFER_RECEIVED","5000","Bob")
+    self:NotifyOnScreen("BOUNTY_RECEIVED","5000")
+  elseif command == 'test2' then
+    self:NotifyOnScreen("AUCTION_WON",65135,5000.45)
+  elseif command == 'test3' then
+    self:NotifyOnScreen("TRANSFER_RECEIVED","5000","Bob")
   elseif command == 'bounty' then
     self:AdminDistributeBounty(arg1,arg2)
   elseif command == 'version' then
@@ -2388,7 +2493,7 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
 	if a ~= "$" then return end
 	
   if command == 'bid' then
-    self:Bid(arg1,from)
+    self:Bid(false,arg1,from)
   elseif command == 'balance' then
     self:WhisperBalance(from)
   elseif command == 'check' then
@@ -2402,7 +2507,7 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
   elseif command == 'lifetime' then
     self:WhisperLifetime(from)
   elseif command == 'transfer' then
-    self:WhisperTransfer(arg1,arg2,from)
+    self:WhisperTransfer(false,arg1,arg2,from)
   elseif command == 'help' then
 	  sendchat("Available Commands:", from, 'whisper')
 		sendchat("'$ balance' to check your current balance", from, 'whisper')
