@@ -125,6 +125,7 @@ local function CreateRenameTab(container)
   rename:SetWidth(150)
   rename:SetCallback("OnClick",function(what)
     -- todo: hookup functionality
+    EminentDKP:AdminRename(who:GetValue(),newname:GetValue())
   end)
   renamegrp:AddChild(rename)
   
@@ -143,6 +144,7 @@ local function SelectGroup(container, event, group)
   elseif group == "bounty" then
     CreateBountyTab(container)
   end
+  EminentDKP.actionpanel:SetStatusText("")
 end
 
 function EminentDKP:CreateActionPanel()
@@ -154,7 +156,6 @@ function EminentDKP:CreateActionPanel()
   self.actionpanel:SetWidth(450)
   self.actionpanel:SetHeight(400)
   self.actionpanel:SetTitle("EminentDKP Action Panel")
-  self.actionpanel:SetStatusText("AceGUI-3.0 Example Container Frame")
   self.actionpanel:SetCallback("OnClose", function(widget)
     AceGUI:Release(widget)
     EminentDKP.actionpanel = nil

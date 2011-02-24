@@ -704,7 +704,7 @@ function EminentDKP:ApplySettings(win)
 
 	-- Don't show window if we are solo, option.
 	-- Don't show window in a PvP instance, option.
-	if (self.db.profile.hidesolo and is_solo()) or (self.db.profile.hidepvp and is_in_pvp())then
+	if (self.db.profile.hidesolo and is_solo()) or (self.db.profile.hidepvp and is_in_pvp()) then
 	  win:Hide()
 	else
 		win:Show()
@@ -1029,7 +1029,7 @@ function EminentDKP:OnEnable()
 	self:RawHook(self,"AdminDistributeBounty","EnsureOfficership")
 	self:RawHook(self,"AdminVanityReset","EnsureOfficership")
 	self:RawHook(self,"AdminVanityRoll","EnsureOfficership")
-	self:RawHook(self,"AdminRename","EnsureOfficership")
+	--self:RawHook(self,"AdminRename","EnsureOfficership")
 	
 	if type(CUSTOM_CLASS_COLORS) == "table" then
 		self.classColors = CUSTOM_CLASS_COLORS
@@ -1824,7 +1824,7 @@ function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, src
   if not self:AmOfficer() and not UnitInRaid("player") then return end
   if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
     table.insert(recent_deaths,1,dstName)
-    if #(recent_deaths) > 10
+    if #(recent_deaths) > 10 then
       tremove(recent_deaths)
     end
   end
@@ -1834,7 +1834,7 @@ end
 function EminentDKP:ACHIEVEMENT_EARNED(event, achievementID)
   if not self:AmOfficer() and not UnitInRaid("player") then return end
   table.insert(recent_achievements,1,select(2,GetAchievementInfo(achievementID)))
-  if #(recent_achievements) > 10
+  if #(recent_achievements) > 10 then
     tremove(recent_achievements)
   end
 end
@@ -1924,7 +1924,7 @@ function EminentDKP:RAID_ROSTER_UPDATE()
   
   -- Make sure players exist in the pool
   for d = 1, GetNumRaidMembers() do
-		name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(d)
+		local name = select(1,GetRaidRosterInfo(d))
 		if not self:PlayerExistsInPool(name) then
 		  self:CreateAddPlayerSyncEvent(name,select(2,UnitClass(name)))
 		end
@@ -2300,23 +2300,31 @@ end
 function EminentDKP:AdminVanityReset(who)
   if self:PlayerExistsInPool(who) then
     self:CreateVanityResetSyncEvent(who)
-    sendchat('Reseting current vanity DKP for '.. who ..'.', nil, 'self')
+    self:DisplayActionResult(string.format(L["Successfully reset vanity DKP for %s."],who))
   else
-    sendchat('The player '..who..' does not exist in the DKP pool.', nil, 'self')
+    self:DisplayActionResult(string.format(L["ERROR: %s does not exist in the DKP pool."],who))
   end
 end
 
 function EminentDKP:AdminRename(from,to)
   if self:PlayerExistsInPool(from) then
-    if not self:PlayerExistsInPool(to) then
-      self:CreateRenameSyncEvent(from,to)
-      sendchat('Succesfully renamed '..from..' -> '..to..'!', nil, 'self')
+    if self:PlayerExistsInPool(to) then
+      if self:IsPlayerFresh(to) then
+        --self:CreateRenameSyncEvent(from,to)
+        self:DisplayActionResult(string.format(L["Successfully renamed %s to %s."],from,to))
+      else
+        self:DisplayActionResult(string.format(L["ERROR: %s is not a fresh player."],to))
+      end
     else
-      sendchat('The player '..to..' already exists in the DKP pool.', nil, 'self')
+      self:DisplayActionResult(string.format(L["ERROR: %s does not exist in the DKP pool."],to))
     end
   else
-    sendchat('The player '..from..' does not exist in the DKP pool.', nil, 'self')
+    self:DisplayActionResult(string.format(L["ERROR: %s does not exist in the DKP pool."],from))
   end
+end
+
+function EminentDKP:DisplayActionResult(status)
+  self.actionpanel:SetStatusText(status)
 end
 
 ------------- END ADMIN FUNCTIONS -------------
@@ -2329,14 +2337,6 @@ function EminentDKP:ProcessSlashCmd(input)
     self:AdminStartAuction()
   elseif command == 'bounty' then
     self:AdminDistributeBounty(arg1,arg2)
-  elseif command == 'vanity' then
-    if arg1 then
-      self:AdminVanityReset(arg1)
-    else
-      self:AdminVanityRoll()
-    end
-  elseif command == 'rename' then
-    self:AdminRename(arg1,arg2)
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then

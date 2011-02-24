@@ -153,3 +153,11 @@ L["Show menu button"] = "Show menu button"
 L["Click for"] = "Click for"
 L["Shift-Click for"] = "Shift-Click for"
 L["Control-Click for"] = "Control-Click for"
+
+-- General messages
+
+L["ERROR: %s does not exist in the DKP pool."] = "ERROR: %s does not exist in the DKP pool."
+L["ERROR: %s is not a fresh player."] = "ERROR: %s is not a fresh player."
+
+L["Successfully renamed %s to %s."] = "Successfully renamed %s to %s."
+L["Successfully reset vanity DKP for %s."] = "Successfully reset vanity DKP for %s."
