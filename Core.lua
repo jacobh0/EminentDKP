@@ -1901,14 +1901,22 @@ end
 -- Tracking for hide when solo option
 function EminentDKP:PARTY_MEMBERS_CHANGED()
   if self.db.profile.hidesolo then
-		self:ToggleMeters(true)
+    if is_solo() then
+		  self:ToggleMeters(false)
+	  else
+	    self:ToggleMeters(true)
+    end
 	end
 end
 
 -- Keep track of people in the raid
 function EminentDKP:RAID_ROSTER_UPDATE()
   if self.db.profile.hidesolo then
-		self:ToggleMeters(true)
+    if is_solo() then
+		  self:ToggleMeters(false)
+	  else
+	    self:ToggleMeters(true)
+    end
 	end
   
   -- This only needs to be run by the masterlooter
