@@ -156,8 +156,13 @@ L["Control-Click for"] = "Control-Click for"
 
 -- General messages
 
+L["Achievement: %s"] = "Achievement: %s"
+L["Kill: %s"] = "Kill: %s"
+
 L["ERROR: %s does not exist in the DKP pool."] = "ERROR: %s does not exist in the DKP pool."
 L["ERROR: %s is not a fresh player."] = "ERROR: %s is not a fresh player."
+L["ERROR: Invalid bounty amount given."] = "ERROR: Invalid bounty amount given."
+L["ERROR: An auction must not be active."] = "ERROR: An auction must not be active."
 
 L["Successfully renamed %s to %s."] = "Successfully renamed %s to %s."
 L["Successfully reset vanity DKP for %s."] = "Successfully reset vanity DKP for %s."

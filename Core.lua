@@ -30,6 +30,7 @@ TODO:
 6. Address database integrity issues surrounding officer capabilities
 7. Revamp version system
 8. Sync database scans (so officers don't run duplicate scans in a day)
+9. Investigate individual day current DKP (lamashtu at -72k when only deduction is 25k)
 
 ]]
 
@@ -1028,7 +1029,7 @@ function EminentDKP:OnEnable()
 	self:RawHook(self,"AdminDistributeBounty","EnsureOfficership")
 	self:RawHook(self,"AdminVanityReset","EnsureOfficership")
 	self:RawHook(self,"AdminVanityRoll","EnsureOfficership")
-	--self:RawHook(self,"AdminRename","EnsureOfficership")
+	self:RawHook(self,"AdminRename","EnsureOfficership")
 	
 	if type(CUSTOM_CLASS_COLORS) == "table" then
 		self.classColors = CUSTOM_CLASS_COLORS
@@ -1067,7 +1068,7 @@ function EminentDKP:LevelUpDisplayShow(frame)
     dot = { 0.64257813, 0.68359375, 0.18750000, 0.23046875 },
     goldBG = { 0.56054688, 0.99609375, 0.24218750, 0.46679688 },
     gLine = { 0.00195313, 0.81835938, 0.01953125, 0.03320313 },
-    textTint = {0.67,0.93,0.45},
+    textTint = { 0.67, 0.93, 0.45 },
   }
   if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" then
     frame.currSpell = 2 -- currSpell > #(unlockList)
@@ -1923,7 +1924,7 @@ end
 -- Keep track of any earned achievements
 function EminentDKP:ACHIEVEMENT_EARNED(event, achievementID)
   if not self:AmOfficer() and not UnitInRaid("player") then return end
-  table.insert(recent_achievements,1,select(2,GetAchievementInfo(achievementID)))
+  table.insert(recent_achievements,1,select(2,GetAchievementInfo(tonumber(achievementID))))
   if #(recent_achievements) > 10 then
     tremove(recent_achievements)
   end
@@ -1932,7 +1933,6 @@ end
 -- Broadcast version
 function EminentDKP:PLAYER_ENTERING_WORLD()
   self:BroadcastVersion()
-  
   -- Hide the meters if we're PVPing and we want it hidden
   if self.db.profile.hidepvp then
     if is_in_pvp() then
@@ -2334,13 +2334,22 @@ function EminentDKP:AuctionBidTimer()
   end
 end
 
-function EminentDKP:AdminDistributeBounty(percent,reason)
+function EminentDKP:GetBountyReasons()
+  local reasons = { ["Default"] = "Default" }
+  for i,mob in pairs(recent_deaths) do
+    reasons[mob] = string.format(L["Kill: %s"],mob)
+  end
+  for i,achiev in pairs(recent_achievements) do
+    reasons[achiev] = string.format(L["Achievement: %s"],achiev)
+  end
+  return reasons
+end
+
+function EminentDKP:AdminDistributeBounty(percent,value,reason)
   -- todo: maybe offer a config option to automatically run this after a boss death?
   if not auction_active then
-    local p = math.floor(tonumber(percent))
-    if p <= 100 and p > 0 then
-      sendchat('Distributing '.. percent ..'% of the bounty to the raid.', nil, 'self')
-      
+    local p = tonumber(value) or 0
+    if (percent and p <= 100 and p > 0) or (not percent and p <= self:GetAvailableBounty() and p > 0) then
       -- Construct list of players to receive bounty
       local players = self:GetCurrentRaidMembersIDs()
       
@@ -2353,18 +2362,20 @@ function EminentDKP:AdminDistributeBounty(percent,reason)
           name = reason
         end
       end
-      local amount = (self:GetAvailableBounty() * (p/100))
+      local amount = (percent and (self:GetAvailableBounty() * (p/100)) or p)
       local dividend = (amount/#(players))
       
-      self:CreateBountySyncEvent(players,amount,name)
-      sendchat('A bounty of '..self:StdNumber(amount)..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
-      sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
-      sendchat('New bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
+      self:CreateBountySyncEvent(players,amount,reason)
+      -- todo: send message over addon channel
+      
+      --sendchat('A bounty of '..self:StdNumber(amount)..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
+      --sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
+      --sendchat('New bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
     else
-      sendchat('You must enter a percent between 0 and 100.', nil, 'self')
+      self:DisplayActionResult(L["ERROR: Invalid bounty amount given."])
     end
   else
-    sendchat('An auction must not be active.', nil, 'self')
+    self:DisplayActionResult(L["ERROR: An auction must not be active."])
   end
   
 end
@@ -2374,7 +2385,7 @@ function EminentDKP:AdminVanityRoll()
   if not auction_active then
     local ranks = {}
     for r = 1, GetNumRaidMembers() do
-  		name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(r)
+  		local name = select(1,GetRaidRosterInfo(r))
   		if name then
   		  local data = self:GetPlayerByName(name)
   			if data.currentVanityDKP > 0 then

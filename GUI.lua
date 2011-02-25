@@ -80,7 +80,7 @@ local function CreateVanityTab(container)
   reset:SetWidth(150)
   reset:SetCallback("OnClick",function(what)
     -- todo: hookup functionality
-    EminentDKP:Print(who:GetValue())
+    EminentDKP:AdminVanityReset(who:GetValue())
   end)
   resetgrp:AddChild(reset)
   container:AddChild(resetgrp)
@@ -94,6 +94,7 @@ local function CreateVanityTab(container)
   roll:SetWidth(150)
   roll:SetCallback("OnClick",function(what)
     -- todo: hookup functionality
+    EminentDKP:AdminVanityRoll()
   end)
   rollgrp:AddChild(roll)
   container:AddChild(rollgrp)
@@ -112,9 +113,9 @@ local function CreateRenameTab(container)
   local who = AceGUI:Create("Dropdown")
   who:SetLabel("Player")
   who:SetList(EminentDKP:GetPlayerNames())
-  who:SetCallback("OnValueChanged",function(data)
+  who:SetCallback("OnValueChanged",function(i,j,value)
     newname:SetText("")
-    newname:SetList(EminentDKP:GetPlayersOfClass(data.value))
+    newname:SetList(EminentDKP:GetPlayersOfClass(value))
   end)
   who:SetWidth(150)
   renamegrp:AddChild(who)
@@ -130,6 +131,51 @@ local function CreateRenameTab(container)
   renamegrp:AddChild(rename)
   
   container:AddChild(renamegrp)
+end
+
+local function CreateBountyTab(container)
+  local bountygrp = AceGUI:Create("InlineGroup")
+  bountygrp:SetTitle("Award Bounty")
+  bountygrp:SetLayout("Flow")
+  bountygrp:SetWidth(200)
+  
+  local reason = AceGUI:Create("Dropdown")
+  reason:SetLabel("Reason")
+  reason:SetWidth(150)
+  reason:SetList(EminentDKP:GetBountyReasons())
+  reason:SetValue("Default")
+  
+  local amount = AceGUI:Create("Slider")
+  amount:SetLabel("Amount")
+  amount:SetSliderValues(0.5,100,0.5)
+  amount:SetValue(0.5)
+  
+  local percent = AceGUI:Create("CheckBox")
+  percent:SetLabel("Percent")
+  percent:SetValue(true)
+  percent:SetCallback("OnValueChanged",function(i,j,checked)
+    if checked then
+      amount:SetSliderValues(0.5,100,0.5)
+      amount:SetValue(0.5)
+    else
+      amount:SetSliderValues(1,math.floor(EminentDKP:GetAvailableBounty()),1)
+      amount:SetValue(1)
+    end
+  end)
+  
+  local award = AceGUI:Create("Button")
+  award:SetText("Award")
+  award:SetWidth(150)
+  award:SetCallback("OnClick",function(what)
+    -- todo: hookup functionality
+    EminentDKP:AdminDistributeBounty(percent:GetValue(),amount:GetValue(),reason:GetValue())
+  end)
+  
+  bountygrp:AddChild(reason)
+  bountygrp:AddChild(percent)
+  bountygrp:AddChild(amount)
+  bountygrp:AddChild(award)
+  container:AddChild(bountygrp)
 end
 
 -- Callback function for OnGroupSelected
@@ -169,7 +215,8 @@ function EminentDKP:CreateActionPanel()
   tab:SetTabs({
     {text="Transfer", value="transfer"},
     {text="Vanity", value="vanity"},
-    {text="Rename", value="rename"}
+    {text="Rename", value="rename"},
+    {text="Bounty", value="bounty"},
   })
   -- Register callback
   tab:SetCallback("OnGroupSelected", SelectGroup)
