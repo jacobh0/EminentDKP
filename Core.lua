@@ -21,8 +21,6 @@ end
 
 TODO:
 
-1. Convert permission level checks into hooks
- -- Simplify permissions, and refactor checks for less code overhead
 2. Organize meter display code and move to GUI.lua
 3. Convert all static messages into localized messages
 4. Rebuild internal whisper functions to support either addon whispers or player whispers
@@ -1030,6 +1028,8 @@ function EminentDKP:OnEnable()
 	self:RawHook(self,"AdminVanityReset","EnsureOfficership")
 	self:RawHook(self,"AdminVanityRoll","EnsureOfficership")
 	self:RawHook(self,"AdminRename","EnsureOfficership")
+	self:RawHook(self,"Bid","EnsureToMasterlooter")
+	self:RawHook(self,"Transfer","EnsureToMasterlooter")
 	
 	if type(CUSTOM_CLASS_COLORS) == "table" then
 		self.classColors = CUSTOM_CLASS_COLORS
@@ -1037,20 +1037,6 @@ function EminentDKP:OnEnable()
 	
 	-- Broadcast version every 5 minutes
   self:ScheduleRepeatingTimer("BroadcastVersion", 300)
-	
-	-- need hook for:
-	-- self:Bid(arg1,from)
-	-- self:WhisperTransfer(arg1,arg2,from)
-	--[[
-	if self.lootMethod ~= 'master' then
-    sendchat("Master looting must be enabled.", from, 'whisper')
-    return
-  end
-  if self.masterLooterPartyID ~= 0 then
-    sendchat("That command must be sent to the master looter.", from, 'whisper')
-    return
-  end
-	]]
 end
 
 -- Hook the animation step function so we can change the font size of the flavor text
@@ -1119,26 +1105,39 @@ function EminentDKP:NotifyOnScreen(...)
   LevelUpDisplaySide:Hide()
 end
 
-function EminentDKP:EnsureOfficership(...)
+function EminentDKP:EnsureToMasterlooter(self, ...)
+  local addon, name = ...
+  if not self.amMasterLooter then
+    self:WhisperPlayer(addon,L["That command must be sent to the master looter."],name)
+    return
+  end
+  if not self:AmOfficer() then
+    self:WhisperPlayer(addon,L["The master looter must be an officer."],name)
+    return
+  end
+  self.hooks["EnsureToMasterlooter"](...)
+end
+
+function EminentDKP:EnsureOfficership(self, ...)
   -- Check if the command can only be used by an officer
   if not self:AmOfficer() then
-    sendchat("That command can only be used by an officer.", nil, 'self')
+    sendchat(L["That command can only be used by an officer."], nil, 'self')
     return
   end
   self.hooks["EnsureOfficership"](...)
 end
 
-function EminentDKP:EnsureMasterlooter(...)
+function EminentDKP:EnsureMasterlooter(self, ...)
   if not self:AmOfficer() then
-    sendchat("That command can only be used by an officer.", nil, 'self')
+    sendchat(L["That command can only be used by an officer."], nil, 'self')
     return
   end
   if self.lootMethod ~= 'master' then
-    sendchat("Master looting must be enabled.", nil, 'self')
+    sendchat(L["Master looting must be enabled."], nil, 'self')
     return
   end
   if not self.amMasterLooter then
-    sendchat("Only the master looter can use this command.", nil, 'self')
+    sendchat(L["Only the master looter can use that command."], nil, 'self')
     return
   end
   self.hooks["EnsureMasterlooter"](...)
@@ -1965,7 +1964,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
     self:CancelTimer(self.combatCheckTimer,true)
     self:ToggleMeters(false)
   end
-  if not self:AmOfficer() and not self.amMasterLooter then return end
+  if not self:AmMasterLooter() then return end
   
   if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) > 0 then
     sendchat('Performing database scan...', nil, 'self')
@@ -2013,7 +2012,7 @@ function EminentDKP:RAID_ROSTER_UPDATE()
 	end
   
   -- This only needs to be run by the masterlooter
-  if not self:AmOfficer() and not self.amMasterLooter then return end
+  if not self:AmMasterLooter() then return end
   
   -- Make sure players exist in the pool
   for d = 1, GetNumRaidMembers() do
@@ -2031,9 +2030,13 @@ function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
 end
 
+function EminentDKP:AmMasterLooter()
+  return (self.amMasterLooter and self:AmOfficer())
+end
+
 -- Loot window closing means cancel auction
 function EminentDKP:LOOT_CLOSED()
-  if UnitInRaid("player") and self.amMasterLooter and auction_active then
+  if self:AmMasterLooter() and auction_active then
     sendchat('Auction cancelled. All bids have been voided.', "raid", "preset")
     auction_active = false
     self:CancelTimer(self.bidTimer)
@@ -2044,7 +2047,7 @@ end
 -- Prints out the loot to the raid when looting a corpse
 function EminentDKP:LOOT_OPENED()
   -- This only needs to be run by the masterlooter
-  if not self:AmOfficer() and not self.amMasterLooter then return end
+  if not self:AmMasterLooter() then return end
   
   if UnitInRaid("player") then
     -- Query some info about this unit...
@@ -2082,7 +2085,7 @@ function EminentDKP:WhisperPlayer(addon,what,who)
 end
 
 -- Place a bid on an active auction
-function EminentDKP:Bid(addon,amount,from)
+function EminentDKP:Bid(addon,from,amount)
   if auction_active then
     if eligible_looters[from] then
       local bid = math.floor(tonumber(amount))
@@ -2105,7 +2108,7 @@ function EminentDKP:Bid(addon,amount,from)
 end
 
 -- Transfer DKP from one player to another
-function EminentDKP:WhisperTransfer(addon,amount,to,from)
+function EminentDKP:Transfer(addon,from,amount,to)
   if not auction_active then
     if to ~= from then
       if self:PlayerExistsInPool(from) then
@@ -2202,7 +2205,7 @@ end
 ------------- START ADMIN FUNCTIONS -------------
 
 function EminentDKP:AdminStartAuction()
-  if self.amMasterLooter then
+  if self:AmMasterLooter() then
     if GetNumLootItems() > 0 then
       local guid = UnitGUID("target")
       if #(recent_loots[guid].slots) > 0 then
@@ -2401,7 +2404,7 @@ function EminentDKP:AdminVanityRoll()
 	    sendchat(rank..'. '..data.n..' ('..tostring(data.v)..') - '..tostring(data.r)..'.', "raid", "preset")
     end
   else
-    sendchat('An auction must not be active.', nil, 'self')
+    self:DisplayActionResult(L["ERROR: An auction must not be active."])
   end
 end
 
@@ -2451,8 +2454,6 @@ function EminentDKP:ProcessSlashCmd(input)
     self:NotifyOnScreen("AUCTION_WON",65135,5000.45)
   elseif command == 'test3' then
     self:NotifyOnScreen("TRANSFER_RECEIVED","5000","Bob")
-  elseif command == 'bounty' then
-    self:AdminDistributeBounty(arg1,arg2)
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
@@ -2462,9 +2463,6 @@ function EminentDKP:ProcessSlashCmd(input)
   elseif command == 'admin' then
     sendchat("Admin Commands:", nil, 'self')
 		sendchat("'/edkp auction' to begin an auction (must be looting)", nil, 'self')
-		sendchat("'/edkp bounty X Y' to distribute X% of the bounty pool to the raid for a given reason Y", nil, 'self')
-		sendchat("'/edkp vanity X' to clear the vanity DKP for player X. If X is not given, a vanity roll is performed instead. Each roll is weighted by that player's current vanity dkp.", nil, 'self')
-	  sendchat("'/edkp rename X Y' to rename a player from X to Y (Y must not already exist)", nil, 'self')
 	else
 	  sendchat("Unrecognized command. Type '/edkp admin' for a list of valid commands.", nil, 'self')
   end
@@ -2504,7 +2502,7 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
 	if a ~= "$" then return end
 	
   if command == 'bid' then
-    self:Bid(false,arg1,from)
+    self:Bid(false,from,arg1)
   elseif command == 'balance' then
     self:WhisperBalance(from)
   elseif command == 'check' then
@@ -2518,7 +2516,7 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
   elseif command == 'lifetime' then
     self:WhisperLifetime(from)
   elseif command == 'transfer' then
-    self:WhisperTransfer(false,arg1,arg2,from)
+    self:WhisperTransfer(false,from,arg1,arg2)
   elseif command == 'help' then
 	  sendchat("Available Commands:", from, 'whisper')
 		sendchat("'$ balance' to check your current balance", from, 'whisper')

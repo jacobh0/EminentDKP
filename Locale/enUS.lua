@@ -156,6 +156,12 @@ L["Control-Click for"] = "Control-Click for"
 
 -- General messages
 
+L["That command must be sent to the master looter."] = "That command must be sent to the master looter."
+L["The master looter must be an officer."] = "The master looter must be an officer."
+L["That command can only be used by an officer."] = "That command can only be used by an officer."
+L["Master looting must be enabled."] = "Master looting must be enabled."
+L["Only the master looter can use that command."] = "Only the master looter can use that command."
+
 L["Achievement: %s"] = "Achievement: %s"
 L["Kill: %s"] = "Kill: %s"
 
