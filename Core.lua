@@ -1018,6 +1018,7 @@ function EminentDKP:OnEnable()
 	self:RegisterComm("EminentDKP-Fulfill", "ProcessSyncFulfill")
 	self:RegisterComm("EminentDKP-Request", "ProcessSyncRequest")
 	self:RegisterComm("EminentDKP-Version", "ProcessSyncVersion")
+	self:RegisterComm("EminentDKP-Cmd", "ProcessCommand")
 	self:RegisterComm("EminentDKP", "ProcessSyncEvent")
 	-- Custom event notifications
 	self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
@@ -2076,13 +2077,21 @@ function EminentDKP:LOOT_OPENED()
 			end
 			-- Ensure that we only print once by keeping track of the GUID
 			recent_loots[guid] = { name=unitName, slots=eligible_slots }
+			-- todo: send itemstring list to raid
+			
     end
   end
 end
 
+function EminentDKP:SendCommand(...)
+  local cmd, arg1, arg2 = ...
+  local msg = cmd .. "," .. arg1 .. "," .. arg2
+  self:SendCommMessage('EminentDKP-Cmd',msg,'WHISPER',self.masterLooterName,'ALERT')
+end
+
 function EminentDKP:WhisperPlayer(addon,what,who)
   if addon then
-    self:SendCommMessage('EminentDKP',what,'WHISPER',who,'ALERT')
+    self:SendCommMessage('EminentDKP-Notify',what,'WHISPER',who,'ALERT')
   else
     sendchat(what, who, 'whisper')
   end
@@ -2500,6 +2509,17 @@ function EminentDKP:CHAT_MSG_WHISPER_CONTROLLER(eventController, message, from, 
   end
 end
 
+function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
+  if not self:AmMasterLooter() then return end
+  local command, arg1, arg2 = strsplit(",", message, 3)
+  
+  if command == 'bid' then
+    self:Bid(false,sender,arg1)
+  elseif command == 'transfer' then
+    self:Transfer(false,sender,arg1,arg2)
+  end
+end
+
 function EminentDKP:CHAT_MSG_WHISPER(message, from)
   -- Only interpret messages starting with $
   local a, command, arg1, arg2 = strsplit(" ", message, 4)
@@ -2520,7 +2540,7 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
   elseif command == 'lifetime' then
     self:WhisperLifetime(from)
   elseif command == 'transfer' then
-    self:WhisperTransfer(false,from,arg1,arg2)
+    self:Transfer(false,from,arg1,arg2)
   elseif command == 'help' then
 	  sendchat("Available Commands:", from, 'whisper')
 		sendchat("'$ balance' to check your current balance", from, 'whisper')
