@@ -1019,9 +1019,11 @@ function EminentDKP:OnEnable()
 	self:RegisterComm("EminentDKP-Request", "ProcessSyncRequest")
 	self:RegisterComm("EminentDKP-Version", "ProcessSyncVersion")
 	self:RegisterComm("EminentDKP-Cmd", "ProcessCommand")
+	self:RegisterComm("EminentDKP-Notify", "ProcessNotification")
 	self:RegisterComm("EminentDKP", "ProcessSyncEvent")
 	-- Custom event notifications
 	self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
+	self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
 	self:RawHook("LevelUpDisplay_AnimStep", "LevelUpDisplayFinished", true)
 	-- Permission Hooks
 	self:RawHook(self,"AdminStartAuction","EnsureMasterlooter")
@@ -1042,10 +1044,15 @@ end
 
 -- Hook the animation step function so we can change the font size of the flavor text
 function EminentDKP:LevelUpDisplayFinished(frame)
-  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" then
+  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" or frame.type == "TRANSFER_MADE" then
     frame.spellFrame.flavorText:SetFontObject("GameFontNormalLarge")
   end
   self.hooks["LevelUpDisplay_AnimStep"](frame)
+end
+
+function EminentDKP:LevelUpDisplayHide(frame)
+  self:ExecuteNextNotification()
+  self.hooks[frame].OnHide(frame)
 end
 
 -- Overriding the default level up display to show custom messages
@@ -1057,15 +1064,26 @@ function EminentDKP:LevelUpDisplayShow(frame)
     gLine = { 0.00195313, 0.81835938, 0.01953125, 0.03320313 },
     textTint = { 0.67, 0.93, 0.45 },
   }
-  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" then
+  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" or frame.type == "TRANSFER_MADE" then
     frame.currSpell = 2 -- currSpell > #(unlockList)
     frame.unlockList = { }
+    frame.levelFrame.levelText:SetFontObject("GameFont_Gigantic")
+    frame:SetHeight(72)
+    frame.levelFrame:SetHeight(72)
     if frame.type == "BOUNTY_RECEIVED" then
       frame.levelFrame.reachedText:SetFormattedText(L["You have received a bounty of"])
       frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
     elseif frame.type == "TRANSFER_RECEIVED" then
       frame.levelFrame.reachedText:SetFormattedText(L["%s has transferred you"],self.notifyDetails.src)
       frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+    elseif frame.type == "TRANSFER_MADE" then
+      --self:Print("height is: "..tostring(frame.levelFrame:GetHeight()))
+      frame:SetHeight(50)
+      frame.levelFrame:SetHeight(50)
+      frame.levelFrame.reachedText:SetFormattedText(L["%s has transferred %s"],self.notifyDetails.src,self.notifyDetails.extra)
+      frame.levelFrame.levelText:SetFontObject("GameFontNormalLarge")
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+      texcoords.textTint = { 0.92, 0.49, 0.04 }
     elseif frame.type == "AUCTION_WON" then
       table.insert(frame.unlockList,{ icon=select(10,GetItemInfo(self.notifyDetails.desc)),
                                       subIcon=SUBICON_TEXCOOR_ARROW,
@@ -1097,13 +1115,35 @@ function EminentDKP:LevelUpDisplayShow(frame)
   end
 end
 
+local animating = false
+local queued_notifications = {}
+
+function EminentDKP:ExecuteNextNotification()
+  if #(queued_notifications) > 0 then
+    local n = tremove(queued_notifications)
+    LevelUpDisplay.type = n.type
+    self.notifyDetails = n.data
+    LevelUpDisplay:Show()
+    LevelUpDisplaySide:Hide()
+  else
+    animating = false
+  end
+end
+
+-- todo: add queueing for notifications
 function EminentDKP:NotifyOnScreen(...)
-  local eventType, received, source = ...
+  local eventType, received, source, extra = ...
+  local data = { src = source, desc = received, extra = extra }
   
-  LevelUpDisplay.type = eventType
-  self.notifyDetails = { src = source, desc = received }
-  LevelUpDisplay:Show()
-  LevelUpDisplaySide:Hide()
+  if animating then
+    table.insert(queued_notifications,1,{ type=eventType, data=data })
+  else
+    LevelUpDisplay.type = eventType
+    self.notifyDetails = data
+    animating = true
+    LevelUpDisplay:Show()
+    LevelUpDisplaySide:Hide()
+  end
 end
 
 function EminentDKP:EnsureToMasterlooter(self, ...)
@@ -2061,10 +2101,13 @@ function EminentDKP:LOOT_OPENED()
     if not recent_loots[guid] and GetNumLootItems() > 0 then
       local eligible_items = {}
       local eligible_slots = {}
+      local itemstring_list = {}
       for slot = 1, GetNumLootItems() do 
 				local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
 				if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
-				  table.insert(eligible_items,GetLootSlotLink(slot))
+				  local link = GetLootSlotLink(slot)
+				  table.insert(eligible_items,link)
+				  table.insert(itemstring_list,string.match(link, "item[%-?%d:]+"))
 				  table.insert(eligible_slots,slot)
 				end
 			end
@@ -2074,11 +2117,14 @@ function EminentDKP:LOOT_OPENED()
 			  for i,loot in ipairs(eligible_items) do
 			    sendchat(loot,"raid", "preset")
 		    end
+		    
+		    -- Share loot list with raid
+		    local data = "loot_" .. libS:Serialize(itemstring_list)
+		    local tosync = libCE:Encode(libC:CompressHuffman(data))
+		    self:SendCommMessage('EminentDKP-Notify',tosync,'RAID')
 			end
 			-- Ensure that we only print once by keeping track of the GUID
 			recent_loots[guid] = { name=unitName, slots=eligible_slots }
-			-- todo: send itemstring list to raid
-			
     end
   end
 end
@@ -2466,7 +2512,7 @@ function EminentDKP:ProcessSlashCmd(input)
   elseif command == 'test2' then
     self:NotifyOnScreen("AUCTION_WON",65135,5000.45)
   elseif command == 'test3' then
-    self:NotifyOnScreen("TRANSFER_RECEIVED","5000","Bob")
+    self:NotifyOnScreen("TRANSFER_MADE","5000","Bob","Joe")
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
@@ -2506,6 +2552,42 @@ function EminentDKP:CHAT_MSG_WHISPER_CONTROLLER(eventController, message, from, 
   -- Ensure all commands received are hidden
   if string.match(message, "^$ %a+") then
     eventController:BlockFromChatFrame()
+  end
+end
+
+function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
+  if sender == self.myName then return end
+  -- Decode the compressed data
+  local one = libCE:Decode(message)
+
+  -- Decompress the decoded data
+  local two, message = libC:Decompress(one)
+  if not two then
+  	sendchat('Error occured while decoding a notification: '..message,nil,'self')
+  	return
+  end
+  
+  local notifyType, rawdata = strsplit('_',two,2)
+  
+  -- Deserialize the decompressed data
+  local success, data = libS:Deserialize(rawdata)
+  if not success then
+    sendchat('Error occured while deserializing notification data.',nil,'self')
+  	return
+  end
+  
+  if notifyType == "loot" then
+    self.auctionItems = data
+  elseif notifyType == "bounty" then
+    self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
+  elseif notifyType == "transfer" then
+    if data.receiver == self.myName then
+      self:NotifyOnScreen("TRANSFER_RECEIVED",data.amount,data.sender)
+    else
+      self:NotifyOnScreen("TRANSFER_MADE",data.amount,data.sender,data.receiver)
+    end
+  elseif notifyType == "auction" and data.receiver == self.myName then
+    self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
   end
 end
 

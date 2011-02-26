@@ -174,6 +174,7 @@ L["Successfully renamed %s to %s."] = "Successfully renamed %s to %s."
 L["Successfully reset vanity DKP for %s."] = "Successfully reset vanity DKP for %s."
 
 L["%s has transferred you"] = "%s has transferred you"
+L["%s has transferred %s"] = "%s has transferred %s"
 L["You have received a bounty of"] = "You have received a bounty of"
 L["You've won an auction for"] = "You've won an auction for"
 L["You Have Just"] = "You Have Just"
