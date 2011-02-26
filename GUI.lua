@@ -41,16 +41,20 @@ EminentDKP.displays["meter"] = meter
 
 -- Show the tab responsible for transfers
 local function CreateTransferTab(container)
+  local transfergrp = AceGUI:Create("InlineGroup")
+  transfergrp:SetTitle("Transfer DKP")
+  transfergrp:SetLayout("Flow")
+  transfergrp:SetWidth(200)
+  
   local recip = AceGUI:Create("Dropdown")
-  recip:SetText("Receipient")
+  recip:SetLabel("Recipient")
   recip:SetList(EminentDKP:GetOtherPlayersNames())
-  container:AddChild(recip)
+  recip:SetWidth(150)
   
   local amount = AceGUI:Create("Slider")
   amount:SetLabel("Amount")
   amount:SetSliderValues(1,EminentDKP:GetMyCurrentDKP(),1)
   amount:SetValue(1)
-  container:AddChild(amount)
   
   local send = AceGUI:Create("Button")
   send:SetText("Send")
@@ -60,40 +64,62 @@ local function CreateTransferTab(container)
     EminentDKP:Print(recip:GetValue())
     EminentDKP:Print(amount:GetValue())
   end)
-  container:AddChild(send)
+  send:SetDisabled(true)
+  
+  recip:SetCallback("OnValueChanged",function(i,j,val)
+    if val ~= "" then
+      send:SetDisabled(false)
+    else
+      send:SetDisabled(true)
+    end
+  end)
+  
+  transfergrp:AddChild(recip)
+  transfergrp:AddChild(amount)
+  transfergrp:AddChild(send)
+  container:AddChild(transfergrp)
 end
 
 local function CreateVanityTab(container)
   local resetgrp = AceGUI:Create("InlineGroup")
-  resetgrp:SetTitle("Reset Player Vanity DKP")
+  resetgrp:SetTitle("Reset Vanity DKP")
   resetgrp:SetLayout("Flow")
   resetgrp:SetWidth(200)
   
   local who = AceGUI:Create("Dropdown")
-  who:SetText("Player")
+  who:SetLabel("Player")
   who:SetList(EminentDKP:GetPlayerNames())
   who:SetWidth(150)
-  resetgrp:AddChild(who)
   
   local reset = AceGUI:Create("Button")
   reset:SetText("Reset")
   reset:SetWidth(150)
   reset:SetCallback("OnClick",function(what)
-    -- todo: hookup functionality
     EminentDKP:AdminVanityReset(who:GetValue())
   end)
+  reset:SetDisabled(true)
+  
+  who:SetCallback("OnValueChanged",function(i,j,val)
+    if val ~= "" then
+      reset:SetDisabled(false)
+    else
+      reset:SetDisabled(true)
+    end
+  end)
+  
+  resetgrp:AddChild(who)
   resetgrp:AddChild(reset)
   container:AddChild(resetgrp)
   
   local rollgrp = AceGUI:Create("InlineGroup")
   rollgrp:SetTitle("Vanity DKP Roll")
   rollgrp:SetLayout("Flow")
+  rollgrp:SetWidth(200)
   
   local roll = AceGUI:Create("Button")
   roll:SetText("Roll")
   roll:SetWidth(150)
   roll:SetCallback("OnClick",function(what)
-    -- todo: hookup functionality
     EminentDKP:AdminVanityRoll()
   end)
   rollgrp:AddChild(roll)
@@ -106,30 +132,36 @@ local function CreateRenameTab(container)
   renamegrp:SetLayout("Flow")
   renamegrp:SetWidth(200)
   
-  local newname = AceGUI:Create("Dropdown")
-  newname:SetLabel("New Name")
-  newname:SetWidth(150)
-  
-  local who = AceGUI:Create("Dropdown")
-  who:SetLabel("Player")
-  who:SetList(EminentDKP:GetPlayerNames())
-  who:SetCallback("OnValueChanged",function(i,j,value)
-    newname:SetText("")
-    newname:SetList(EminentDKP:GetPlayersOfClass(value))
-  end)
-  who:SetWidth(150)
-  renamegrp:AddChild(who)
-  renamegrp:AddChild(newname)
-  
   local rename = AceGUI:Create("Button")
   rename:SetText("Rename")
   rename:SetWidth(150)
+  rename:SetDisabled(true)
+  
+  local newname = AceGUI:Create("Dropdown")
+  newname:SetLabel("New Player")
+  newname:SetWidth(150)
+  newname:SetCallback("OnValueChanged",function(i,j,value)
+    rename:SetDisabled(false)
+  end)
+  
+  local who = AceGUI:Create("Dropdown")
+  who:SetLabel("Old Player")
+  who:SetList(EminentDKP:GetPlayerNames())
+  who:SetCallback("OnValueChanged",function(i,j,value)
+    newname:SetValue(1)
+    -- todo: fresh players only
+    newname:SetList(EminentDKP:GetPlayersOfClass(value))
+    rename:SetDisabled(true)
+  end)
+  who:SetWidth(150)
+  
   rename:SetCallback("OnClick",function(what)
-    -- todo: hookup functionality
     EminentDKP:AdminRename(who:GetValue(),newname:GetValue())
   end)
-  renamegrp:AddChild(rename)
   
+  renamegrp:AddChild(who)
+  renamegrp:AddChild(newname)
+  renamegrp:AddChild(rename)
   container:AddChild(renamegrp)
 end
 
@@ -167,7 +199,6 @@ local function CreateBountyTab(container)
   award:SetText("Award")
   award:SetWidth(150)
   award:SetCallback("OnClick",function(what)
-    -- todo: hookup functionality
     EminentDKP:AdminDistributeBounty(percent:GetValue(),amount:GetValue(),reason:GetValue())
   end)
   
@@ -178,11 +209,22 @@ local function CreateBountyTab(container)
   container:AddChild(bountygrp)
 end
 
+local function CreateNothingTab(container)
+  local msg = AceGUI:Create("Label")
+  msg:SetText("Transfers are not available during an auction.")
+  
+  container:AddChild(msg)
+end
+
 -- Callback function for OnGroupSelected
 local function SelectGroup(container, event, group)
   container:ReleaseChildren()
   if group == "transfer" then
-    CreateTransferTab(container)
+    if true then
+      CreateNothingTab(container)
+    else
+      CreateTransferTab(container)
+    end
   elseif group == "vanity" then
     CreateVanityTab(container)
   elseif group == "rename" then
@@ -199,8 +241,8 @@ function EminentDKP:CreateActionPanel()
     self.actionpanel = nil
   end
   self.actionpanel = AceGUI:Create("EminentDKPFrame")
-  self.actionpanel:SetWidth(450)
-  self.actionpanel:SetHeight(400)
+  self.actionpanel:SetWidth(400)
+  self.actionpanel:SetHeight(300)
   self.actionpanel:SetTitle("EminentDKP Action Panel")
   self.actionpanel:SetCallback("OnClose", function(widget)
     AceGUI:Release(widget)
@@ -209,14 +251,14 @@ function EminentDKP:CreateActionPanel()
   self.actionpanel:SetLayout("Fill")
   
   -- Create the TabGroup
-  local tab =  AceGUI:Create("TabGroup")
+  local tab = AceGUI:Create("TabGroup")
   tab:SetLayout("Flow")
   -- Setup which tabs to show
   tab:SetTabs({
-    {text="Transfer", value="transfer"},
-    {text="Vanity", value="vanity"},
-    {text="Rename", value="rename"},
-    {text="Bounty", value="bounty"},
+    {text="Transfer", value="transfer", disabled=EminentDKP:AuctionActive()},
+    {text="Vanity", value="vanity", disabled=(not EminentDKP:AmOfficer())},
+    {text="Rename", value="rename", disabled=(not EminentDKP:AmOfficer())},
+    {text="Bounty", value="bounty", disabled=(not EminentDKP:AmMasterLooter())},
   })
   -- Register callback
   tab:SetCallback("OnGroupSelected", SelectGroup)

@@ -1448,6 +1448,10 @@ function EminentDKP:FormatNumber(number)
 	end
 end
 
+function EminentDKP:AuctionActive()
+  return auction_active
+end
+
 function EminentDKP:StdNumber(number)
   return string.format('%.02f', number)
 end
