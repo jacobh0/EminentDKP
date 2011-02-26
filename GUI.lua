@@ -220,7 +220,7 @@ end
 local function SelectGroup(container, event, group)
   container:ReleaseChildren()
   if group == "transfer" then
-    if true then
+    if EminentDKP:AuctionActive() then
       CreateNothingTab(container)
     else
       CreateTransferTab(container)
