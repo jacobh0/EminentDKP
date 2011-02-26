@@ -2119,9 +2119,7 @@ function EminentDKP:LOOT_OPENED()
 		    end
 		    
 		    -- Share loot list with raid
-		    local data = "loot_" .. libS:Serialize(itemstring_list)
-		    local tosync = libCE:Encode(libC:CompressHuffman(data))
-		    self:SendCommMessage('EminentDKP-Notify',tosync,'RAID')
+		    self:SendNotification("loot",itemstring_list)
 			end
 			-- Ensure that we only print once by keeping track of the GUID
 			recent_loots[guid] = { name=unitName, slots=eligible_slots }
@@ -2176,6 +2174,9 @@ function EminentDKP:Transfer(addon,from,amount,to)
           if dkp > 0 then
             if self:PlayerHasDKP(from,dkp) then
               self:CreateTransferSyncEvent(from,to,dkp)
+              
+              self:SendNotification("transfer",{ amount = dkp, sender=from, receiver=to })
+              
               sendchat('Succesfully transferred '.. dkp ..' DKP to ' .. to .. '.', from, 'whisper')
               sendchat(from .. ' just transferred '.. dkp .. ' DKP to you.', to, 'whisper')
               sendchat(from .. " has transferred " .. dkp .. " DKP to " .. to .. ".", "raid", "preset")
@@ -2376,6 +2377,8 @@ function EminentDKP:AuctionBidTimer()
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
       sendchat(looter..' has won '..GetLootSlotLink(self.bidItem.slotNum)..' for '..secondHighestBid..' DKP!', "raid", "preset")
       sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
+      
+      self:SendNotification("auction",{ amount = secondHighestBid, receiver = looter, item = self.bidItem.itemString })
     end
     
     -- Distribute the loot
@@ -2428,7 +2431,9 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
       local dividend = (amount/#(players))
       
       self:CreateBountySyncEvent(players,amount,reason)
-      -- todo: send message over addon channel
+      
+      -- Announce bounty to the other addons
+	    self:SendNotification("bounty",{ amount = dividend })
       
       --sendchat('A bounty of '..self:StdNumber(amount)..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
       --sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
@@ -2553,6 +2558,12 @@ function EminentDKP:CHAT_MSG_WHISPER_CONTROLLER(eventController, message, from, 
   if string.match(message, "^$ %a+") then
     eventController:BlockFromChatFrame()
   end
+end
+
+function EminentDKP:SendNotification(notifyType,rawdata)
+  local data = notifyType .. "_" .. libS:Serialize(rawdata)
+  local tosync = libCE:Encode(libC:CompressHuffman(data))
+  self:SendCommMessage('EminentDKP-Notify',tosync,'RAID')
 end
 
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
