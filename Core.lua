@@ -619,6 +619,14 @@ function EminentDKP:ReloadWindows()
   		  sets.today.date = date
 		  end
   	end
+  	-- prune any sets that extend beyond our given timeframe
+  	for name, set in pairs(sets) do
+  	  if set.sortnum == 3 then
+  	    if GetDaysSince(set.starttime) > self.db.profile.daystoshow then
+  	      sets[name] = nil
+	      end
+	    end
+	  end
   end
 
 	-- Re-create windows
@@ -1469,6 +1477,9 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     -- Give 3 seconds before we request missing events
     -- This gives time to receive more events that are already being synced
     self.syncTimer = self:ScheduleTimer("RequestMissingEvents", 3, false)
+    self:ReloadSets(true)
+  else
+    self:ReloadSets(true)
   end
 end
 
@@ -2083,6 +2094,7 @@ end
 function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
     sendchat('Auction cancelled. All bids have been voided.', "raid", "preset")
+    self:SendNotification("auctioncancel",{ item = self.bidItem.itemString })
     auction_active = false
     self:CancelTimer(self.bidTimer)
     self.bidItem = nil
@@ -2258,7 +2270,7 @@ function EminentDKP:WhisperCheck(who, to)
     sendchat('Vanity DKP: '..self:StdNumber(data.currentVanityDKP), to, 'whisper')
     sendchat('Last Raid: '..GetDaysSince(data.lastRaid)..' day(s) ago.', to, 'whisper')
   else
-    sendchat(who.." does not exist in the DKP pool.", to, 'whisper')
+    sendchat(L["%s does not exist in the DKP pool."]:format(who), to, 'whisper')
   end
 end
 
@@ -2511,14 +2523,6 @@ function EminentDKP:ProcessSlashCmd(input)
   
   if command == 'auction' then
     self:AdminStartAuction()
-  elseif command == 'test' then
-    --self:NotifyOnScreen("AUCTION_WON","5000")
-    --self:NotifyOnScreen("TRANSFER_RECEIVED","5000","Bob")
-    self:NotifyOnScreen("BOUNTY_RECEIVED","5000")
-  elseif command == 'test2' then
-    self:NotifyOnScreen("AUCTION_WON",65135,5000.45)
-  elseif command == 'test3' then
-    self:NotifyOnScreen("TRANSFER_MADE","5000","Bob","Joe")
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
@@ -2573,7 +2577,6 @@ function EminentDKP:SendNotification(...)
 end
 
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
-  if sender == self.myName then return end
   -- Decode the compressed data
   local one = libCE:Decode(message)
 
@@ -2595,6 +2598,7 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
   
   if notifyType == "loot" then
     self.auctionItems = data
+    -- todo: setup some stuff...
   elseif notifyType == "bounty" then
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
   elseif notifyType == "transfer" then
@@ -2605,6 +2609,9 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
     end
   elseif notifyType == "auction" then
     auction_active = true
+    -- todo: do more with data.item
+  elseif notifyType == "auctioncancel" then
+    auction_active = false
     -- todo: do more with data.item
   elseif notifyType == "auctionwon" then
     auction_active = false
@@ -2656,12 +2663,6 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
 		sendchat("'$ bid X' (*) to enter a bid of X on the active auction", from, 'whisper')
 		sendchat("'$ transfer X Y' (*) to transfer X dkp to player Y", from, 'whisper')						
 		sendchat("* - these commands can only be sent to the master looter and only during a raid", from, 'whisper')
-  elseif command == 'tutorial' then
-    sendchat("I have many jobs here. I keep track of the raiders and their dkp. I announce loot to the raid and conduct auctions. When an auction ends, I award loot to the winner and distribute dkp to the raid.", from, 'whisper')
-		sendchat("Most of my functionality is automated, but users (like you) can interact with me by whispering commands to the master looter. If you are a new user, there are two commands that you should learn right away: '$ balance' and '$ bid X'.", from, 'whisper')
-		sendchat("'$ balance' will show you how much dkp you have available to spend. You can whisper this command to the master looter at any time. '$ bid X' will enter your bid of X dkp on the active auction.", from, 'whisper')
-		sendchat("Once I announce an auction to the raid, you have 30 seconds to enter your bid. If you make the highest bid, you will win the auction and pay whatever the second highest bid was. This is the Vickrey auction model.", from, 'whisper')
-		sendchat("You will start earning dkp immediately and, as far as I am concerned, you are free to start bidding on auctions right away. You can view a list of the other commands by whispering '$ help'.", from, 'whisper')
   else
     sendchat("Unrecognized command. Whisper '$ help' for a list of valid commands.", from, 'whisper')
   end
