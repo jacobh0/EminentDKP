@@ -2285,7 +2285,7 @@ function EminentDKP:AdminStartAuction()
     		  
       		-- Gather some info about this item
       		local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-			
+			    
     			auction_active = true
     			self.bidItem = { 
     			  name=lootName, 
@@ -2603,8 +2603,15 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
     else
       self:NotifyOnScreen("TRANSFER_MADE",data.amount,data.sender,data.receiver)
     end
-  elseif notifyType == "auctionwon" and data.receiver == self.myName then
-    self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
+  elseif notifyType == "auction" then
+    auction_active = true
+    -- todo: do more with data.item
+  elseif notifyType == "auctionwon" then
+    auction_active = false
+    -- todo: do more with data.item
+    if data.receiver == self.myName then
+      self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
+    end
   end
 end
 
@@ -2613,9 +2620,9 @@ function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
   local command, arg1, arg2 = strsplit(",", message, 3)
   
   if command == 'bid' then
-    self:Bid(false,sender,arg1)
+    self:Bid(true,sender,arg1)
   elseif command == 'transfer' then
-    self:Transfer(false,sender,arg1,arg2)
+    self:Transfer(true,sender,arg1,arg2)
   end
 end
 
