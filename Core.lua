@@ -1087,7 +1087,7 @@ function EminentDKP:LevelUpDisplayShow(frame)
     elseif frame.type == "AUCTION_WON" then
       table.insert(frame.unlockList,{ icon=select(10,GetItemInfo(self.notifyDetails.desc)),
                                       subIcon=SUBICON_TEXCOOR_ARROW,
-                                      text=string.format(L["has been won for %.02f DKP"],self.notifyDetails.src),
+                                      text=string.format(L["has been won for %.0f DKP"],self.notifyDetails.src),
                                       subText=select(2,GetItemInfo(self.notifyDetails.desc)),
                                       })
       frame.currSpell = 1
@@ -2133,11 +2133,12 @@ function EminentDKP:SendCommand(...)
   self:SendCommMessage('EminentDKP-Cmd',msg,'WHISPER',self.masterLooterName,'ALERT')
 end
 
-function EminentDKP:WhisperPlayer(addon,what,who)
+function EminentDKP:WhisperPlayer(addon, msg, who, accept)
   if addon then
-    self:SendCommMessage('EminentDKP-Notify',what,'WHISPER',who,'ALERT')
+    local nt = (accept and "accept" or "reject")
+    self:SendNotification(nt,{ message=msg },who)
   else
-    sendchat(what, who, 'whisper')
+    sendchat(msg, who, 'whisper')
   end
 end
 
@@ -2149,18 +2150,18 @@ function EminentDKP:Bid(addon,from,amount)
       if bid > 0 then
         if self:PlayerHasDKP(from,bid) then
           self.bidItem.bids[from] = bid
-          self:WhisperPlayer(addon,'Your bid of '.. bid .. ' has been accepted.', from)
+          self:WhisperPlayer(addon,L["Your bid of %.0f has been accepted."]:format(bid), from, true)
         else
-          self:WhisperPlayer(addon,'The bid amount must not exceed your current DKP.', from)
+          self:WhisperPlayer(addon,L["The DKP amount must not exceed your current DKP."], from)
         end
       else
-        self:WhisperPlayer(addon,'Bid must be a number greater than 0.', from)
+        self:WhisperPlayer(addon,L["DKP amount must be a number greater than 0."], from)
       end
     else
-      self:WhisperPlayer(addon,'You are not eligible to receive loot.', from)
+      self:WhisperPlayer(addon,L["You are not eligible to receive loot."], from)
     end
   else
-    self:WhisperPlayer(addon,"There is currently no auction active.", from)
+    self:WhisperPlayer(addon,L["There is currently no auction active."], from)
   end
 end
 
@@ -2176,27 +2177,26 @@ function EminentDKP:Transfer(addon,from,amount,to)
               self:CreateTransferSyncEvent(from,to,dkp)
               
               self:SendNotification("transfer",{ amount = dkp, sender=from, receiver=to })
-              
-              sendchat('Succesfully transferred '.. dkp ..' DKP to ' .. to .. '.', from, 'whisper')
-              sendchat(from .. ' just transferred '.. dkp .. ' DKP to you.', to, 'whisper')
-              sendchat(from .. " has transferred " .. dkp .. " DKP to " .. to .. ".", "raid", "preset")
+              sendchat(L["Succesfully transferred %.2f DKP to %s."]:format(dkp,to), from, 'whisper')
+              sendchat(L["%s just transferred %.2f DKP to you."]:format(from,dkp), to, 'whisper')
+              sendchat(L["%s has transferred %.2f DKP to %s."]:format(from,dkp,to), "raid", "preset")
             else
-              sendchat('The DKP amount must not exceed your current DKP.', from, 'whisper')
+              self:WhisperPlayer(addon,L["The DKP amount must not exceed your current DKP."], from)
             end
           else
-            sendchat('DKP amount must be a number greater than 0.', from, 'whisper')
+            self:WhisperPlayer(addon,L["DKP amount must be a number greater than 0."], from)
           end
         else
-          sendchat(to.." does not exist in the DKP pool.", from, 'whisper')
+          self:WhisperPlayer(addon,L["%s does not exist in the DKP pool."]:format(to), from)
         end
       else
-        sendchat("You do not exist in the DKP pool.", from, 'whisper')
+        self:WhisperPlayer(addon,L["You do not exist in the DKP pool."], from)
       end
     else
-      sendchat("You cannot transfer DKP to yourself.", from, 'whisper')
+      self:WhisperPlayer(addon,L["You cannot transfer DKP to yourself."], from)
     end
   else
-    sendchat("You cannot transfer DKP during an auction.", from, 'whisper')
+    self:WhisperPlayer(addon,L["You cannot transfer DKP during an auction."], from)
   end
 end
 
@@ -2295,6 +2295,7 @@ function EminentDKP:AdminStartAuction()
     			  slotNum=slot,
     			  srcGUID=UnitGUID("target")
     			}
+    			self:SendNotification("auction",{ item = self.bidItem.itemString })
     			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
 			
     			sendchat(itemLink .. ' bid now!', "raid_warning", "preset")
@@ -2378,7 +2379,7 @@ function EminentDKP:AuctionBidTimer()
       sendchat(looter..' has won '..GetLootSlotLink(self.bidItem.slotNum)..' for '..secondHighestBid..' DKP!', "raid", "preset")
       sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
       
-      self:SendNotification("auction",{ amount = secondHighestBid, receiver = looter, item = self.bidItem.itemString })
+      self:SendNotification("auctionwon",{ amount = secondHighestBid, receiver = looter, item = self.bidItem.itemString })
     end
     
     -- Distribute the loot
@@ -2435,9 +2436,9 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
       -- Announce bounty to the other addons
 	    self:SendNotification("bounty",{ amount = dividend })
       
-      --sendchat('A bounty of '..self:StdNumber(amount)..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
-      --sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
-      --sendchat('New bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
+      sendchat('A bounty of '..self:StdNumber(amount)..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
+      sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
+      sendchat('New bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
     else
       self:DisplayActionResult(L["ERROR: Invalid bounty amount given."])
     end
@@ -2560,10 +2561,15 @@ function EminentDKP:CHAT_MSG_WHISPER_CONTROLLER(eventController, message, from, 
   end
 end
 
-function EminentDKP:SendNotification(notifyType,rawdata)
+function EminentDKP:SendNotification(...)
+  local notifyType, rawdata, target = ...
   local data = notifyType .. "_" .. libS:Serialize(rawdata)
   local tosync = libCE:Encode(libC:CompressHuffman(data))
-  self:SendCommMessage('EminentDKP-Notify',tosync,'RAID')
+  if not target then
+    self:SendCommMessage('EminentDKP-Notify',tosync,'RAID')
+  else
+    self:SendCommMessage('EminentDKP-Notify',tosync,'WHISPER',target)
+  end
 end
 
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
@@ -2597,7 +2603,7 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
     else
       self:NotifyOnScreen("TRANSFER_MADE",data.amount,data.sender,data.receiver)
     end
-  elseif notifyType == "auction" and data.receiver == self.myName then
+  elseif notifyType == "auctionwon" and data.receiver == self.myName then
     self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
   end
 end
