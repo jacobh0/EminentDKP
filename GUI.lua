@@ -190,6 +190,33 @@ end
 
 local function HideTip2() GameTooltip:Hide(); ResetCursor() end
 
+local function VerifyBid(frame)
+  local value = frame:GetText()
+  if value == "" then return end
+  local num_value = tonumber(value) or 0
+  local my_dkp = math.floor(EminentDKP:GetMyCurrentDKP())
+  if my_dkp < 1 then
+    frame:SetText("0")
+    SetDesaturation(frame:GetParent().bid:GetNormalTexture(), true)
+    frame:GetParent().bid:Disable()
+    return
+  else
+    SetDesaturation(frame:GetParent().bid:GetNormalTexture(), false)
+    frame:GetParent().bid:Enable()
+  end
+  if num_value < 1 then
+    frame:SetText("1")
+  elseif num_value > my_dkp then
+    frame:SetText(tostring(my_dkp))
+  else
+    frame:SetText(string.format("%.0f",value))
+  end
+end
+
+local function ClearFocus(frame)
+  frame:ClearFocus()
+end
+
 local function CreateNewItemFrame()
   local frame = CreateFrame("Frame", nil, auction_anchor)
 	frame:Width(400)
@@ -231,7 +258,7 @@ local function CreateNewItemFrame()
 	
 	local status = CreateFrame("StatusBar", nil, frame)
 	status:Width(326)
-	status:Height(20)
+	status:Height(28)
 	status:SetPoint("CENTER", frame, "CENTER", 0, 0)
 	--status:SetScript("OnUpdate", StatusUpdate)
 	status:SetFrameLevel(status:GetFrameLevel()-1)
@@ -241,7 +268,7 @@ local function CreateNewItemFrame()
 	frame.status = status
 	
 	local bid = CreateFrame("Button", nil, frame)
-	bid:SetPoint("RIGHT", frame, "RIGHT", 0, -4)
+	bid:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
 	bid:Width(28)
 	bid:Height(28)
 	bid:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Up")
@@ -250,10 +277,30 @@ local function CreateNewItemFrame()
 	bid.tiptext = "Bid Now"
 	--f:SetScript("OnEnter", SetTip)
 	--f:SetScript("OnLeave", HideTip)
-	--f:SetScript("OnClick", PlaceBid)
+	bid:SetScript("OnClick", function(f)
+	  f:GetParent().bidamt:ClearFocus()
+	  EminentDKP:SendCommand("bid",f:GetParent().bidamt:GetText())
+	end)
 	bid:SetMotionScriptsWhileDisabled(true)
 	
 	frame.bid = bid
+	
+	local bidamt = CreateFrame("EditBox", nil, frame)
+	bidamt:SetPoint("RIGHT", bid, "LEFT", 4, 0)
+	bidamt:Width(50)
+	bidamt:Height(20)
+	bidamt:SetTextInsets(0, 0, 3, 3)
+	bidamt:SetMaxLetters(6)
+	bidamt:SetBackdrop(backdrop_default)
+	bidamt:SetBackdropColor(0, 0, 0, 0)
+	bidamt:SetBackdropBorderColor(0,0,0,1)
+	bidamt:SetAutoFocus(false)
+	bidamt:SetFontObject(ChatFontNormal)
+	bidamt:SetScript("OnTextChanged", VerifyBid)
+	bidamt:SetScript("OnEnterPressed", ClearFocus)
+	bidamt:SetScript("OnEscapePressed", ClearFocus)
+	
+	frame.bidamt = bidamt
 	
 	local loot = frame:CreateFontString(nil, "ARTWORK")
 	loot:SetFont(media:Fetch('font', nil), 12, "OUTLINE")
@@ -262,7 +309,16 @@ local function CreateNewItemFrame()
 	loot:Height(10)
 	loot:Width(200)
 	loot:SetJustifyH("LEFT")
-	frame.fsloot = loot
+	frame.loot = loot
+	
+	local winner = frame:CreateFontString(nil, "ARTWORK")
+	winner:SetFont(media:Fetch('font', nil), 12, "OUTLINE")
+	winner:Point("RIGHT", frame, "RIGHT", 4, 0)
+	winner:Height(10)
+	winner:Width(80)
+	winner:SetJustifyH("RIGHT")
+	winner:Hide()
+	frame.winner = winner
 	
 	return frame
 end
@@ -293,8 +349,8 @@ function EminentDKP:ShowAuctions()
   	f.button.link = iLink
     
     local color = ITEM_QUALITY_COLORS[iQuality]
-  	f.fsloot:SetVertexColor(color.r, color.g, color.b)
-  	f.fsloot:SetText(iName)
+  	f.loot:SetVertexColor(color.r, color.g, color.b)
+  	f.loot:SetText(iName)
     
     f:SetBackdropBorderColor(color.r, color.g, color.b, 1)
   	f.buttonborder:SetBackdropBorderColor(color.r, color.g, color.b, 1)

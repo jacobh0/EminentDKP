@@ -2136,8 +2136,11 @@ end
 
 function EminentDKP:SendCommand(...)
   local cmd, arg1, arg2 = ...
-  local msg = cmd .. "," .. arg1 .. "," .. arg2
-  self:SendCommMessage('EminentDKP-Cmd',msg,'WHISPER',self.masterLooterName,'ALERT')
+  local tbl = {}
+  table.insert(tbl,cmd)
+  table.insert(tbl,arg1)
+  table.insert(tbl,arg2)
+  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self.masterLooterName,'ALERT')
 end
 
 function EminentDKP:WhisperPlayer(addon, msg, who, accept)
