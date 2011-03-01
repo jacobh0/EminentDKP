@@ -24,7 +24,7 @@ EminentDKP.displays["meter"] = meter
   Auction Interface Functions
 ---------------------------------------------------------------------]]
 
-local auction_anchor = nil
+local auction_frame = nil
 
 local backdrop_default = {
 	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -54,48 +54,40 @@ local function stopMove(self)
 end
 
 function EminentDKP:CreateAuctionFrame()
-  local settings = self.db.profile.auctionanchor
-  auction_anchor = CreateFrame("Frame", settings.name, UIParent)
-  auction_anchor:SetPoint("TOPLEFT", UIParent, "CENTER")
-  auction_anchor:SetWidth(400)
-  auction_anchor:SetHeight(15)
-  auction_anchor:SetMovable(true)
-	auction_anchor:SetClampedToScreen(true)
-  auction_anchor.locked = false
-  
-  local myfont = CreateFont("MyTitleFont")
-  myfont:CopyFontObject(ChatFontSmall)
+  local settings = self.db.profile.auctionframe
+  auction_frame = CreateFrame("Frame", "EminentDKPAuctionFrameWindow", UIParent)
+  auction_frame:SetPoint("TOPLEFT", UIParent, "CENTER")
+  auction_frame:SetWidth(settings.itemwidth)
+  auction_frame:SetHeight(settings.itemheight * .75)
+  auction_frame:SetMovable(true)
+  auction_frame:SetClampedToScreen(true)
 
-  auction_anchor.title = CreateFrame("Button", nil, auction_anchor)
-  auction_anchor.title:SetBackdrop(backdrop_default)
-  auction_anchor.title:SetNormalFontObject(myfont)
-  auction_anchor.title:SetBackdropColor(0,0,0,1)
-  auction_anchor.title:SetText("Test")
-  auction_anchor.title:SetWidth(400)
-  auction_anchor.title:SetHeight(15)
-  auction_anchor.title:SetScript("OnMouseDown", move)
-	auction_anchor.title:SetScript("OnMouseUp", stopMove)
-  auction_anchor.title:SetPoint("TOPLEFT", auction_anchor, "TOPLEFT")
-	auction_anchor.title:SetPoint("BOTTOMLEFT", auction_anchor, "BOTTOMLEFT")
+  auction_frame.title = CreateFrame("Button", nil, auction_frame)
+  auction_frame.title:SetWidth(settings.itemwidth)
+  auction_frame.title:SetHeight(settings.itemheight * .75)
+  auction_frame.title:SetScript("OnMouseDown", move)
+  auction_frame.title:SetScript("OnMouseUp", stopMove)
+  auction_frame.title:SetPoint("TOPLEFT", auction_frame, "TOPLEFT")
+  auction_frame.title:SetPoint("BOTTOMLEFT", auction_frame, "BOTTOMLEFT")
   
   -- Register with LibWindow-1.1
-  libwindow.RegisterConfig(auction_anchor, settings)
+  libwindow.RegisterConfig(auction_frame, settings)
 
   -- Restore auction anchor position.
-  libwindow.RestorePosition(auction_anchor)
+  libwindow.RestorePosition(auction_frame)
   
-  self:ApplyAuctionAnchorSettings()
+  self:ApplyAuctionFrameSettings()
 end
 
 local auction_titlebackdrop = {}
 local auction_windowbackdrop = {}
 
-function EminentDKP:ApplyAuctionAnchorSettings()
-  local p = self.db.profile.auctionanchor
+function EminentDKP:ApplyAuctionFrameSettings()
+  local p = self.db.profile.auctionframe
   
-  local fo = CreateFont("TitleFont"..p.name)
+  local fo = CreateFont("TitleFontEminentDKPAuctionFrame")
 	fo:SetFont(media:Fetch('font', p.title.font), p.title.fontsize)
-	auction_anchor.title:SetNormalFontObject(fo)
+	auction_frame.title:SetNormalFontObject(fo)
 	local inset = p.title.margin
 	auction_titlebackdrop.bgFile = media:Fetch("statusbar", p.title.texture)
 	if p.title.borderthickness > 0 then
@@ -107,25 +99,25 @@ function EminentDKP:ApplyAuctionAnchorSettings()
 	auction_titlebackdrop.tileSize = 0
 	auction_titlebackdrop.edgeSize = p.title.borderthickness
 	auction_titlebackdrop.insets = {left = inset, right = inset, top = inset, bottom = inset}
-	auction_anchor.title:SetBackdrop(auction_titlebackdrop)
+	auction_frame.title:SetBackdrop(auction_titlebackdrop)
 	local color = p.title.color
-	auction_anchor.title:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
+	auction_frame.title:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
 	
 	if p.enabletitle then
-	  auction_anchor.title:Show()
+	  auction_frame.title:Show()
   else
-    auction_anchor.title:Hide()
+    auction_frame.title:Hide()
   end
   
   -- Window
 	if p.enablebackground then
-		if auction_anchor.bgframe == nil then
-			auction_anchor.bgframe = CreateFrame("Frame", p.name.."BG", g)
-			auction_anchor.bgframe:SetFrameStrata("BACKGROUND")
-			auction_anchor.bgframe:EnableMouse()
-			auction_anchor.bgframe:EnableMouseWheel()
-			--auction_anchor.bgframe:SetScript("OnMouseDown", function(frame, btn) if btn == "RightButton" then window:RightClick() end end)
-			auction_anchor.bgframe:SetScript("OnMouseWheel", function() end)
+		if auction_frame.bgframe == nil then
+			auction_frame.bgframe = CreateFrame("Frame", p.name.."BG", g)
+			auction_frame.bgframe:SetFrameStrata("BACKGROUND")
+			auction_frame.bgframe:EnableMouse()
+			auction_frame.bgframe:EnableMouseWheel()
+			--auction_frame.bgframe:SetScript("OnMouseDown", function(frame, btn) if btn == "RightButton" then window:RightClick() end end)
+			auction_frame.bgframe:SetScript("OnMouseWheel", function() end)
 		end
 
 		local inset = p.background.margin
@@ -139,32 +131,24 @@ function EminentDKP:ApplyAuctionAnchorSettings()
 		auction_windowbackdrop.tileSize = 0
 		auction_windowbackdrop.edgeSize = p.background.borderthickness
 		auction_windowbackdrop.insets = {left = inset, right = inset, top = inset, bottom = inset}
-		auction_anchor.bgframe:SetBackdrop(auction_windowbackdrop)
+		auction_frame.bgframe:SetBackdrop(auction_windowbackdrop)
 		local color = p.background.color
-		auction_anchor.bgframe:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
-		auction_anchor.bgframe:SetWidth(auction_anchor:GetWidth() + (p.background.borderthickness * 2))
-		auction_anchor.bgframe:SetHeight(p.background.height)
+		auction_frame.bgframe:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
+		auction_frame.bgframe:SetWidth(auction_frame:GetWidth() + (p.background.borderthickness * 2))
+		auction_frame.bgframe:SetHeight(p.background.height)
 
-		auction_anchor.bgframe:ClearAllPoints()
-		auction_anchor.bgframe:SetPoint("LEFT", auction_anchor.title, "LEFT", -p.background.borderthickness, 0)
-		auction_anchor.bgframe:SetPoint("RIGHT", auction_anchor.title, "RIGHT", p.background.borderthickness, 0)
-		auction_anchor.bgframe:SetPoint("TOP", auction_anchor.title, "BOTTOM", 0, 5)
-		auction_anchor.bgframe:Show()
-		
-		-- Calculate max number of bars to show if our height is not dynamic.
-		--[[
-		if p.background.height > 0 then
-			local maxbars = math.floor(p.background.height / math.max(1, p.barheight + p.barspacing))
-			g:SetMaxBars(maxbars)
-		else
-			-- Adjust background height according to current bars.
-			self:AdjustBackgroundHeight(window)
-		end
-		]]
-	elseif auction_anchor.bgframe then
-		auction_anchor.bgframe:Hide()
+		auction_frame.bgframe:ClearAllPoints()
+		auction_frame.bgframe:SetPoint("LEFT", auction_frame.title, "LEFT", -p.background.borderthickness, 0)
+		auction_frame.bgframe:SetPoint("RIGHT", auction_frame.title, "RIGHT", p.background.borderthickness, 0)
+		auction_frame.bgframe:SetPoint("TOP", auction_frame.title, "BOTTOM", 0, 5)
+		auction_frame.bgframe:Show()
+	elseif auction_frame.bgframe then
+		auction_frame.bgframe:Hide()
 	end
+	
+	auction_frame.locked = p.locked
   
+  self:ReApplyItemFrameSettings()
 end
 
 local item_frames = {}
@@ -192,11 +176,10 @@ local function HideTip2() GameTooltip:Hide(); ResetCursor() end
 
 local function VerifyBid(frame)
   local value = frame:GetText()
-  if value == "" then return end
   local num_value = tonumber(value) or 0
   local my_dkp = math.floor(EminentDKP:GetMyCurrentDKP())
-  if my_dkp < 1 then
-    frame:SetText("0")
+  if value == "" or my_dkp < 1 then
+    frame:SetText("")
     SetDesaturation(frame:GetParent().bid:GetNormalTexture(), true)
     frame:GetParent().bid:Disable()
     return
@@ -226,24 +209,54 @@ local function TimerUpdate(frame)
   else
     frame.spark:Hide()
     frame:Hide()
-    SetDesaturation(frame:GetParent().bid:GetNormalTexture(), true)
-    frame:GetParent().bid:Disable()
+    frame:GetParent().bid.bidamt:Hide()
+    frame:GetParent().bid:Hide()
   end
 end
 
+local function ApplyItemFrameSettings(frame)
+  local p = EminentDKP.db.profile.auctionframe
+  
+  frame:Width(p.itemwidth)
+	frame:Height(p.itemheight)
+	
+	frame.button:Width(frame:GetHeight())
+	frame.button:Height(frame:GetHeight())
+	
+	frame.buttonborder:Width(frame.button:GetWidth())
+	frame.buttonborder:Height(frame.button:GetHeight())
+	
+	frame.buttonborder2:Width(frame.button:GetWidth() + 2)
+	frame.buttonborder2:Height(frame.button:GetHeight() + 2)
+	
+	frame.status:Width(frame:GetWidth() - 2 - frame.button:GetWidth())
+	frame.status:Height(frame:GetHeight() - 2)
+	frame.status:SetStatusBarTexture(media:Fetch("statusbar", p.itemtexture))
+	
+	frame.status.spark:Height(frame.status:GetHeight() + 5)
+	
+	frame.bid:Width(frame:GetHeight() - 2)
+	frame.bid:Height(frame:GetHeight() - 2)
+	
+	frame.loot:Height(frame:GetHeight() / 2)
+	frame.loot:Width(frame:GetWidth() / 2)
+	frame.loot:SetFont(media:Fetch('font', p.itemfont), p.itemfontsize, "OUTLINE")
+	
+	frame.winner:Height(frame:GetHeight() / 2)
+	frame.winner:Width(frame:GetWidth() - frame.loot:GetWidth() - frame.button:GetWidth())
+  frame.winner:SetFont(media:Fetch('font', p.itemfont), p.itemfontsize - 2, "OUTLINE")
+end
+
 local function CreateNewItemFrame()
-  local frame = CreateFrame("Frame", nil, auction_anchor)
-	frame:Width(400)
-	frame:Height(30)
+  local frame = CreateFrame("Frame", nil, auction_frame)
 	frame:SetBackdrop(backdrop_default)
 	frame:SetBackdropColor(0.1, 0.1, 0.1, 1)
 	--frame:SetScript("OnEvent", OnEvent)
 	--frame:RegisterEvent("CANCEL_LOOT_ROLL")
+	frame:Hide()
 	
 	local button = CreateFrame("Button", nil, frame)
 	button:SetPoint("LEFT", 0, 0)
-	button:Width(frame:GetHeight())
-	button:Height(frame:GetHeight())
 	button:SetScript("OnEnter", SetItemTip)
 	button:SetScript("OnLeave", HideTip2)
 	button:SetScript("OnUpdate", ItemOnUpdate)
@@ -252,37 +265,31 @@ local function CreateNewItemFrame()
 	frame.button = button
 
 	local buttonborder = CreateFrame("Frame", nil, button)
-	buttonborder:Width(button:GetWidth())
-	buttonborder:Height(button:GetHeight())
 	buttonborder:SetPoint("CENTER", button, "CENTER")
 	buttonborder:SetBackdrop(backdrop_default)
 	buttonborder:SetBackdropColor(1, 1, 1, 0)
 	
+	frame.buttonborder = buttonborder
+	
 	local buttonborder2 = CreateFrame("Frame", nil, button)
-	buttonborder2:Width(button:GetWidth() + 2)
-	buttonborder2:Height(button:GetHeight() + 2)
 	buttonborder2:SetFrameLevel(buttonborder:GetFrameLevel()+1)
 	buttonborder2:SetPoint("CENTER", button, "CENTER")
 	buttonborder2:SetBackdrop(backdrop_default)
 	buttonborder2:SetBackdropColor(0, 0, 0, 0)
 	buttonborder2:SetBackdropBorderColor(0,0,0,1)
 	
-	frame.buttonborder = buttonborder
+	frame.buttonborder2 = buttonborder2
 	
 	local status = CreateFrame("StatusBar", nil, frame)
-	status:Width(frame:GetWidth() - 2 - button:GetWidth())
-	status:Height(frame:GetHeight() - 2)
 	status:SetPoint("RIGHT", frame, "RIGHT", -1, 0)
 	status:SetScript("OnUpdate", TimerUpdate)
 	status:SetFrameLevel(status:GetFrameLevel()-1)
-	status:SetStatusBarTexture(media:Fetch("statusbar", nil))
 	status:SetStatusBarColor(.8, .8, .8, .9)
 	status:Hide()
 	frame.status = status
 	
 	local spark = frame:CreateTexture(nil, "OVERLAY")
 	spark:Width(14)
-	spark:Height(status:GetHeight()+5)
 	spark:SetPoint("CENTER", status, "RIGHT", 0, 0)
 	spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
 	spark:SetBlendMode("ADD")
@@ -291,8 +298,6 @@ local function CreateNewItemFrame()
 	
 	local bid = CreateFrame("Button", nil, frame)
 	bid:SetPoint("RIGHT", frame, "RIGHT", -1, -2)
-	bid:Width(28)
-	bid:Height(28)
 	bid:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Up")
 	bid:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Down")
 	bid:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Highlight")
@@ -304,14 +309,16 @@ local function CreateNewItemFrame()
 	  EminentDKP:SendCommand("bid",f.bidamt:GetText())
 	end)
 	bid:SetMotionScriptsWhileDisabled(true)
+	SetDesaturation(bid:GetNormalTexture(), true)
+  bid:Disable()
 	bid:Hide()
 	frame.bid = bid
 	
 	local bidamt = CreateFrame("EditBox", nil, frame)
 	bidamt:SetPoint("RIGHT", bid, "LEFT", -2, 2)
-	bidamt:Width(50)
+	bidamt:Width(45)
 	bidamt:Height(20)
-	bidamt:SetTextInsets(0, 0, 3, 3)
+	bidamt:SetTextInsets(3, 3, 3, 3)
 	bidamt:SetMaxLetters(6)
 	bidamt:SetBackdrop(backdrop_default)
 	bidamt:SetBackdropColor(0.1, 0.1, 0.1, 1)
@@ -326,37 +333,30 @@ local function CreateNewItemFrame()
 	bid.bidamt = bidamt
 	
 	local loot = frame:CreateFontString(nil, "ARTWORK")
-	loot:SetFont(media:Fetch('font', nil), 12, "OUTLINE")
 	loot:Point("LEFT", button, "RIGHT", 4, 0)
-	loot:Height(frame:GetHeight() / 2)
-	loot:Width(frame:GetWidth() / 2)
 	loot:SetJustifyH("LEFT")
 	frame.loot = loot
 	
 	local winner = frame:CreateFontString(nil, "ARTWORK")
-	winner:SetFont(media:Fetch('font', nil), 10, "OUTLINE")
 	winner:Point("RIGHT", frame, "RIGHT", -1, 0)
-	winner:Height(frame:GetHeight() / 2)
-	winner:Width(frame:GetWidth() - loot:GetWidth() - button:GetWidth())
 	winner:SetJustifyH("RIGHT")
 	winner:SetVertexColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
 	winner:Hide()
 	frame.winner = winner
-	
-	frame:Hide()	
+  
+	ApplyItemFrameSettings(frame)
 	return frame
 end
 
 local function GetItemFrame()
   local frame
   if #(recycled_item_frames) > 0 then
-    EminentDKP:Print("using recycled frame")
     frame = tremove(recycled_item_frames)
   else
     frame = CreateNewItemFrame()
   end
   
-	frame:Point("TOPLEFT", #(item_frames) > 0 and item_frames[#(item_frames)] or auction_anchor.title, "BOTTOMLEFT", 0, -4)
+	frame:Point("TOPLEFT", #(item_frames) > 0 and item_frames[#(item_frames)] or auction_frame.title, "BOTTOMLEFT", 0, -(EminentDKP.db.profile.auctionframe.itemspacing))
 	table.insert(item_frames, frame)
 	return frame
 end
@@ -368,13 +368,19 @@ local item_list = { { slot = "1", info = 65135 },
                     { slot = "4", info = 59500 }, 
                     { slot = "5", info = 31090 } }
 
-function EminentDKP:ShowAuctions()
+function EminentDKP:ReApplyItemFrameSettings()
+  for i, frame in ipairs(item_frames) do
+    ApplyItemFrameSettings(frame)
+  end
+end
+
+function EminentDKP:ShowAuctions(mob)
+  auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(mob))
   for i, item in ipairs(item_list) do
     local f = GetItemFrame()
     local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(item.info)
     f.item = item.info
     f.slot = item.slot
-    f.time = time()
     
     f.button:SetNormalTexture(iTexture)
   	f.button.link = iLink

@@ -2511,11 +2511,11 @@ function EminentDKP:ProcessSlashCmd(input)
   if command == 'auction' then
     self:AdminStartAuction()
   elseif command == 'test' then
-    self:ShowAuctions()
+    self:ShowAuctions("Test")
   elseif command == 'test1' then
     self:StartAuction(arg1)
   elseif command == 'test2' then
-    self:ShowAuctionWinner(arg1,arg2,500)
+    self:ShowAuctionWinner(arg1,arg2,50000)
   elseif command == 'test3' then
     self:RecycleAuctionItems()
   elseif command == 'version' then

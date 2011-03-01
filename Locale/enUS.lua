@@ -4,6 +4,7 @@ if not L then return end
 
 L["EminentDKP: Days"] = "EminentDKP: Days"
 L["EminentDKP: Modes"] = "EminentDKP: Modes"
+L["EminentDKP: %s Items"] = "EminentDKP: %s Items"
 
 L["All-time"] = "All-time"
 L["Today"] = "Today"
