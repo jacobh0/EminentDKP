@@ -21,14 +21,15 @@ end
 
 TODO:
 
-2. Organize meter display code and move to GUI.lua
-3. Convert all static messages into localized messages
-4. Rebuild internal whisper functions to support either addon whispers or player whispers
-5. Investigate bar recycling (specifically when wiping the window, etc)
-6. Address database integrity issues surrounding officer capabilities
-7. Revamp version system
-8. Sync database scans (so officers don't run duplicate scans in a day)
-9. Investigate individual day current DKP (lamashtu at -72k when only deduction is 25k)
+0. Look into not having a local variables "sets" (draw everything from saved variables)
+1. Organize meter display code and move to GUI.lua
+2. Convert all static messages into localized messages
+3. Investigate bar recycling (specifically when wiping the window, etc)
+4. Address database integrity issues surrounding officer capabilities
+5. Revamp version system
+6. Sync database scans (so officers don't run duplicate scans in a day)
+7. Investigate individual day current DKP (lamashtu at -72k when only deduction is 25k)
+8. Implement the auction GUI
 
 ]]
 
@@ -587,23 +588,15 @@ function EminentDKP:ReloadWindows()
 	end
 	wipe(windows)
 	
-	--[[
-	  database only changes when incoming events are replicated
-	  so search through events and see if the event belongs to any
-	  and add it to the event, and mark the set changed
-	  
-	  we only need to ever worry about "today" and "alltime" when receiving updates
-	]]
-	
 	-- Re-create sets
 	sets = self:GetMeterSets() or {}
 	if not next(sets) then
 	  self:ReloadSets(false)
   else
-    -- verify sets (check if Today is actually today)
+    -- Verify the "Today" set is actually today
     local today = GetTodayDate()
-    -- check if today has even been used yet...
     if sets.today.date ~= today then
+      -- Has the Today set even been used yet?
       if #(sets.today.players) > 0 then
         local oldtoday = {}
         self:tcopy(oldtoday, sets.today)
@@ -619,7 +612,7 @@ function EminentDKP:ReloadWindows()
   		  sets.today.date = date
 		  end
   	end
-  	-- prune any sets that extend beyond our given timeframe
+  	-- Prune any sets that extend beyond our given timeframe
   	for name, set in pairs(sets) do
   	  if set.sortnum == 3 then
   	    if GetDaysSince(set.starttime) > self.db.profile.daystoshow then
@@ -630,7 +623,6 @@ function EminentDKP:ReloadWindows()
   end
 
 	-- Re-create windows
-	-- As this can be called from a profile change as well as login, re-use windows when possible.
 	for i, win in ipairs(self.db.profile.windows) do
 		self:CreateWindow(win.name, win)
 	end
@@ -648,6 +640,7 @@ function EminentDKP:ReloadSets(updatedisplays)
   sets.today.sortnum = 2
   
   local eventHash = {}
+  -- Start from most recent event and work backwards
   for eventid = self:GetEventCount(), 1, -1 do
     local eid = tostring(eventid)
     local event = self:GetEvent(eid)
@@ -670,6 +663,7 @@ function EminentDKP:ReloadSets(updatedisplays)
         MarkPlayersSeen(eventHash, set, event)
       end
     else
+      -- Stop when we extend beyond our boundary
       break
     end
   end
@@ -975,6 +969,7 @@ function EminentDKP:OnInitialize()
   self.requestedEvents = {}
   self.requestCooldown = false
   
+  self:CreateAuctionFrame()
   self:DatabaseUpdate()
   self:ReloadWindows()
   
@@ -2523,6 +2518,8 @@ function EminentDKP:ProcessSlashCmd(input)
   
   if command == 'auction' then
     self:AdminStartAuction()
+  elseif command == 'test' then
+    self:ShowAuctions()
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
@@ -2596,7 +2593,9 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
   	return
   end
   
-  if notifyType == "loot" then
+  if notifyType == "accept" or notifyType == "reject" then
+    -- do stuff
+  elseif notifyType == "loot" then
     self.auctionItems = data
     -- todo: setup some stuff...
   elseif notifyType == "bounty" then
