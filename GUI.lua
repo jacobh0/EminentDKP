@@ -217,6 +217,20 @@ local function ClearFocus(frame)
   frame:ClearFocus()
 end
 
+local function TimerUpdate(frame)
+  local now = time()
+  local left = frame:GetParent().time - now
+  if left > 0 then
+  	frame.spark:Point("CENTER", frame, "LEFT", (left / 30) * frame:GetWidth(), 0)
+  	frame:SetValue(left)
+  else
+    frame.spark:Hide()
+    frame:Hide()
+    SetDesaturation(frame:GetParent().bid:GetNormalTexture(), true)
+    frame:GetParent().bid:Disable()
+  end
+end
+
 local function CreateNewItemFrame()
   local frame = CreateFrame("Frame", nil, auction_anchor)
 	frame:Width(400)
@@ -225,12 +239,11 @@ local function CreateNewItemFrame()
 	frame:SetBackdropColor(0.1, 0.1, 0.1, 1)
 	--frame:SetScript("OnEvent", OnEvent)
 	--frame:RegisterEvent("CANCEL_LOOT_ROLL")
-	frame:Hide()
 	
 	local button = CreateFrame("Button", nil, frame)
 	button:SetPoint("LEFT", 0, 0)
-	button:Width(30)
-	button:Height(30)
+	button:Width(frame:GetHeight())
+	button:Height(frame:GetHeight())
 	button:SetScript("OnEnter", SetItemTip)
 	button:SetScript("OnLeave", HideTip2)
 	button:SetScript("OnUpdate", ItemOnUpdate)
@@ -239,15 +252,15 @@ local function CreateNewItemFrame()
 	frame.button = button
 
 	local buttonborder = CreateFrame("Frame", nil, button)
-	buttonborder:Width(30)
-	buttonborder:Height(30)
+	buttonborder:Width(button:GetWidth())
+	buttonborder:Height(button:GetHeight())
 	buttonborder:SetPoint("CENTER", button, "CENTER")
 	buttonborder:SetBackdrop(backdrop_default)
 	buttonborder:SetBackdropColor(1, 1, 1, 0)
 	
 	local buttonborder2 = CreateFrame("Frame", nil, button)
-	buttonborder2:Width(32)
-	buttonborder2:Height(32)
+	buttonborder2:Width(button:GetWidth() + 2)
+	buttonborder2:Height(button:GetHeight() + 2)
 	buttonborder2:SetFrameLevel(buttonborder:GetFrameLevel()+1)
 	buttonborder2:SetPoint("CENTER", button, "CENTER")
 	buttonborder2:SetBackdrop(backdrop_default)
@@ -257,18 +270,27 @@ local function CreateNewItemFrame()
 	frame.buttonborder = buttonborder
 	
 	local status = CreateFrame("StatusBar", nil, frame)
-	status:Width(326)
-	status:Height(28)
-	status:SetPoint("CENTER", frame, "CENTER", 0, 0)
-	--status:SetScript("OnUpdate", StatusUpdate)
+	status:Width(frame:GetWidth() - 2 - button:GetWidth())
+	status:Height(frame:GetHeight() - 2)
+	status:SetPoint("RIGHT", frame, "RIGHT", -1, 0)
+	status:SetScript("OnUpdate", TimerUpdate)
 	status:SetFrameLevel(status:GetFrameLevel()-1)
 	status:SetStatusBarTexture(media:Fetch("statusbar", nil))
 	status:SetStatusBarColor(.8, .8, .8, .9)
-	status.parent = frame
+	status:Hide()
 	frame.status = status
 	
+	local spark = frame:CreateTexture(nil, "OVERLAY")
+	spark:Width(14)
+	spark:Height(status:GetHeight()+5)
+	spark:SetPoint("CENTER", status, "RIGHT", 0, 0)
+	spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
+	spark:SetBlendMode("ADD")
+	spark:Hide()
+	status.spark = spark
+	
 	local bid = CreateFrame("Button", nil, frame)
-	bid:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
+	bid:SetPoint("RIGHT", frame, "RIGHT", -1, -2)
 	bid:Width(28)
 	bid:Height(28)
 	bid:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Up")
@@ -278,54 +300,57 @@ local function CreateNewItemFrame()
 	--f:SetScript("OnEnter", SetTip)
 	--f:SetScript("OnLeave", HideTip)
 	bid:SetScript("OnClick", function(f)
-	  f:GetParent().bidamt:ClearFocus()
-	  EminentDKP:SendCommand("bid",f:GetParent().bidamt:GetText())
+	  f.bidamt:ClearFocus()
+	  EminentDKP:SendCommand("bid",f.bidamt:GetText())
 	end)
 	bid:SetMotionScriptsWhileDisabled(true)
-	
+	bid:Hide()
 	frame.bid = bid
 	
 	local bidamt = CreateFrame("EditBox", nil, frame)
-	bidamt:SetPoint("RIGHT", bid, "LEFT", 4, 0)
+	bidamt:SetPoint("RIGHT", bid, "LEFT", -2, 2)
 	bidamt:Width(50)
 	bidamt:Height(20)
 	bidamt:SetTextInsets(0, 0, 3, 3)
 	bidamt:SetMaxLetters(6)
 	bidamt:SetBackdrop(backdrop_default)
-	bidamt:SetBackdropColor(0, 0, 0, 0)
+	bidamt:SetBackdropColor(0.1, 0.1, 0.1, 1)
 	bidamt:SetBackdropBorderColor(0,0,0,1)
 	bidamt:SetAutoFocus(false)
 	bidamt:SetFontObject(ChatFontNormal)
 	bidamt:SetScript("OnTextChanged", VerifyBid)
 	bidamt:SetScript("OnEnterPressed", ClearFocus)
 	bidamt:SetScript("OnEscapePressed", ClearFocus)
+	bidamt:Hide()
 	
-	frame.bidamt = bidamt
+	bid.bidamt = bidamt
 	
 	local loot = frame:CreateFontString(nil, "ARTWORK")
 	loot:SetFont(media:Fetch('font', nil), 12, "OUTLINE")
-	--loot:Point("LEFT", bind, "RIGHT", 0, 0)
 	loot:Point("LEFT", button, "RIGHT", 4, 0)
-	loot:Height(10)
-	loot:Width(200)
+	loot:Height(frame:GetHeight() / 2)
+	loot:Width(frame:GetWidth() / 2)
 	loot:SetJustifyH("LEFT")
 	frame.loot = loot
 	
 	local winner = frame:CreateFontString(nil, "ARTWORK")
-	winner:SetFont(media:Fetch('font', nil), 12, "OUTLINE")
-	winner:Point("RIGHT", frame, "RIGHT", 4, 0)
-	winner:Height(10)
-	winner:Width(80)
+	winner:SetFont(media:Fetch('font', nil), 10, "OUTLINE")
+	winner:Point("RIGHT", frame, "RIGHT", -1, 0)
+	winner:Height(frame:GetHeight() / 2)
+	winner:Width(frame:GetWidth() - loot:GetWidth() - button:GetWidth())
 	winner:SetJustifyH("RIGHT")
+	winner:SetVertexColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
 	winner:Hide()
 	frame.winner = winner
 	
+	frame:Hide()	
 	return frame
 end
 
 local function GetItemFrame()
   local frame
   if #(recycled_item_frames) > 0 then
+    EminentDKP:Print("using recycled frame")
     frame = tremove(recycled_item_frames)
   else
     frame = CreateNewItemFrame()
@@ -337,13 +362,19 @@ local function GetItemFrame()
 end
 
 -- temporary for testing
-local item_list = { 65135, 59483, 59508, 59500, 59483 }
+local item_list = { { slot = "1", info = 65135 },
+                    { slot = "2", info = 59483 }, 
+                    { slot = "3", info = 59508 }, 
+                    { slot = "4", info = 59500 }, 
+                    { slot = "5", info = 31090 } }
 
 function EminentDKP:ShowAuctions()
   for i, item in ipairs(item_list) do
     local f = GetItemFrame()
-    local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(item)
-    f.item = item
+    local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(item.info)
+    f.item = item.info
+    f.slot = item.slot
+    f.time = time()
     
     f.button:SetNormalTexture(iTexture)
   	f.button.link = iLink
@@ -356,22 +387,56 @@ function EminentDKP:ShowAuctions()
   	f.buttonborder:SetBackdropBorderColor(color.r, color.g, color.b, 1)
   	
   	f.status:SetStatusBarColor(color.r, color.g, color.b, .7)
-  	f.status:SetMinMaxValues(0, time())
-  	f.status:SetValue(time())
     
     f:Show()
   end
 end
 
-function EminentDKP:StartAuction(item)
-  
-  
-  
+function EminentDKP:StartAuction(slot)
+  for i, frame in ipairs(item_frames) do
+    if frame.slot == slot then
+      frame.bid:Show()
+      frame.bid.bidamt:Show()
+      frame.time = time() + 30
+      frame.status:SetMinMaxValues(0, 30)
+      frame.status:SetValue(30)
+      frame.status:Show()
+      frame.status.spark:Show()
+      return
+    end
+  end
+end
+
+function EminentDKP:ShowAuctionWinner(slot,name,amount)
+  for i, frame in ipairs(item_frames) do
+    if frame.slot == slot then
+      frame.bid:Hide()
+      frame.bid.bidamt:Hide()
+      frame.winner:SetText(L["Won by %s (%.0f)"]:format(name,amount))
+      frame.winner:Show()
+      frame.status:Hide()
+      frame.status.spark:Hide()
+      return
+    end
+  end
 end
 
 function EminentDKP:RecycleAuctionItems()
-  
-  
+  for i, frame in ipairs(item_frames) do
+    frame.item = nil
+    frame.slot = nil
+    frame.time = nil
+    frame.bid.bidamt:SetText("")
+    frame.winner:SetText("")
+    frame.bid:Hide()
+    frame.bid.bidamt:Hide()
+    frame.winner:Hide()
+    frame.status:Hide()
+    frame.status.spark:Hide()
+    table.insert(recycled_item_frames,frame)
+    frame:Hide()
+  end
+  wipe(item_frames)
 end
 
 --[[-------------------------------------------------------------------

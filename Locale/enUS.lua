@@ -195,3 +195,5 @@ L["Your bid of %.0f has been accepted."] = "Your bid of %.0f has been accepted."
 L["%s has transferred %.2f DKP to %s."] = "%s has transferred %.2f DKP to %s."
 L["%s just transferred %.2f DKP to you."] = "%s just transferred %.2f DKP to you."
 L["Succesfully transferred %.2f DKP to %s."] = "Succesfully transferred %.2f DKP to %s."
+
+L["Won by %s (%.0f)"] = "Won by %s (%.0f)"

@@ -87,18 +87,7 @@ local function IsRaidInCombat()
 end
 
 local function implode(delim,list)
-  local newstr = ""
-  if #(list) == 1 then
-    return list[1]
-  end
-  for i,v in ipairs(list) do
-    if i ~= #(list) then
-      newstr = newstr .. v .. delim
-    else
-      newstr = newstr .. v
-    end
-  end
-  return newstr
+  return table.concat(list,delim)
 end
 
 local function convertToTimestamp(datetime)
@@ -2523,6 +2512,12 @@ function EminentDKP:ProcessSlashCmd(input)
     self:AdminStartAuction()
   elseif command == 'test' then
     self:ShowAuctions()
+  elseif command == 'test1' then
+    self:StartAuction(arg1)
+  elseif command == 'test2' then
+    self:ShowAuctionWinner(arg1,arg2,500)
+  elseif command == 'test3' then
+    self:RecycleAuctionItems()
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
