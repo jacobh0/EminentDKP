@@ -57,14 +57,10 @@ function EminentDKP:CreateAuctionFrame()
   local settings = self.db.profile.auctionframe
   auction_frame = CreateFrame("Frame", "EminentDKPAuctionFrameWindow", UIParent)
   auction_frame:SetPoint("TOPLEFT", UIParent, "CENTER")
-  auction_frame:SetWidth(settings.itemwidth)
-  auction_frame:SetHeight(settings.itemheight * .75)
   auction_frame:SetMovable(true)
   auction_frame:SetClampedToScreen(true)
 
   auction_frame.title = CreateFrame("Button", nil, auction_frame)
-  auction_frame.title:SetWidth(settings.itemwidth)
-  auction_frame.title:SetHeight(settings.itemheight * .75)
   auction_frame.title:SetScript("OnMouseDown", move)
   auction_frame.title:SetScript("OnMouseUp", stopMove)
   auction_frame.title:SetPoint("TOPLEFT", auction_frame, "TOPLEFT")
@@ -84,6 +80,8 @@ local auction_windowbackdrop = {}
 
 function EminentDKP:ApplyAuctionFrameSettings()
   local p = self.db.profile.auctionframe
+  auction_frame:SetWidth(p.itemwidth)
+  auction_frame:SetHeight(p.itemheight * .75)
   
   local fo = CreateFont("TitleFontEminentDKPAuctionFrame")
 	fo:SetFont(media:Fetch('font', p.title.font), p.title.fontsize)
@@ -102,8 +100,10 @@ function EminentDKP:ApplyAuctionFrameSettings()
 	auction_frame.title:SetBackdrop(auction_titlebackdrop)
 	local color = p.title.color
 	auction_frame.title:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
+	auction_frame.title:SetWidth(p.itemwidth)
+  auction_frame.title:SetHeight(p.itemheight * .75)
 	
-	if p.enabletitle then
+	if self:AuctionActive() and p.enabletitle then
 	  auction_frame.title:Show()
   else
     auction_frame.title:Hide()
@@ -233,16 +233,16 @@ local function ApplyItemFrameSettings(frame)
 	frame.status:Height(frame:GetHeight() - 2)
 	frame.status:SetStatusBarTexture(media:Fetch("statusbar", p.itemtexture))
 	
-	frame.status.spark:Height(frame.status:GetHeight() + 5)
+	frame.status.spark:Height(frame.status:GetHeight() + 10)
 	
 	frame.bid:Width(frame:GetHeight() - 2)
 	frame.bid:Height(frame:GetHeight() - 2)
 	
-	frame.loot:Height(frame:GetHeight() / 2)
+	frame.loot:Height(frame:GetHeight() - 4)
 	frame.loot:Width(frame:GetWidth() / 2)
 	frame.loot:SetFont(media:Fetch('font', p.itemfont), p.itemfontsize, "OUTLINE")
 	
-	frame.winner:Height(frame:GetHeight() / 2)
+	frame.winner:Height(frame:GetHeight() - 2)
 	frame.winner:Width(frame:GetWidth() - frame.loot:GetWidth() - frame.button:GetWidth())
   frame.winner:SetFont(media:Fetch('font', p.itemfont), p.itemfontsize - 2, "OUTLINE")
 end
@@ -375,6 +375,9 @@ function EminentDKP:ReApplyItemFrameSettings()
 end
 
 function EminentDKP:ShowAuctions(mob)
+  if self.db.profile.auctionframe.enabletitle then
+	  auction_frame.title:Show()
+  end
   auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(mob))
   for i, item in ipairs(item_list) do
     local f = GetItemFrame()
@@ -443,6 +446,7 @@ function EminentDKP:RecycleAuctionItems()
     frame:Hide()
   end
   wipe(item_frames)
+  auction_frame.title:Hide()
 end
 
 --[[-------------------------------------------------------------------

@@ -75,14 +75,13 @@ EminentDKP.defaults = {
     windows = { default_window },
     auctionframe = {
       itemfontsize = 14,
-    	itemheight = 30,
-    	itemwidth = 400,
+    	itemheight = 28,
+    	itemwidth = 350,
     	itemfont = "Accidental Presidency",
-    	itemtexture = "BantoBar",
+    	itemtexture = "Healbot",
     	itemspacing = 4,
       title = {menubutton = true, font="Accidental Presidency", fontsize=14,margin=0, texture="Armory", bordertexture="None", borderthickness=2, color = {r=0,g=0,b=0,a=0.6}},
     	background = {margin=0, height=150, texture="None", bordertexture="None", borderthickness=0, color = {r=0,g=0,b=0.5,a=0.5}},
-    	hidden = false,
     	enabletitle = true, 
     	enablebackground = false,
     	locked = false,
@@ -181,6 +180,328 @@ EminentDKP.options = {
           desc= L["Deletes the chosen window."],
           func= function(self) if deletewindow then EminentDKP:DeleteWindow(deletewindow) end end,
           order= 3,
+        },
+      },
+    },
+    auctionframe = {
+      type= "group",
+      name= L["Auction Frame"],
+      order= 0,
+      args = {
+        locked = {
+          type= "toggle",
+          name= L["Lock window"],
+          desc= L["Locks the bar window in place."],
+          order= 1,
+          get= function() return EminentDKP.db.profile.auctionframe.locked end,
+          set= function(win)
+            EminentDKP.db.profile.auctionframe.locked = not EminentDKP.db.profile.auctionframe.locked
+            EminentDKP:ApplyAuctionFrameSettings()
+          end,
+        },
+        titleoptions = {
+          type = "group",
+          name = L["Title bar"],
+          order=2,
+          args = {
+            enable = {
+              type="toggle",
+              name=L["Enable"],
+              desc=L["Enables the title bar."],
+              get=function() return EminentDKP.db.profile.auctionframe.enabletitle end,
+              set=function(win) 
+                EminentDKP.db.profile.auctionframe.enabletitle = not EminentDKP.db.profile.auctionframe.enabletitle
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=0,
+            },
+            font = {
+              type = 'select',
+              dialogControl = 'LSM30_Font',
+              name = L["Bar font"],
+              desc = L["The font used by the title bar."],
+              values = AceGUIWidgetLSMlists.font,
+              get = function() return EminentDKP.db.profile.auctionframe.title.font end,
+              set = function(win,key) 
+                EminentDKP.db.profile.auctionframe.title.font = key
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=1,
+            },
+              fontsize = {
+              type="range",
+              name=L["Bar font size"],
+              desc=L["The font size of the title bar."],
+              min=7,
+              max=40,
+              step=1,
+              get=function() return EminentDKP.db.profile.auctionframe.title.fontsize end,
+              set=function(win, size)
+                EminentDKP.db.profile.auctionframe.title.fontsize = size
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=2,
+            },
+            texture = {
+              type = 'select',
+              dialogControl = 'LSM30_Statusbar',
+              name = L["Background texture"],
+              desc = L["The texture used as the background of the title."],
+              values = AceGUIWidgetLSMlists.statusbar,
+              get = function() return EminentDKP.db.profile.auctionframe.title.texture end,
+              set = function(win,key)
+                EminentDKP.db.profile.auctionframe.title.texture = key
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=3,
+            },						    
+              bordertexture = {
+              type = 'select',
+              dialogControl = 'LSM30_Border',
+              name = L["Border texture"],
+              desc = L["The texture used for the border of the title."],
+              values = AceGUIWidgetLSMlists.border,
+              get = function() return EminentDKP.db.profile.auctionframe.title.bordertexture end,
+              set = function(win,key)
+                EminentDKP.db.profile.auctionframe.title.bordertexture = key
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=4,
+            },
+            thickness = {
+              type="range",
+              name=L["Border thickness"],
+              desc=L["The thickness of the borders."],
+              min=0,
+              max=50,
+              step=0.5,
+              get=function() return EminentDKP.db.profile.auctionframe.title.borderthickness end,
+              set=function(win, val)
+                EminentDKP.db.profile.auctionframe.title.borderthickness = val
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=5,
+            },
+            margin = {
+              type="range",
+              name=L["Margin"],
+              desc=L["The margin between the outer edge and the background texture."],
+              min=0,
+              max=50,
+              step=0.5,
+              get=function() return EminentDKP.db.profile.auctionframe.title.margin end,
+              set=function(win, val)
+                EminentDKP.db.profile.auctionframe.title.margin = val
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=6,
+            },
+            color = {
+              type="color",
+              name=L["Background color"],
+              desc=L["The background color of the title."],
+              hasAlpha=true,
+              get=function(i) 
+                local c = EminentDKP.db.profile.auctionframe.title.color
+                return c.r, c.g, c.b, c.a
+              end,
+              set=function(win, r,g,b,a) 
+                EminentDKP.db.profile.auctionframe.title.color = {["r"] = r, ["g"] = g, ["b"] = b, ["a"] = a}
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=7,
+            },
+          }
+        },
+        itemoptions = {
+          type = "group",
+      		name = L["Bars"],
+      		order=1,
+      		args = {
+            barfont = {
+              type = 'select',
+              dialogControl = 'LSM30_Font',
+              name = L["Bar font"],
+              desc = L["The font used by all bars."],
+              values = AceGUIWidgetLSMlists.font,
+              get = function() return EminentDKP.db.profile.auctionframe.itemfont end,
+              set = function(win,key)
+            		EminentDKP.db.profile.auctionframe.itemfont = key
+            		EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=10,
+            },
+      			barfontsize = {
+      				type="range",
+      				name=L["Bar font size"],
+      				desc=L["The font size of all bars."],
+      				min=7,
+      				max=40,
+      				step=1,
+      				get= function() return EminentDKP.db.profile.auctionframe.itemfontsize end,
+      				set= function(win, size)
+                EminentDKP.db.profile.auctionframe.itemfontsize = size
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+      				order=11,
+      			},
+      	    bartexture = {
+              type = 'select',
+              dialogControl = 'LSM30_Statusbar',
+              name = L["Bar texture"],
+              desc = L["The texture used by all bars."],
+              values = AceGUIWidgetLSMlists.statusbar,
+              get = function() return EminentDKP.db.profile.auctionframe.itemtexture end,
+              set = function(win,key)
+                EminentDKP.db.profile.auctionframe.itemtexture = key
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=12,
+      	    },
+      			barspacing = {
+              type="range",
+              name=L["Bar spacing"],
+              desc=L["Distance between bars."],
+              min=0,
+              max=10,
+              step=1,
+              get=function() return EminentDKP.db.profile.auctionframe.itemspacing end,
+              set=function(win, spacing)
+                EminentDKP.db.profile.auctionframe.itemspacing = spacing
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=13,
+      			},
+      			barheight = {
+              type="range",
+              name=L["Bar height"],
+              desc=L["The height of the bars."],
+              min=20,
+              max=40,
+              step=1,
+              get=function() return EminentDKP.db.profile.auctionframe.itemheight end,
+              set=function(win, height)
+                EminentDKP.db.profile.auctionframe.itemheight = height
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=14,
+      			},
+      			barwidth = {
+              type="range",
+              name=L["Bar width"],
+              desc=L["The width of the bars."],
+              min=200,
+              max=400,
+              step=1,
+              get=function() return EminentDKP.db.profile.auctionframe.itemwidth end,
+              set=function(win, width)
+                EminentDKP.db.profile.auctionframe.itemwidth = width
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=15,
+      			},
+      		}
+        },
+        backgroundoptions = {
+          type = "group",
+          name = L["Background"],
+          order=2,
+          args = {
+            enablebackground = {
+              type="toggle",
+              name=L["Enable"],
+              desc=L["Adds a background frame under the bars."],
+              get=function() return EminentDKP.db.profile.auctionframe.enablebackground end,
+              set=function(win) 
+                EminentDKP.db.profile.auctionframe.enablebackground = not EminentDKP.db.profile.auctionframe.enablebackground
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=0,
+            },
+            texture = {
+              type = 'select',
+              dialogControl = 'LSM30_Background',
+              name = L["Background texture"],
+              desc = L["The texture used as the background."],
+              values = AceGUIWidgetLSMlists.background,
+              get = function() return EminentDKP.db.profile.auctionframe.background.texture end,
+              set = function(win,key)
+                EminentDKP.db.profile.auctionframe.background.texture = key
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=1,
+            },
+            bordertexture = {
+              type = 'select',
+              dialogControl = 'LSM30_Border',
+              name = L["Border texture"],
+              desc = L["The texture used for the borders."],
+              values = AceGUIWidgetLSMlists.border,
+              get = function() return EminentDKP.db.profile.auctionframe.background.bordertexture end,
+              set = function(win,key)
+                EminentDKP.db.profile.auctionframe.background.bordertexture = key
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=2,
+            },
+            thickness = {
+              type="range",
+              name=L["Border thickness"],
+              desc=L["The thickness of the borders."],
+              min=0,
+              max=50,
+              step=0.5,
+              get=function() return EminentDKP.db.profile.auctionframe.background.borderthickness end,
+              set=function(win, val)
+                EminentDKP.db.profile.auctionframe.background.borderthickness = val
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=3,
+            },
+            margin = {
+              type="range",
+              name=L["Margin"],
+              desc=L["The margin between the outer edge and the background texture."],
+              min=0,
+              max=50,
+              step=0.5,
+              get=function() return EminentDKP.db.profile.auctionframe.background.margin end,
+              set=function(win, val)
+                EminentDKP.db.profile.auctionframe.background.margin = val
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=4,
+            },
+            height = {
+              type="range",
+              name=L["Window height"],
+              desc=L["The height of the window. If this is 0 the height is dynamically changed according to how many bars exist."],
+              min=0,
+              max=600,
+              step=1,
+              get=function() return EminentDKP.db.profile.auctionframe.background.height end,
+              set=function(win, height)
+                EminentDKP.db.profile.auctionframe.background.height = height
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=5,
+            },
+            color = {
+              type="color",
+              name=L["Background color"],
+              desc=L["The color of the background."],
+              hasAlpha=true,
+              get=function(i) 
+                local c = EminentDKP.db.profile.auctionframe.background.color
+                return c.r, c.g, c.b, c.a
+              end,
+              set=function(win, r,g,b,a)
+                EminentDKP.db.profile.auctionframe.background.color = {["r"] = r, ["g"] = g, ["b"] = b, ["a"] = a}
+                EminentDKP:ApplyAuctionFrameSettings()
+              end,
+              order=6,
+            },
+          },
         },
       },
     },

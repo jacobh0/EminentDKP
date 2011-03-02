@@ -111,10 +111,12 @@ L["Bars"] = "Bars"
 L["Reverse bar growth"] = "Reverse bar growth"
 L["Bars will grow up instead of down."] = "Bars will grow up instead of down."
 
+L["The font used by the title bar."] = true
 L["Bar font"] = true
 L["The font used by all bars."] = true
 L["Bar font size"] = true
 L["The font size of all bars."] = true
+L["The font size of the title bar."] = true
 L["Bar texture"] = true
 L["The texture used by all bars."] = true
 L["Bar spacing"] = true
@@ -137,6 +139,7 @@ L["Margin"] = "Margin"
 L["Window height"] = "Window height"
 L["The height of the window. If this is 0 the height is dynamically changed according to how many bars exist."] = "The height of the window. If this is 0 the height is dynamically changed according to how many bars exist."
 L["Adds a background frame under the bars. The height of the background frame determines how many bars are shown. This will override the max number of bars setting."] = "Adds a background frame under the bars. The height of the background frame determines how many bars are shown. This will override the max number of bars setting."
+L["Adds a background frame under the bars."] = "Adds a background frame under the bars."
 L["Enable"] = "Enable"
 L["Background"] = "Background"
 L["The texture used as the background."] = "The texture used as the background."
@@ -154,6 +157,9 @@ L["Show menu button"] = "Show menu button"
 L["Click for"] = "Click for"
 L["Shift-Click for"] = "Shift-Click for"
 L["Control-Click for"] = "Control-Click for"
+
+L["Auction Frame"] = "Auction Frame"
+
 
 -- General messages
 
