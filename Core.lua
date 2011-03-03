@@ -577,7 +577,7 @@ function EminentDKP:ReloadWindows()
 	wipe(windows)
 	
 	-- Re-create sets
-	sets = self:GetMeterSets() or {}
+	sets = self:GetMeterSets()
 	if not next(sets) then
 	  self:ReloadSets(false)
   else
@@ -617,7 +617,7 @@ function EminentDKP:ReloadWindows()
 end
 
 function EminentDKP:ReloadSets(updatedisplays)
-  sets = self:GetMeterSets() or {}
+  sets = self:GetMeterSets()
   wipe(sets)
   
   local today = GetTodayDate()
@@ -681,6 +681,7 @@ function EminentDKP:ApplySettingsAll()
   for i, win in ipairs(windows) do
 		self:ApplySettings(win)
 	end
+	self:ApplyAuctionFrameSettings()
 end
 
 function EminentDKP:ApplySettings(win)
@@ -2125,7 +2126,7 @@ function EminentDKP:LOOT_OPENED()
 				if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
 				  local link = GetLootSlotLink(slot)
 				  table.insert(eligible_items,link)
-				  table.insert(itemlist,string.match(link, "item[%-?%d:]+"))
+				  table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), slot=slot })
 				  table.insert(slotlist,1,slot)
 				end
 			end
@@ -2189,9 +2190,9 @@ function EminentDKP:Transfer(addon,from,amount,to)
               self:CreateTransferSyncEvent(from,to,dkp)
               
               self:SendNotification("transfer",{ amount = dkp, sender=from, receiver=to })
-              sendchat(L["Succesfully transferred %.2f DKP to %s."]:format(dkp,to), from, 'whisper')
-              sendchat(L["%s just transferred %.2f DKP to you."]:format(from,dkp), to, 'whisper')
-              sendchat(L["%s has transferred %.2f DKP to %s."]:format(from,dkp,to), "raid", "preset")
+              sendchat(L["Succesfully transferred %.02f DKP to %s."]:format(dkp,to), from, 'whisper')
+              sendchat(L["%s just transferred %.02f DKP to you."]:format(from,dkp), to, 'whisper')
+              sendchat(L["%s has transferred %.02f DKP to %s."]:format(from,dkp,to), "raid", "preset")
             else
               self:WhisperPlayer(addon,L["The DKP amount must not exceed your current DKP."], from)
             end
@@ -2653,10 +2654,6 @@ function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
     self:Bid(true,sender,arg1)
   elseif command == 'transfer' then
     self:Transfer(true,sender,arg1,arg2)
-  elseif command == 'loot' and eligible_looters[sender] then
-    local data = self.auctionItems[arg1]
-    data.guid = arg1
-    self:SendNotification("lootlist",data,sender)
   end
 end
 

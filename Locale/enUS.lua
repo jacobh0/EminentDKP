@@ -216,9 +216,9 @@ L["There is currently no auction active."] = "There is currently no auction acti
 L["You are not eligible to receive loot."] = "You are not eligible to receive loot."
 L["Your bid of %.0f has been accepted."] = "Your bid of %.0f has been accepted."
 
-L["%s has transferred %.2f DKP to %s."] = "%s has transferred %.2f DKP to %s."
-L["%s just transferred %.2f DKP to you."] = "%s just transferred %.2f DKP to you."
-L["Succesfully transferred %.2f DKP to %s."] = "Succesfully transferred %.2f DKP to %s."
+L["%s has transferred %.02f DKP to %s."] = "%s has transferred %.02f DKP to %s."
+L["%s just transferred %.02f DKP to you."] = "%s just transferred %.02f DKP to you."
+L["Succesfully transferred %.02f DKP to %s."] = "Succesfully transferred %.02f DKP to %s."
 
 L["%s now up for auction! Auction ends in 30 seconds."] = "%s now up for auction! Auction ends in 30 seconds."
 L["Bids for %s"] = "Bids for %s"

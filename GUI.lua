@@ -17,10 +17,6 @@ meter.name = "Meter display"
 EminentDKP.displays["meter"] = meter
 
 --[[-------------------------------------------------------------------
-  Meter Window Functions
----------------------------------------------------------------------]]
-
---[[-------------------------------------------------------------------
   Auction Interface Functions
 ---------------------------------------------------------------------]]
 
@@ -251,8 +247,6 @@ local function CreateNewItemFrame()
   local frame = CreateFrame("Frame", nil, auction_frame)
 	frame:SetBackdrop(backdrop_default)
 	frame:SetBackdropColor(0.1, 0.1, 0.1, 1)
-	--frame:SetScript("OnEvent", OnEvent)
-	--frame:RegisterEvent("CANCEL_LOOT_ROLL")
 	frame:Hide()
 	
 	local button = CreateFrame("Button", nil, frame)
