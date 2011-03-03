@@ -361,25 +361,26 @@ local function GetItemFrame()
 	return frame
 end
 
--- temporary for testing
-local item_list = { { slot = "1", info = 65135 },
-                    { slot = "2", info = 59483 }, 
-                    { slot = "3", info = 59508 }, 
-                    { slot = "4", info = 59500 }, 
-                    { slot = "5", info = 31090 } }
-
 function EminentDKP:ReApplyItemFrameSettings()
   for i, frame in ipairs(item_frames) do
     ApplyItemFrameSettings(frame)
+    frame:Point("TOPLEFT", i > 1 and item_frames[i] or auction_frame.title, "BOTTOMLEFT", 0, -(self.db.profile.auctionframe.itemspacing))
   end
 end
 
-function EminentDKP:ShowAuctions(mob)
+local auction_guid = ""
+
+function EminentDKP:ShowAuctionItems(guid)
+  if auction_guid == guid then
+    return
+  elseif auction_guid ~= "" then
+    self:RecycleAuctionItems()
+  end
   if self.db.profile.auctionframe.enabletitle then
 	  auction_frame.title:Show()
   end
-  auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(mob))
-  for i, item in ipairs(item_list) do
+  auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(self.auctionItems[guid].name))
+  for i, item in ipairs(self.auctionItems[guid].items) do
     local f = GetItemFrame()
     local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(item.info)
     f.item = item.info
@@ -399,18 +400,31 @@ function EminentDKP:ShowAuctions(mob)
     
     f:Show()
   end
+  auction_guid = guid
 end
 
-function EminentDKP:StartAuction(slot)
+function EminentDKP:CancelAuction(slot)
+  for i, frame in ipairs(item_frames) do
+    if frame.slot == slot then
+      frame.status:SetValue(-1)
+      frame.winner:SetText(L["Auction cancelled"])
+      frame.winner:Show()
+      return
+    end
+  end
+end
+
+function EminentDKP:StartAuction(slot,start)
   for i, frame in ipairs(item_frames) do
     if frame.slot == slot then
       frame.bid:Show()
       frame.bid.bidamt:Show()
-      frame.time = time() + 30
+      frame.time = start + 30
       frame.status:SetMinMaxValues(0, 30)
       frame.status:SetValue(30)
       frame.status:Show()
       frame.status.spark:Show()
+      frame.winner:Hide()
       return
     end
   end
@@ -447,6 +461,10 @@ function EminentDKP:RecycleAuctionItems()
   end
   wipe(item_frames)
   auction_frame.title:Hide()
+  if self.auctionItems[auction_guid] then
+    self.auctionItems[auction_guid] = nil
+  end
+  auction_guid = ""
 end
 
 --[[-------------------------------------------------------------------
@@ -636,22 +654,11 @@ local function CreateBountyTab(container)
   container:AddChild(bountygrp)
 end
 
-local function CreateNothingTab(container)
-  local msg = AceGUI:Create("Label")
-  msg:SetText("Transfers are not available during an auction.")
-  
-  container:AddChild(msg)
-end
-
 -- Callback function for OnGroupSelected
 local function SelectGroup(container, event, group)
   container:ReleaseChildren()
   if group == "transfer" then
-    if EminentDKP:AuctionActive() then
-      CreateNothingTab(container)
-    else
-      CreateTransferTab(container)
-    end
+    CreateTransferTab(container)
   elseif group == "vanity" then
     CreateVanityTab(container)
   elseif group == "rename" then
@@ -682,7 +689,7 @@ function EminentDKP:CreateActionPanel()
   tab:SetLayout("Flow")
   -- Setup which tabs to show
   tab:SetTabs({
-    {text="Transfer", value="transfer", disabled=EminentDKP:AuctionActive()},
+    {text="Transfer", value="transfer"},
     {text="Vanity", value="vanity", disabled=(not EminentDKP:AmOfficer())},
     {text="Rename", value="rename", disabled=(not EminentDKP:AmOfficer())},
     {text="Bounty", value="bounty", disabled=(not EminentDKP:AmMasterLooter())},

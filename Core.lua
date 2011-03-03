@@ -29,7 +29,6 @@ TODO:
 5. Revamp version system
 6. Sync database scans (so officers don't run duplicate scans in a day)
 7. Investigate individual day current DKP (lamashtu at -72k when only deduction is 25k)
-8. Implement the auction GUI
 
 ]]
 
@@ -980,6 +979,9 @@ function EminentDKP:DatabaseUpdate()
       end
       for eid, eventdata in pairs(pool.events) do
         self.db.factionrealm.pools[name].events[eid].datetime = convertToTimestamp(eventdata.datetime)
+        if eventdata.eventType == 'bounty' and (not eventdata.source or eventdata.source == "") then
+          self.db.factionrealm.pools[name].events[eid].source = "Default"
+        end
       end
       if self.db.factionrealm.pools[name].lastScan ~= 0 then
         self.db.factionrealm.pools[name].lastScan = convertToTimestamp(self.db.factionrealm.pools[name].lastScan)
@@ -1359,9 +1361,10 @@ end
 -- Compare the version against our version, and note any newer version
 function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   if sender == self.myName then return end
-  local compare = CompareVersions(self:GetVersion(),message)
+  local version, welcome = strsplit(':',message,2)
+  local compare = CompareVersions(self:GetVersion(),version)
   
-  UpdateNewestVersion(message)
+  UpdateNewestVersion(version)
   if compare.major > 0 or compare.minor > 0 then
     -- Broadcast our newer version
     self:BroadcastVersion()
@@ -1377,6 +1380,24 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
         -- This staggers event requests to cut down on addon channel traffic and spamming
         self:ScheduleTimer("RequestMissingEvents", math.random(5), true)
       end
+    end
+  end
+  
+  -- If they login during an auction, and are eligible, notify them appropriately
+  if welcome and welcome == "Hello" then
+    if self:AmMasterLooter() and self.bidItem and eligible_looters[sender] then
+      -- Send them the loot
+      self:SendNotification("lootlist",{ 
+        guid=self.bidItem.srcGUID, 
+        name=self.auctionItems[self.bidItem.srcGUID].name,
+        items=self.auctionItems[self.bidItem.srcGUID].items
+      },sender)
+      -- Start the auction for them
+      self:SendNotification("auction",{ 
+        guid=self.bidItem.srcGUID, 
+        slot=self.bidItem.slotNum, 
+        start=self.bidItem.start
+      },sender)
     end
   end
 end
@@ -1971,7 +1992,7 @@ end
 
 -- Broadcast version
 function EminentDKP:PLAYER_ENTERING_WORLD()
-  self:BroadcastVersion()
+  self:SendCommMessage('EminentDKP-Version',self:GetVersion()..":Hello",'GUILD')
   -- Hide the meters if we're PVPing and we want it hidden
   if self.db.profile.hidepvp then
     if is_in_pvp() then
@@ -2078,9 +2099,10 @@ end
 function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
     sendchat('Auction cancelled. All bids have been voided.', "raid", "preset")
-    self:SendNotification("auctioncancel",{ item = self.bidItem.itemString })
+    self:SendNotification("auctioncancel",{ guid = self.bidItem.srcGUID, item = self.bidItem.itemString })
     auction_active = false
     self:CancelTimer(self.bidTimer)
+    table.insert(recent_loots[self.bidItem.srcGUID].slots,self.bidItem.slotNum)
     self.bidItem = nil
   end
 end
@@ -2096,15 +2118,15 @@ function EminentDKP:LOOT_OPENED()
     local unitName = select(1,UnitName("target"))
     if not recent_loots[guid] and GetNumLootItems() > 0 then
       local eligible_items = {}
-      local eligible_slots = {}
-      local itemstring_list = {}
+      local slotlist = {}
+      local itemlist = {}
       for slot = 1, GetNumLootItems() do 
 				local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
 				if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
 				  local link = GetLootSlotLink(slot)
 				  table.insert(eligible_items,link)
-				  table.insert(itemstring_list,string.match(link, "item[%-?%d:]+"))
-				  table.insert(eligible_slots,slot)
+				  table.insert(itemlist,string.match(link, "item[%-?%d:]+"))
+				  table.insert(slotlist,1,slot)
 				end
 			end
 			
@@ -2115,21 +2137,12 @@ function EminentDKP:LOOT_OPENED()
 		    end
 		    
 		    -- Share loot list with raid
-		    self:SendNotification("loot",itemstring_list)
+		    self:SendNotification("lootlist",{ guid=guid, name=unitName, items=itemlist })
 			end
 			-- Ensure that we only print once by keeping track of the GUID
-			recent_loots[guid] = { name=unitName, slots=eligible_slots }
+			recent_loots[guid] = { name=unitName, slots=slotlist }
     end
   end
-end
-
-function EminentDKP:SendCommand(...)
-  local cmd, arg1, arg2 = ...
-  local tbl = {}
-  table.insert(tbl,cmd)
-  table.insert(tbl,arg1)
-  table.insert(tbl,arg2)
-  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self.masterLooterName,'ALERT')
 end
 
 function EminentDKP:WhisperPlayer(addon, msg, who, accept)
@@ -2273,14 +2286,18 @@ function EminentDKP:AdminStartAuction()
           self:UpdateLootEligibility()
   		
       		-- Fast forward to next eligible slot
-      		local slot = recent_loots[guid].slots[1]
-      		local itemLink = GetLootSlotLink(slot)
+      		local slot
+      		local itemLink
       		
-      		while itemLink == nil do
-      		  table.remove(recent_loots[guid].slots,1)
-      		  slot = recent_loots[guid].slots[1]
+      		while not itemLink and #(recent_loots[guid].slots) > 0 do
+      		  slot = tremove(recent_loots[guid].slots)
       		  itemLink = GetLootSlotLink(slot)
     		  end
+    		  
+    		  if not itemLink then
+    		    self:DisplayActionResult(L["There is no loot available to auction."])
+    		    return
+  		    end
     		  
       		-- Gather some info about this item
       		local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
@@ -2292,25 +2309,25 @@ function EminentDKP:AdminStartAuction()
     			  elapsed=0, 
     			  bids={}, 
     			  slotNum=slot,
+    			  start=time(),
     			  srcGUID=UnitGUID("target")
     			}
-    			self:SendNotification("auction",{ item = self.bidItem.itemString })
+    			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
     			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
 			
-    			sendchat(itemLink .. ' bid now!', "raid_warning", "preset")
-    			sendchat(itemLink .. ' now up for auction! Auction ends in 30 seconds.', "raid", "preset")
-      		--local itemString = string.match(itemLink, "item[%-?%d:]+")
+    			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
+    			sendchat(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink), "raid", "preset")
         else
-          sendchat('An auction is already active.', nil, 'self')
+          self:DisplayActionResult(L["An auction is already active."])
         end
       else
-        sendchat('There is no loot available to auction.', nil, 'self')
+        self:DisplayActionResult(L["There is no loot available to auction."])
       end
     else
-      sendchat('You must be looting a corpse to start an auction.', nil, 'self')
+      self:DisplayActionResult(L["You must be looting a corpse to start an auction."])
     end
   else
-    sendchat('You must be the master looter to initiate an auction.', nil, 'self')
+    self:DisplayActionResult(L["You must be the master looter to initiate an auction."])
   end
 end
 
@@ -2320,7 +2337,7 @@ function EminentDKP:AuctionBidTimer()
   
   -- If 30 seconds has elapsed, then close it
   if self.bidItem.elapsed == 30 then
-    sendchat('Auction has closed. Determining winner...', "raid", "preset")
+    sendchat(L["Auction has closed. Determining winner..."], "raid", "preset")
     auction_active = false
     self:CancelTimer(self.bidTimer)
     
@@ -2332,11 +2349,11 @@ function EminentDKP:AuctionBidTimer()
     
     if next(self.bidItem.bids) == nil then
       -- No bids received, so disenchant
-      sendchat('No bids received. Disenchanting.', "raid", "preset")
+      sendchat(L["No bids received. Disenchanting."], "raid", "preset")
       if eligible_looters[self.db.profile.disenchanter] then
         looter = self.db.profile.disenchanter
       else
-        sendchat(self.db.profile.disenchanter..' was not eligible to receive loot to disenchant.', nil, 'self')
+        sendchat(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter), nil, 'self')
       end
     else
       local bids = 0
@@ -2364,10 +2381,9 @@ function EminentDKP:AuctionBidTimer()
         looter = winners[1]
       else
         -- We have a tie to break
-        local tiebreak = math.random(#(winners))
-        looter = winners[tiebreak]
+        looter = winners[math.random(#(winners))]
         secondHighestBid = winningBid
-        sendchat('A tie was broken with a random roll.', "raid", "preset")
+        sendchat(L["A tie was broken with a random roll."], "raid", "preset")
       end
       
       -- Construct list of players to receive dkp
@@ -2375,23 +2391,21 @@ function EminentDKP:AuctionBidTimer()
       local dividend = (secondHighestBid/#(players))
       
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
-      sendchat(looter..' has won '..GetLootSlotLink(self.bidItem.slotNum)..' for '..secondHighestBid..' DKP!', "raid", "preset")
-      sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
-      
-      self:SendNotification("auctionwon",{ amount = secondHighestBid, receiver = looter, item = self.bidItem.itemString })
+      sendchat(L["%s has won %s for %.0f DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid), "raid", "preset")
+      sendchat(L["Each player has received %.0f DKP."]:format(dividend), "raid", "preset")
+      self:SendNotification("auctionwon",{ guid = self.bidItem.srcGUID, amount = secondHighestBid, receiver = looter, item = self.bidItem.itemString, slot = self.bidItem.slotNum })
     end
     
     -- Distribute the loot
-    table.remove(recent_loots[guid].slots,1)
     GiveMasterLoot(self.bidItem.slotNum, eligible_looters[looter])
-    self.bidItem = nil
     
     -- Re-run the auction routine...
     if #(recent_loots[guid].slots) > 0 then
-      sendchat('The next auction will begin in 3 seconds.', "raid", "preset")
-      self:ScheduleTimer("AdminStartAuction", 3)
+      self:AdminStartAuction()
     else
-      sendchat('No more loot found.', "raid", "preset")
+      self.bidItem = nil
+      sendchat(L["No more loot found."], "raid", "preset")
+      self:SendNotification("lootdone",{ guid = self.bidItem.srcGUID })
     end
   else
     local timeLeft = (30 - self.bidItem.elapsed)
@@ -2402,10 +2416,10 @@ end
 function EminentDKP:GetBountyReasons()
   local reasons = { ["Default"] = "Default" }
   for i,mob in pairs(recent_deaths) do
-    reasons[mob] = string.format(L["Kill: %s"],mob)
+    reasons[mob] = L["Kill: %s"]:format(mob)
   end
   for i,achiev in pairs(recent_achievements) do
-    reasons[achiev] = string.format(L["Achievement: %s"],achiev)
+    reasons[achiev] = L["Achievement: %s"]:format(achiev)
   end
   return reasons
 end
@@ -2418,15 +2432,6 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
       -- Construct list of players to receive bounty
       local players = self:GetCurrentRaidMembersIDs()
       
-      -- todo: solidify the process by which a "reason" is acquired
-      local name = UnitName("target")
-      if name ~= nil then
-        if reason ~= nil then
-          name = "Default"
-        else
-          name = reason
-        end
-      end
       local amount = (percent and (self:GetAvailableBounty() * (p/100)) or p)
       local dividend = (amount/#(players))
       
@@ -2435,9 +2440,9 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
       -- Announce bounty to the other addons
 	    self:SendNotification("bounty",{ amount = dividend })
       
-      sendchat('A bounty of '..self:StdNumber(amount)..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
-      sendchat('Each player has received '..self:StdNumber(dividend)..' DKP.', "raid", "preset")
-      sendchat('New bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
+      sendchat(L["A bounty of %.02f has been awarded to %.0f players."]:format(amount,#(players)), "raid", "preset")
+      sendchat(L["Each player has received %.02f DKP."]:format(dividend), "raid", "preset")
+      sendchat(L["The bounty pool is now %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
     else
       self:DisplayActionResult(L["ERROR: Invalid bounty amount given."])
     end
@@ -2499,7 +2504,11 @@ function EminentDKP:AdminRename(from,to)
 end
 
 function EminentDKP:DisplayActionResult(status)
-  self.actionpanel:SetStatusText(status)
+  if self.actionpanel then
+    self.actionpanel:SetStatusText(status)
+  else
+    sendchat(status, nil, 'self')
+  end
 end
 
 ------------- END ADMIN FUNCTIONS -------------
@@ -2510,14 +2519,6 @@ function EminentDKP:ProcessSlashCmd(input)
   
   if command == 'auction' then
     self:AdminStartAuction()
-  elseif command == 'test' then
-    self:ShowAuctions("Test")
-  elseif command == 'test1' then
-    self:StartAuction(arg1)
-  elseif command == 'test2' then
-    self:ShowAuctionWinner(arg1,arg2,50000)
-  elseif command == 'test3' then
-    self:RecycleAuctionItems()
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
@@ -2571,7 +2572,10 @@ function EminentDKP:SendNotification(...)
   end
 end
 
+local last_notification = {}
+
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
+  if not self:IsAnOfficer(sender) then return end
   -- Decode the compressed data
   local one = libCE:Decode(message)
 
@@ -2591,11 +2595,19 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
   	return
   end
   
+  self:ActuateNotification(notifyType,data)
+end
+
+function EminentDKP:ActuateNotification(notifyType,data)
   if notifyType == "accept" or notifyType == "reject" then
     -- do stuff
-  elseif notifyType == "loot" then
-    self.auctionItems = data
-    -- todo: setup some stuff...
+  elseif notifyType == "lootlist" then
+    local guid = data.guid
+    -- We only set the loot list once
+    if not self.auctionItems[guid] then
+      data.guid = nil
+      self.auctionItems[guid] = data
+    end
   elseif notifyType == "bounty" then
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
   elseif notifyType == "transfer" then
@@ -2605,18 +2617,32 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
       self:NotifyOnScreen("TRANSFER_MADE",data.amount,data.sender,data.receiver)
     end
   elseif notifyType == "auction" then
-    auction_active = true
-    -- todo: do more with data.item
+    if not self:AmMasterLooter() then auction_active = true end
+    self:ShowAuctionItems(data.guid)
+    self:StartAuction(data.slot,tonumber(data.start))
   elseif notifyType == "auctioncancel" then
-    auction_active = false
-    -- todo: do more with data.item
+    if not self:AmMasterLooter() then auction_active = false end
+    self:ShowAuctionItems(data.guid)
+    self:CancelAuction(data.slot)
   elseif notifyType == "auctionwon" then
-    auction_active = false
-    -- todo: do more with data.item
+    if not self:AmMasterLooter() then auction_active = false end
+    self:ShowAuctionItems(data.guid)
+    self:ShowAuctionWinner(data.slot,data.receiver,data.amount)
     if data.receiver == self.myName then
       self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
     end
+  elseif notifyType == "lootdone" then
+    self:RecycleAuctionItems()
   end
+end
+
+function EminentDKP:SendCommand(...)
+  local cmd, arg1, arg2 = ...
+  local tbl = {}
+  table.insert(tbl,cmd)
+  table.insert(tbl,arg1)
+  table.insert(tbl,arg2)
+  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self.masterLooterName,'ALERT')
 end
 
 function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
@@ -2627,6 +2653,10 @@ function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
     self:Bid(true,sender,arg1)
   elseif command == 'transfer' then
     self:Transfer(true,sender,arg1,arg2)
+  elseif command == 'loot' and eligible_looters[sender] then
+    local data = self.auctionItems[arg1]
+    data.guid = arg1
+    self:SendNotification("lootlist",data,sender)
   end
 end
 

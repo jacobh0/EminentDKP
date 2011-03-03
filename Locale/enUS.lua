@@ -204,3 +204,4 @@ L["%s just transferred %.2f DKP to you."] = "%s just transferred %.2f DKP to you
 L["Succesfully transferred %.2f DKP to %s."] = "Succesfully transferred %.2f DKP to %s."
 
 L["Won by %s (%.0f)"] = "Won by %s (%.0f)"
+L["Auction cancelled"] = "Auction cancelled"
