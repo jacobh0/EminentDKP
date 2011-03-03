@@ -21,13 +21,10 @@ end
 
 TODO:
 
-0. Look into not having a local variables "sets" (draw everything from saved variables)
 1. Organize meter display code and move to GUI.lua
 2. Convert all static messages into localized messages
 3. Investigate bar recycling (specifically when wiping the window, etc)
-4. Address database integrity issues surrounding officer capabilities
-5. Revamp version system
-6. Sync database scans (so officers don't run duplicate scans in a day)
+4. Revamp version system
 
 ]]
 
@@ -1156,7 +1153,11 @@ end
 function EminentDKP:EnsureOfficership(self, ...)
   -- Check if the command can only be used by an officer
   if not self:AmOfficer() then
-    sendchat(L["That command can only be used by an officer."], nil, 'self')
+    self:DisplayActionResult(L["That command can only be used by an officer."])
+    return
+  end
+  if self:NeedSync() then
+    self:DisplayActionResult(L["Your database must be up to date first."])
     return
   end
   self.hooks["EnsureOfficership"](...)
@@ -1164,15 +1165,19 @@ end
 
 function EminentDKP:EnsureMasterlooter(self, ...)
   if not self:AmOfficer() then
-    sendchat(L["That command can only be used by an officer."], nil, 'self')
+    self:DisplayActionResult(L["That command can only be used by an officer."])
     return
   end
   if self.lootMethod ~= 'master' then
-    sendchat(L["Master looting must be enabled."], nil, 'self')
+    self:DisplayActionResult(L["Master looting must be enabled."])
     return
   end
   if not self.amMasterLooter then
-    sendchat(L["Only the master looter can use that command."], nil, 'self')
+    self:DisplayActionResult(L["Only the master looter can use that command."])
+    return
+  end
+  if self:NeedSync() then
+    self:DisplayActionResult(L["Your database must be up to date first."])
     return
   end
   self.hooks["EnsureMasterlooter"](...)
@@ -1199,6 +1204,10 @@ end
 
 function EminentDKP:GetEventCountDifference()
   return self:GetNewestEventCount() - self:GetEventCount()
+end
+
+function EminentDKP:NeedSync()
+  return (self:GetEventCountDifference() > 0)
 end
 
 -- Get list of events we need that aren't in the cache
@@ -2054,6 +2063,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
     end
     sendchat('Current bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
     self:GetActivePool().lastScan = time()
+    self:SendNotification("scan",{ time=self:GetLastScan() })
     self:PrintStandings()
   end
 end
@@ -2640,6 +2650,8 @@ function EminentDKP:ActuateNotification(notifyType,data)
     end
   elseif notifyType == "lootdone" then
     self:RecycleAuctionItems()
+  elseif notifyType == "scan" then
+    self:GetActivePool().lastScan = data.time
   end
 end
 
