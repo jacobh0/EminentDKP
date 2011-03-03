@@ -1,7 +1,7 @@
 ## Interface: 40000
 ## Title: EminentDKP
 ## Notes: DKP used by Eminent of Crushridge-US
-## Author: Grioja, Thanah
+## Author: Grioja
 ## Version: 2.1.0
 ## SavedVariables: EminentDKPDB
 ## OptionalDeps: Ace3

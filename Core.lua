@@ -1121,7 +1121,6 @@ function EminentDKP:ExecuteNextNotification()
   end
 end
 
--- todo: add queueing for notifications
 function EminentDKP:NotifyOnScreen(...)
   local eventType, received, source, extra = ...
   local data = { src = source, desc = received, extra = extra }
@@ -1191,7 +1190,6 @@ function EminentDKP:GetVersion()
 end
 
 function EminentDKP:GetNewestVersion()
-  -- todo: reset newest version if our eventcounter increases
   return (newest_version ~= '' and newest_version or self:GetVersion())
 end
 
@@ -1636,14 +1634,15 @@ function EminentDKP:GetPlayerNames()
   return list
 end
 
-function EminentDKP:GetPlayersOfClass(name)
-  local playerid = self:GetPlayerIDByName(name)
-  local player = self:GetPlayerByID(playerid)
+function EminentDKP:GetPlayersOfClass(name,fresh)
+  local player, playerid = self:GetPlayerByName(name)
   local list = {}
   for pid,data in pairs(self:GetActivePool().players) do
     if playerid ~= pid and data.class == player.class then
-      local name = self:GetPlayerNameByID(pid)
-      list[name] = name
+      if not fresh or (fresh and self:IsPlayerFresh(player)) then
+        local name = self:GetPlayerNameByID(pid)
+        list[name] = name
+      end
     end
   end
   return list
@@ -1970,6 +1969,11 @@ function EminentDKP:CreateEvent(src,etype,extra,t,b,val,dtime)
     value = val,
     datetime = dtime
   }
+  
+  -- Update newest_version (since it may be out of date now)
+  local old_newest_version = self:GetNewestVersion()
+  newest_version = ""
+  UpdateNewestVersion(old_newest_version)
   
   return cid
 end
@@ -2442,7 +2446,6 @@ function EminentDKP:GetBountyReasons()
 end
 
 function EminentDKP:AdminDistributeBounty(percent,value,reason)
-  -- todo: maybe offer a config option to automatically run this after a boss death?
   if not auction_active then
     local p = tonumber(value) or 0
     if (percent and p <= 100 and p > 0) or (not percent and p <= self:GetAvailableBounty() and p > 0) then
