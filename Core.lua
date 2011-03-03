@@ -28,7 +28,6 @@ TODO:
 4. Address database integrity issues surrounding officer capabilities
 5. Revamp version system
 6. Sync database scans (so officers don't run duplicate scans in a day)
-7. Investigate individual day current DKP (lamashtu at -72k when only deduction is 25k)
 
 ]]
 
@@ -560,7 +559,7 @@ local function MarkPlayersSeen(seen, set, event)
       if not seen[set.name][pid] then
         local player = EminentDKP:GetPlayerByID(pid)
         if player.active then
-          table.insert(set.players, {id=pid,class=player.class,modedata={}})
+          table.insert(set.players, {id=pid,modedata={}})
           seen[set.name][pid] = true
         end
       end
@@ -1574,6 +1573,13 @@ function EminentDKP:GetPlayerNameByID(pid)
     if id == pid then
       return name
     end
+  end
+  return nil
+end
+
+function EminentDKP:GetPlayerClassByID(pid)
+  if self:GetActivePool().players[pid] then
+    return self:GetActivePool().players[pid].class
   end
   return nil
 end

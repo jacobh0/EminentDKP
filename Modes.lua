@@ -151,20 +151,22 @@ local classModePrototype = {
     
     for i, p in pairs(set.players) do
       -- Iterate through the player's relevant events and calculate data!
-      if tContains(classFilter[self:GetName()],p.class) then
-        for j, eid in ipairs(set.events) do
-          local event = EminentDKP:GetEvent(eid)
-          -- Vanity resets are of no concern
-          if event.eventType ~= 'vanityreset' then
-            local player = EminentDKP:GetPlayerByID(p.id)
-            -- Was there an earning?
-            if player.earnings[eid] then
-              p.modedata.currentDKP = p.modedata.currentDKP + player.earnings[eid]
-              p.modedata.earnedDKP = p.modedata.earnedDKP + player.earnings[eid]
-            end
-            -- Was there a deduction?
-            if player.deductions[eid] then 
-              p.modedata.currentDKP = p.modedata.currentDKP - player.deductions[eid]
+      local player = EminentDKP:GetPlayerByID(p.id)
+      if tContains(classFilter[self:GetName()],player.class) then
+        if p.modedata.earnedDKP == 0 then
+          for j, eid in ipairs(set.events) do
+            local event = EminentDKP:GetEvent(eid)
+            -- Vanity resets are of no concern
+            if event.eventType ~= 'vanityreset' then
+              -- Was there an earning?
+              if player.earnings[eid] then
+                p.modedata.currentDKP = p.modedata.currentDKP + player.earnings[eid]
+                p.modedata.earnedDKP = p.modedata.earnedDKP + player.earnings[eid]
+              end
+              -- Was there a deduction?
+              if player.deductions[eid] then 
+                p.modedata.currentDKP = p.modedata.currentDKP - player.deductions[eid]
+              end
             end
           end
         end
@@ -178,7 +180,8 @@ local classModePrototype = {
   	local nr = 1
     
   	for pid, player in pairs(get_players(set)) do
-  		if tContains(classFilter[self:GetName()],player.class) then
+  	  local class = (player.class and player.class or EminentDKP:GetPlayerClassByID(player.id))
+  		if tContains(classFilter[self:GetName()],class) then
   		  local earned = player.earnedDKP or player.modedata.earnedDKP
   		  -- Only show people who have had any activity in the system...
   		  if earned > 0 then
@@ -187,7 +190,7 @@ local classModePrototype = {
     			d.id = player.id or pid
     			d.label = EminentDKP:GetPlayerNameByID(d.id)
     			d.value = player.currentDKP or player.modedata.currentDKP
-    			d.class = string.upper(string.gsub(player.class,"%s*",""))
+    			d.class = class
     			-- Never show percent unless it is the alltime set, the percents are meaningless on individual days
     			local showpercent = self.metadata.columns.Percent
     			if set.sortnum ~= 1 then
@@ -266,6 +269,7 @@ function balancemode:PopulateData(win, set)
   local player = find_player(set,self.playerid)
   local playerData = (player.currentDKP and player or EminentDKP:GetPlayerByID(self.playerid))
   local nr = 1
+  local max = 0
   
   for i, eid in ipairs(get_events(set,self.playerid,event_filter_balance)) do
     local event = EminentDKP:GetEvent(eid)
@@ -294,14 +298,21 @@ function balancemode:PopulateData(win, set)
 		      d.color = red
 		      d.icon = select(3,GetSpellInfo(28084)) -- negative charge icon
 	      end
+	      
+	      if d.value > max then
+  				max = d.value
+  			end
   			nr = nr + 1
       end
     end
   end
+  win.metadata.maxvalue = max
 end
+
 function itemmode:PopulateData(win, set) 
   local player = find_player(set,self.playerid)
   local nr = 1
+  local max = 0
   
   for i, eid in ipairs(get_events(set,self.playerid,event_filter_auction_won)) do
     local event = EminentDKP:GetEvent(eid)
@@ -313,6 +324,11 @@ function itemmode:PopulateData(win, set)
 		d.value = event.value
 		d.valuetext = FormatValueText(event.value, self.metadata.columns.DKP)
 		d.icon = select(10, GetItemInfo(event.extraInfo))
+		
+		if d.value > max then
+			max = d.value
+		end
 		nr = nr + 1
   end
+  win.metadata.maxvalue = max
 end
