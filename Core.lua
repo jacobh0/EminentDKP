@@ -2117,7 +2117,7 @@ end
 
 -- Keep track of the last container we opened
 function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
-  if not self.amMasterLooter then return end
+  if not self:AmMasterLooter() then return end
   if spell == "Opening" and unit == "player" then
     lastContainerName = target
   end
@@ -2271,7 +2271,7 @@ function EminentDKP:PrintStandings()
   
   sendchat(L["Current DKP standings:"], "raid", "preset")
   for rank,data in ipairs(a) do
-    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), "raid", "preset")
+    sendchat(("%d. %s - %.02f"):format(rank,data.n,data.dkp), "raid", "preset")
   end
 end
 
@@ -2280,7 +2280,7 @@ function EminentDKP:WhisperStandings(to)
   
   sendchat(L["Current DKP standings:"], to, 'whisper')
   for rank,data in ipairs(a) do
-    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), to, 'whisper')
+    sendchat(("%d. %s - %.02f"):format(rank,data.n,data.dkp), to, 'whisper')
   end
 end
 
@@ -2289,7 +2289,7 @@ function EminentDKP:WhisperLifetime(to)
   
   sendchat(L["Lifetime Earned DKP standings:"], to, 'whisper')
   for rank,data in ipairs(a) do
-    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), to, 'whisper')
+    sendchat(("%d. %s - %.02f"):format(rank,data.n,data.dkp), to, 'whisper')
   end
 end
 
@@ -2609,8 +2609,6 @@ function EminentDKP:SendNotification(...)
     self:SendCommMessage('EminentDKP-Notify',tosync,'WHISPER',target)
   end
 end
-
-local last_notification = {}
 
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
   if not self:IsAnOfficer(sender) then return end
