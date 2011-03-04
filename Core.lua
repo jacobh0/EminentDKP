@@ -25,6 +25,7 @@ TODO:
 2. Convert all static messages into localized messages
 3. Investigate bar recycling (specifically when wiping the window, etc)
 4. Revamp version system
+5. Facilitate errors for bids (auction GUI or whisper)
 
 ]]
 
@@ -2166,10 +2167,10 @@ function EminentDKP:LOOT_OPENED()
   end
 end
 
-function EminentDKP:WhisperPlayer(addon, msg, who, accept)
+function EminentDKP:WhisperPlayer(addon, method, msg, who, accept)
   if addon then
     local nt = (accept and "accept" or "reject")
-    self:SendNotification(nt,{ message=msg },who)
+    self:SendNotification(nt,{ from=method, message=msg },who)
   else
     sendchat(msg, who, 'whisper')
   end
@@ -2183,18 +2184,18 @@ function EminentDKP:Bid(addon,from,amount)
       if bid > 0 then
         if self:PlayerHasDKP(from,bid) then
           self.bidItem.bids[from] = bid
-          self:WhisperPlayer(addon,L["Your bid of %.0f has been accepted."]:format(bid), from, true)
+          self:WhisperPlayer(addon,"bid",L["Your bid of %.0f has been accepted."]:format(bid), from, true)
         else
-          self:WhisperPlayer(addon,L["The DKP amount must not exceed your current DKP."], from)
+          self:WhisperPlayer(addon,"bid",L["The DKP amount must not exceed your current DKP."], from)
         end
       else
-        self:WhisperPlayer(addon,L["DKP amount must be a number greater than 0."], from)
+        self:WhisperPlayer(addon,"bid",L["DKP amount must be a number greater than 0."], from)
       end
     else
-      self:WhisperPlayer(addon,L["You are not eligible to receive loot."], from)
+      self:WhisperPlayer(addon,"bid",L["You are not eligible to receive loot."], from)
     end
   else
-    self:WhisperPlayer(addon,L["There is currently no auction active."], from)
+    self:WhisperPlayer(addon,"bid",L["There is currently no auction active."], from)
   end
 end
 
@@ -2214,22 +2215,22 @@ function EminentDKP:Transfer(addon,from,amount,to)
               sendchat(L["%s just transferred %.02f DKP to you."]:format(from,dkp), to, 'whisper')
               sendchat(L["%s has transferred %.02f DKP to %s."]:format(from,dkp,to), "raid", "preset")
             else
-              self:WhisperPlayer(addon,L["The DKP amount must not exceed your current DKP."], from)
+              self:WhisperPlayer(addon,"transfer",L["The DKP amount must not exceed your current DKP."], from)
             end
           else
-            self:WhisperPlayer(addon,L["DKP amount must be a number greater than 0."], from)
+            self:WhisperPlayer(addon,"transfer",L["DKP amount must be a number greater than 0."], from)
           end
         else
-          self:WhisperPlayer(addon,L["%s does not exist in the DKP pool."]:format(to), from)
+          self:WhisperPlayer(addon,"transfer",L["%s does not exist in the DKP pool."]:format(to), from)
         end
       else
-        self:WhisperPlayer(addon,L["You do not exist in the DKP pool."], from)
+        self:WhisperPlayer(addon,"transfer",L["You do not exist in the DKP pool."], from)
       end
     else
-      self:WhisperPlayer(addon,L["You cannot transfer DKP to yourself."], from)
+      self:WhisperPlayer(addon,"transfer",L["You cannot transfer DKP to yourself."], from)
     end
   else
-    self:WhisperPlayer(addon,L["You cannot transfer DKP during an auction."], from)
+    self:WhisperPlayer(addon,"transfer",L["You cannot transfer DKP during an auction."], from)
   end
 end
 
@@ -2500,9 +2501,9 @@ end
 function EminentDKP:AdminVanityReset(who)
   if self:PlayerExistsInPool(who) then
     self:CreateVanityResetSyncEvent(who)
-    self:DisplayActionResult(string.format(L["Successfully reset vanity DKP for %s."],who))
+    self:DisplayActionResult(L["Successfully reset vanity DKP for %s."]:format(who))
   else
-    self:DisplayActionResult(string.format(L["ERROR: %s does not exist in the DKP pool."],who))
+    self:DisplayActionResult(L["ERROR: %s does not exist in the DKP pool."]:format(who))
   end
 end
 
@@ -2511,15 +2512,15 @@ function EminentDKP:AdminRename(from,to)
     if self:PlayerExistsInPool(to) then
       if self:IsPlayerFresh(to) then
         --self:CreateRenameSyncEvent(from,to)
-        self:DisplayActionResult(string.format(L["Successfully renamed %s to %s."],from,to))
+        self:DisplayActionResult(L["Successfully renamed %s to %s."]:format(from,to))
       else
-        self:DisplayActionResult(string.format(L["ERROR: %s is not a fresh player."],to))
+        self:DisplayActionResult(L["ERROR: %s is not a fresh player."]:format(to))
       end
     else
-      self:DisplayActionResult(string.format(L["ERROR: %s does not exist in the DKP pool."],to))
+      self:DisplayActionResult(L["ERROR: %s does not exist in the DKP pool."]:format(to))
     end
   else
-    self:DisplayActionResult(string.format(L["ERROR: %s does not exist in the DKP pool."],from))
+    self:DisplayActionResult(L["ERROR: %s does not exist in the DKP pool."]:format(from))
   end
 end
 
@@ -2620,7 +2621,11 @@ end
 
 function EminentDKP:ActuateNotification(notifyType,data)
   if notifyType == "accept" or notifyType == "reject" then
-    -- do stuff
+    if data.from == "transfer" then
+      self:DisplayActionResult(data.msg)
+    elseif data.from == "bid" then
+      -- todo: show message on auction frame
+    end
   elseif notifyType == "lootlist" then
     local guid = data.guid
     -- We only set the loot list once
