@@ -25,7 +25,7 @@ TODO:
 2. Convert all static messages into localized messages
 3. Investigate bar recycling (specifically when wiping the window, etc)
 4. Revamp version system
-5. Facilitate errors for bids (auction GUI or whisper)
+5. Vanity rolls?
 
 ]]
 
@@ -2623,7 +2623,11 @@ function EminentDKP:ActuateNotification(notifyType,data)
     if data.from == "transfer" then
       self:DisplayActionResult(data.message)
     elseif data.from == "bid" then
-      -- todo: show message on auction frame
+      if notifyType == "accept" then
+        self:AcceptLastItemBid()
+      else
+        self:RejectLastItemBid()
+      end
     end
   elseif notifyType == "lootlist" then
     local guid = data.guid

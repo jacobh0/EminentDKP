@@ -31,6 +31,7 @@ local backdrop_default = {
 	insets = {left = 2, right = 2, top = 2, bottom = 2}
 }
 
+-- Handle the auction frame being moved
 local function move(self)
 	if not self:GetParent().locked then
 		self.startX = self:GetParent():GetLeft()
@@ -38,6 +39,7 @@ local function move(self)
 		self:GetParent():StartMoving()
 	end
 end
+-- Save position for the auction frame
 local function stopMove(self)
 	if not self:GetParent().locked then
 		self:GetParent():StopMovingOrSizing()
@@ -49,6 +51,7 @@ local function stopMove(self)
 	end
 end
 
+-- Create the base auction frame for items
 function EminentDKP:CreateAuctionFrame()
   local settings = self.db.profile.auctionframe
   auction_frame = CreateFrame("Frame", "EminentDKPAuctionFrameWindow", UIParent)
@@ -74,6 +77,7 @@ end
 local auction_titlebackdrop = {}
 local auction_windowbackdrop = {}
 
+-- Apply profile settings to the auction frame (and item frames)
 function EminentDKP:ApplyAuctionFrameSettings()
   local p = self.db.profile.auctionframe
   auction_frame:SetWidth(p.itemwidth)
@@ -170,6 +174,8 @@ end
 
 local function HideTip2() GameTooltip:Hide(); ResetCursor() end
 
+-- This is run in the bid amount box everytime they type something
+-- It ensures no incorrect bid is sent
 local function VerifyBid(frame)
   local value = frame:GetText()
   local num_value = tonumber(value) or 0
@@ -192,10 +198,12 @@ local function VerifyBid(frame)
   end
 end
 
+-- This clears the focus of a frame (editbox)
 local function ClearFocus(frame)
   frame:ClearFocus()
 end
 
+-- This updates the timer bar on an item auction
 local function TimerUpdate(frame)
   local now = time()
   local left = frame:GetParent().time - now
@@ -210,6 +218,10 @@ local function TimerUpdate(frame)
   end
 end
 
+local auction_guid = ""
+local last_bid_frame
+
+-- Apply the profile settings to an item frame
 local function ApplyItemFrameSettings(frame)
   local p = EminentDKP.db.profile.auctionframe
   
@@ -243,6 +255,7 @@ local function ApplyItemFrameSettings(frame)
   frame.winner:SetFont(media:Fetch('font', p.itemfont), p.itemfontsize - 2, "OUTLINE")
 end
 
+-- Create a new item frame absent any settings
 local function CreateNewItemFrame()
   local frame = CreateFrame("Frame", nil, auction_frame)
 	frame:SetBackdrop(backdrop_default)
@@ -299,6 +312,7 @@ local function CreateNewItemFrame()
 	--f:SetScript("OnEnter", SetTip)
 	--f:SetScript("OnLeave", HideTip)
 	bid:SetScript("OnClick", function(f)
+	  last_bid_frame = f:GetParent()
 	  f.bidamt:ClearFocus()
 	  EminentDKP:SendCommand("bid",f.bidamt:GetText())
 	end)
@@ -342,6 +356,7 @@ local function CreateNewItemFrame()
 	return frame
 end
 
+-- Either get a recycled frame or create a new one
 local function GetItemFrame()
   local frame
   if #(recycled_item_frames) > 0 then
@@ -355,6 +370,17 @@ local function GetItemFrame()
 	return frame
 end
 
+-- Turn the bid amount box red (signify rejection of bid)
+function EminentDKP:RejectLastItemBid()
+  last_bid_frame.bid.bidamt:SetBackdropBorderColor(235,0,0,1)
+end
+
+-- Turn the bid amount box green (signify the acceptance of bid)
+function EminentDKP:AcceptLastItemBid()
+  last_bid_frame.bid.bidamt:SetBackdropBorderColor(0,235,0,1)
+end
+
+-- Reapply settings to each item frame (and adjust their positioning if necessary)
 function EminentDKP:ReApplyItemFrameSettings()
   for i, frame in ipairs(item_frames) do
     ApplyItemFrameSettings(frame)
@@ -362,9 +388,9 @@ function EminentDKP:ReApplyItemFrameSettings()
   end
 end
 
-local auction_guid = ""
-
+-- Display all the available loot for a given GUID
 function EminentDKP:ShowAuctionItems(guid)
+  -- If we are already showing the loot for a GUID: stop
   if auction_guid == guid then
     return
   elseif auction_guid ~= "" then
@@ -397,6 +423,7 @@ function EminentDKP:ShowAuctionItems(guid)
   auction_guid = guid
 end
 
+-- Cancel the auction for a specified slots
 function EminentDKP:CancelAuction(slot)
   for i, frame in ipairs(item_frames) do
     if frame.slot == slot then
@@ -408,10 +435,12 @@ function EminentDKP:CancelAuction(slot)
   end
 end
 
+-- Start the timer and show bid box/button for an item
 function EminentDKP:StartAuction(slot,start)
   for i, frame in ipairs(item_frames) do
     if frame.slot == slot then
       frame.bid:Show()
+      frame.bid.bidamt:SetBackdropBorderColor(0,0,0,1)
       frame.bid.bidamt:Show()
       frame.time = start + 30
       frame.status:SetMinMaxValues(0, 30)
@@ -424,6 +453,7 @@ function EminentDKP:StartAuction(slot,start)
   end
 end
 
+-- Label an item with a winner
 function EminentDKP:ShowAuctionWinner(slot,name,amount)
   for i, frame in ipairs(item_frames) do
     if frame.slot == slot then
@@ -438,6 +468,7 @@ function EminentDKP:ShowAuctionWinner(slot,name,amount)
   end
 end
 
+-- Cleanup and recycle all the frames for re-use later (saves memory)
 function EminentDKP:RecycleAuctionItems()
   for i, frame in ipairs(item_frames) do
     frame.item = nil
@@ -455,6 +486,7 @@ function EminentDKP:RecycleAuctionItems()
   end
   wipe(item_frames)
   auction_frame.title:Hide()
+  -- Clear out the loot list for this GUID, we no longer need it
   if self.auctionItems[auction_guid] then
     self.auctionItems[auction_guid] = nil
   end
