@@ -1,155 +1,99 @@
---[[
-  Written by Grioja of <Eminent> on Crushridge-US. All rights reserved.
-  Modifications may be made freely, however no re-distribution may be made without my express permission.
-  
-  -- Credits --
-  Thanah of <Eminent> on Crushridge-US (for the original mod)
-  Ace3 maintainers and contributors (your libraries kick ass)
-]]
-
-EminentDKP = LibStub("AceAddon-3.0"):NewAddon("EminentDKP", "AceComm-3.0", "AceEvent-3.0", "AceTimer-3.0", "AceConsole-3.0")
+EminentDKP = LibStub("AceAddon-3.0"):NewAddon("EminentDKP", "AceComm-3.0", "AceEvent-3.0", "AceTimer-3.0", "AceConsole-3.0", "AceHook-3.0")
+local L = LibStub("AceLocale-3.0"):GetLocale("EminentDKP", false)
 local libCH = LibStub:GetLibrary("LibChatHandler-1.0")
+local media = LibStub("LibSharedMedia-3.0")
+libCH:Embed(EminentDKP)
 local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 
-VERSION = '2.0.4'
+VERSION = '2.1.0'
 local newest_version = ''
 local needs_update = false
 
-local defaults = {
-  factionrealm = {
-    pools = {
-      ["Default"] = {
-        players = {},
-        playerIDs = {},
-        playerCounter = 0,
-        events = {},
-        eventCounter = 0,
-        lastScan = '',
-        bounty = {
-          size = 1000000,
-          available = 1000000
-        }
-      }
-    }
-  },
-  profile = {
-    activepool = "Default",
-    raid = {
-      disenchanter = "",
-      itemRarity = 3,
-      expiretime = 30
-    }
-  }
-}
+local function Debug(message)
+  if false then
+    EminentDKP:Print(message)
+  end
+end
 
-local options = {
-  type = "group",
-	name = "EminentDKP",
-	plugins = {},
-  args = {
-    d = {
-      type = "description",
-      name = "DKP used by Eminent of Crushridge-US",
-      order = 0,
-    },
-  	raid = {
-  	  type = "group",
-  		name = "Raid",
-  		order = 1,
-      args = {
-        disenchanter = {
-      		type="input",
-      		name="Disenchanter",
-      		desc="The name of the designated disenchanter.",
-      		get=function() return EminentDKP.db.profile.raid.disenchanter end,
-      		set=function(self, val) EminentDKP.db.profile.raid.disenchanter = val end,
-      		order=1,
-      	},
-      	itemrarity = {
-      	  type="select",
-					name="Item Rarity Threshold",
-					desc="The minimum rarity an item must be in order to be auctioned off.",
-					values=	{ "Common","Uncommon","Rare","Epic" },
-					get=function() return EminentDKP.db.profile.raid.itemRarity end,
-					set=function(self, val) EminentDKP.db.profile.raid.itemRarity = val end,
-					order=2,
-      	},
-      	expiretime = {
-      	  type="input",
-					name="DKP Expiration Time",
-					desc="The number of days after a player's last raid that their DKP expires.",
-					get=function() return tostring(EminentDKP.db.profile.raid.expiretime) end,
-					set=function(self, val) if tonumber(val) > 0 then EminentDKP.db.profile.raid.expiretime = tonumber(val) end end,
-					order=3,
-      	}
-      }
-    }
-	}
+--[[
 
-}
+TODO:
 
-libCH:Embed(EminentDKP)
+1. Organize meter display code and move to GUI.lua
+2. Convert all static messages into localized messages
+3. Investigate bar recycling (specifically when wiping the window, etc)
+4. Revamp version system
+5. Vanity rolls?
 
--- todo: convert permission checks into hooks
+]]
 
-local officer_cmds = { bounty = true, auction = true, rename = true,
-                     reset = true, vanity = true, transfer = true,
-                     bid = true }
-local ml_cmds = { bid = true, auction = true, transfer = true, rename = true }
+-- All the meter windows
+local windows = {}
+
+-- All saved sets
+local sets = {}
+
+-- Modes (see Modes.lua)
+local modes = {}
+
+local recent_achievements = {}
+local recent_deaths = {}
 
 local auction_active = false
 
 local recent_loots = {}
-
 local eligible_looters = {}
 
 local events_cache = {}
 
 local lastContainerName = nil
 
-local function GetTodayDateTime()
-  local weekday, month, day, year = CalendarGetDate()
-  local hour, minutes = GetGameTime()
-  return hour .. ":" .. minutes .. " " .. month .. "/" .. day .. "/" .. year
+local function GetDate(timestamp)
+  return date("%x",timestamp)
 end
 
-local function GetDayNumber(datetime)
-  local time, date = strsplit(' ',datetime)
-  local month, day, year = strsplit('/',date)
-  return ((year-2010)*365.25)+((month-1)*30.4375)+day
+local function GetTodayDate()
+  return GetDate(time())
 end
 
-local function GetDayDifference(date_one,date_two)
-  return GetDayNumber(date_one) - GetDayNumber(date_two)
+local function GetDaysBetween(this,that)
+  return math.floor((this - that) / 86400)
 end
 
-local function round(val, decimal)
-  if (decimal) then
-    return math.floor( (val * 10^decimal) + 0.5) / (10^decimal)
-  else
-    return math.floor(val+0.5)
-  end
+local function GetDaysSince(timestamp)
+  return GetDaysBetween(time(),timestamp)
 end
 
-local function numstring(number)
-  return string.format('%.02f', number)
+local function IsRaidInCombat()
+	if GetNumRaidMembers() > 0 then
+		-- We are in a raid.
+		for i = 1, GetNumRaidMembers(), 1 do
+			if UnitExists("raid"..i) and UnitAffectingCombat("raid"..i) then
+				return true
+			end
+		end
+	elseif GetNumPartyMembers() > 0 then
+		-- In party.
+		for i = 1, GetNumPartyMembers(), 1 do
+			if UnitExists("party"..i) and UnitAffectingCombat("party"..i) then
+				return true
+			end
+		end
+	end
 end
 
 local function implode(delim,list)
-  local newstr = ""
-  if #(list) == 1 then
-    return list[1]
-  end
-  for i,v in ipairs(list) do
-    if i ~= #(list) then
-      newstr = newstr .. v .. delim
-    else
-      newstr = newstr .. v
-    end
-  end
-  return newstr
+  return table.concat(list,delim)
+end
+
+local function convertToTimestamp(datetime)
+  local t, d = strsplit(' ',datetime)
+  local hour, min = strsplit(':',t)
+  local month, day, year = strsplit('/',d)
+  
+  return time({day=day,month=month,year=year,hour=hour,min=min,sec=0})
 end
 
 local function sendchat(msg, chan, chantype)
@@ -214,24 +158,798 @@ local function CheckVersionCompatability(otherversion)
   end
 end
 
+--[[-------------------------------------------------------------------
+  Meter Window Functions
+---------------------------------------------------------------------]]
+
+-- Are we in a PVP zone?
+local function is_in_pvp()
+	return select(2,IsInInstance()) == "pvp" or select(2,IsInInstance()) == "arena"
+end
+
+-- Are we solo?
+local function is_solo()
+	return GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0
+end
+
+local function find_mode(name)
+	for i, mode in ipairs(modes) do
+		if mode:GetName() == name then
+			return mode
+		end
+	end
+end
+
+-- Our window type.
+local Window = {}
+
+local mt = {__index = Window}
+
+function Window:new()
+  return setmetatable({
+    -- Our dataset.
+    dataset = {},
+    -- Metadata about our dataset.
+    metadata = {},
+    -- Our display provider.
+    display = nil,
+    -- Our mode traversing history.
+    history = {},
+  }, mt)
+end
+
+function Window:AddOptions()
+	local settings = self.settings
+	
+	local options = {
+    type = "group",
+    name = function() return settings.name end,
+    args = {
+      rename = {
+        type= "input",
+        name= L["Rename window"],
+        desc= L["Enter the name for the window."],
+        get= function() return settings.name end,
+        set= function(win, val)
+          if val ~= settings.name and val ~= "" and not EminentDKP:GetWindow(val) then
+            settings.name = val
+          end
+        end,
+        order= 1,
+      },
+      display = {
+        type= "select",
+        name= L["Display system"],
+        desc= L["Choose the system to be used for displaying data in this window."],
+        values= function()
+          local list = {}
+          for name, display in pairs(EminentDKP.displays) do
+            list[name] = display.name
+          end
+          return list
+        end,
+        get= function() return settings.display end,
+        set= function(win, display)
+          self:SetDisplay(display)
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order= 21,
+      },
+      locked = {
+        type= "toggle",
+        name= L["Lock window"],
+        desc= L["Locks the bar window in place."],
+        order= 18,
+        get= function() return settings.barslocked end,
+        set= function(win)
+          settings.barslocked = not settings.barslocked
+        	EminentDKP:ApplySettings(win[2])
+        end,
+      }
+    }
+	}
+	self.display:AddDisplayOptions(self, options.args)
+	EminentDKP.options.args.windows.args[self.settings.name] = options
+end
+
+function Window:destroy()
+	self.dataset = nil
+	self.display:Destroy(self)
+end
+
+function Window:SetDisplay(name)
+	-- Don't do anything if nothing actually changed.
+	if name ~= self.settings.display or self.display == nil then
+		if self.display then
+			-- Destroy old display.
+			self.display:Destroy(self)
+		end
+		
+		-- Set new display.
+		self.settings.display = name
+		self.display = EminentDKP.displays[self.settings.display]
+		
+		-- Add options. Replaces old options.
+		self:AddOptions()
+	end
+end
+
+-- Tells window to update the display of its dataset, using its display provider.
+function Window:UpdateDisplay()
+	-- Fetch max value if our mode has not done this itself.
+	if not self.metadata.maxvalue then
+		self.metadata.maxvalue = 0
+		for i, data in ipairs(self.dataset) do
+			if data.id and data.value > self.metadata.maxvalue then
+				self.metadata.maxvalue = data.value
+			end
+		end
+	end
+	
+	-- Display it.
+	self.display:Update(self)
+end
+
+function Window:Show()
+	self.display:Show(self)
+end
+
+function Window:Hide()
+	self.display:Hide(self)
+end
+
+function Window:IsShown()
+	return self.display:IsShown(self)
+end
+
+function Window:Wipe()
+	-- Clear dataset.
+	wipe(self.dataset)
+	
+	-- Clear display.
+	self.display:Wipe(self)
+end
+
+-- Sets up the mode view.
+function Window:DisplayMode(mode)
+	self:Wipe()
+	self.selectedmode = mode
+	self.metadata = {}
+	
+	-- Apply mode's metadata.
+	if mode.metadata then
+		for key, value in pairs(mode.metadata) do
+			self.metadata[key] = value
+		end
+	end
+  
+	-- Save for remembrance
+	self.settings.mode = mode:GetName()
+	self.metadata.title = mode.title or mode:GetName()
+
+	EminentDKP:UpdateDisplay(self)
+end
+
+local function click_on_mode(win, id, label, button)
+	if button == "LeftButton" then
+		local mode = find_mode(id)
+		if mode then
+			win:DisplayMode(mode)
+		end
+	elseif button == "RightButton" then
+		win:RightClick()
+	end
+end
+
+-- Sets up the mode list.
+function Window:DisplayModes(setid)
+	self.history = {}
+	self:Wipe()
+
+	self.selectedplayer = nil
+	self.selectedmode = nil
+
+	self.metadata = {}
+	self.metadata.title = L["EminentDKP: Modes"]
+
+	-- Verify the selected set
+	if sets[setid] then
+	  self.selectedset = setid
+  else
+    self.selectedset = "alltime"
+  end
+	
+	-- Save for remembrance
+	self.settings.mode = nil
+	self.settings.set = self.selectedset
+	
+	self.metadata.click = click_on_mode
+	self.metadata.maxvalue = 1
+
+	EminentDKP:UpdateDisplay(self)
+end
+
+local function click_on_set(win, id, label, button)
+	if button == "LeftButton" then
+		win:DisplayModes(id)
+	elseif button == "RightButton" then
+		win:RightClick() 
+	end
+end
+
+-- Default "right-click" behaviour in case no special click function is defined:
+-- 1) If there is a mode traversal history entry, go to the last mode.
+-- 2) Go to modes list if we are in a mode.
+-- 3) Go to set list.
+function Window:RightClick(group, button)
+	if self.selectedmode then
+		-- If mode traversal history exists, go to last entry, else mode list.
+		if #(self.history) > 0 then
+			self:DisplayMode(tremove(self.history))
+		else
+			self:DisplayModes(self.selectedset)
+		end
+	elseif self.selectedset then
+		self:DisplaySets()
+	end
+end
+
+-- Sets up the set list.
+function Window:DisplaySets()
+	self.history = {}
+	self:Wipe()
+	
+	self.metadata = {}
+	
+	self.selectedmode = nil
+	self.selectedset = nil
+	
+	self.settings.mode = nil
+	self.settings.set = nil
+
+	self.metadata.title = L["EminentDKP: Days"]
+
+	self.metadata.click = click_on_set
+	self.metadata.maxvalue = 1
+	self.metadata.sortfunc = function(a,b)
+    if a.sortnum < b.sortnum then return true end
+    if b.sortnum < a.sortnum then return false end
+    return a.starttime > b.starttime
+  end
+	
+	EminentDKP:UpdateDisplay(self)
+end
+
+function Window:get_selected_set()
+  if sets[self.selectedset] then
+    return sets[self.selectedset]
+  end
+  return sets.alltime
+end
+
+-- Ask a mode to verify the contents of a set.
+local function verify_set(mode, set)
+	for j, player in ipairs(set.players) do
+		if mode.AddPlayerAttributes then
+			mode:AddPlayerAttributes(player)
+		end
+	end
+	mode:CalculateData(set)
+end
+
+-- Create a set with default attributes and have the modes apply their attributes
+local function createSet(setname)
+	local set = {players = {}, events = {}, name = setname, sortnum = 3,
+	             starttime = 0, endtime = 0, changed = true, modedata = {}}
+  
+	-- Tell each mode to apply its needed attributes.
+	for i, mode in ipairs(modes) do 
+	  if mode.AddSetAttributes then
+  		mode:AddSetAttributes(set)
+  	end
+  end
+
+	return set
+end
+
+function EminentDKP:GetWindows()
+	return windows
+end
+
+-- Toggle visibility of all the meter displays
+function EminentDKP:ToggleMeters(visible)
+	for i, win in ipairs(windows) do
+	  if visible and not win:IsShown() then
+		  win:Show()
+	  elseif not visible and win:IsShown() then
+	    win:Hide()
+    end
+	end
+end
+
+-- Table copy function
+function EminentDKP:tcopy(to, from)
+  for k,v in pairs(from) do
+    if type(v) == "table" then
+      to[k] = {}
+      EminentDKP:tcopy(to[k], v)
+    else
+      to[k] = v
+    end
+  end
+end
+
+function EminentDKP:GetMeterSets()
+  return self:GetActivePool().sets
+end
+
+-- Create a window and its db settings
+function EminentDKP:CreateWindow(name, settings)
+	if not settings then
+		settings = {}
+		self:tcopy(settings, EminentDKP.windowdefaults)
+		table.insert(self.db.profile.windows, settings)
+	end
+
+	local window = Window:new()
+	window.settings = settings
+	window.settings.name = name
+	
+	window.selectedset = window.settings.set
+	if window.settings.mode then
+	  window.selectedmode = find_mode(window.settings.mode)
+  end
+	
+	-- Set the window's display and call it's Create function.
+	window:SetDisplay(window.settings.display or "meter")
+	
+	window.display:Create(window)
+	
+	table.insert(windows, window)
+	
+	self:ApplySettings(window)
+  
+	-- Display initial view depending on settings
+	if window.selectedmode then
+	  window:DisplayMode(window.selectedmode)
+	elseif window.selectedset then
+	  window:DisplayModes(window.selectedset)
+  else
+	  window:DisplaySets()
+  end
+end
+
+-- Delete window from our windows table, and also from db.
+function EminentDKP:DeleteWindow(name)
+	for i, win in ipairs(windows) do
+		if win.settings.name == name then
+			win:destroy()
+			wipe(table.remove(windows, i))
+		end
+	end
+	for i, win in ipairs(self.db.profile.windows) do
+		if win.name == name then
+			table.remove(self.db.profile.windows, i)
+		end
+	end
+	self.options.args.windows.args[name] = nil
+end
+
+-- Builds a unique list of players for a set
+local function MarkPlayersSeen(seen, set, event)
+  local sources = { event.source, event.target, event.beneficiary }
+  
+  for i, field in ipairs(sources) do
+    local playerids = {}
+    if i < 3 then
+      local pid = tostring(tonumber(field) or 0)
+      if pid ~= "0" then
+        table.insert(playerids,pid)
+      end
+    else
+      if field ~= "" then
+        playerids = { strsplit(",",field) }
+      end
+    end
+    if not seen[set.name] then
+      seen[set.name] = {}
+    end
+    for j, pid in ipairs(playerids) do
+      -- Seen this player in this set?
+      if not seen[set.name][pid] then
+        local player = EminentDKP:GetPlayerByID(pid)
+        if player.active then
+          table.insert(set.players, {id=pid,modedata={}})
+          seen[set.name][pid] = true
+        end
+      end
+    end
+  end
+end
+
+-- Reload
+function EminentDKP:ReloadWindows()
+	-- Delete all existing windows in case of a profile change.
+	for i, win in ipairs(windows) do
+		win:destroy()
+	end
+	wipe(windows)
+	
+	-- Re-create sets
+	sets = self:GetMeterSets()
+	if not next(sets) then
+	  self:ReloadSets(false)
+  else
+    -- Verify the "Today" set is actually today
+    local today = GetTodayDate()
+    if sets.today.date ~= today then
+      -- Has the Today set even been used yet?
+      if #(sets.today.players) > 0 then
+        local oldtoday = {}
+        self:tcopy(oldtoday, sets.today)
+        oldtoday.name = oldtoday.date
+        oldtoday.sortnum = 3
+        sets[oldtoday.date] = oldtoday
+    	  sets.today = createSet(L["Today"])
+    	  sets.today.date = today
+    	  sets.today.sortnum = 2
+  	  
+  	    self:VerifySet(sets.today)
+  		else
+  		  sets.today.date = date
+		  end
+  	end
+  	-- Prune any sets that extend beyond our given timeframe
+  	for name, set in pairs(sets) do
+  	  if set.sortnum == 3 then
+  	    if GetDaysSince(set.starttime) > self.db.profile.daystoshow then
+  	      sets[name] = nil
+	      end
+	    end
+	  end
+  end
+
+	-- Re-create windows
+	for i, win in ipairs(self.db.profile.windows) do
+		self:CreateWindow(win.name, win)
+	end
+end
+
+function EminentDKP:ReloadSets(updatedisplays)
+  sets = self:GetMeterSets()
+  wipe(sets)
+  
+  local today = GetTodayDate()
+  sets.alltime = createSet(L["All-time"])
+  sets.alltime.sortnum = 1
+  sets.today = createSet(L["Today"])
+  sets.today.date = today
+  sets.today.sortnum = 2
+  
+  local eventHash = {}
+  -- Start from most recent event and work backwards
+  for eventid = self:GetEventCount(), 1, -1 do
+    local eid = tostring(eventid)
+    local event = self:GetEvent(eid)
+    local diff = GetDaysSince(event.datetime)
+    if eventid > 0 and diff <= self.db.profile.daystoshow then
+      local date = GetDate(event.datetime)
+      if sets.today.date == date then
+        table.insert(sets.today.events,eid)
+        sets.today.starttime = event.datetime
+        MarkPlayersSeen(eventHash, sets.today, event)
+      elseif sets[date] then
+        table.insert(sets[date].events,eid)
+        sets[date].starttime = event.datetime
+        MarkPlayersSeen(eventHash, sets[date], event)
+      else
+        local set = createSet(date)
+        set.endtime = event.datetime
+        table.insert(set.events, eid)
+        sets[date] = set
+        MarkPlayersSeen(eventHash, set, event)
+      end
+    else
+      -- Stop when we extend beyond our boundary
+      break
+    end
+  end
+  
+  self:VerifyAllSets()
+  if updatedisplays then
+    self:UpdateAllDisplays()
+  end
+end
+
+-- For a set, give each mode a chance to calculate the data they need
+function EminentDKP:VerifySet(set)
+  for j, mode in ipairs(modes) do
+    verify_set(mode, set)
+	end
+	set.changed = false
+end
+
+-- For every set, have each mode verify their data
+function EminentDKP:VerifyAllSets()
+  for setid, set in pairs(sets) do
+    self:VerifySet(set)
+  end
+end
+
+function EminentDKP:ApplySettingsAll()
+  for i, win in ipairs(windows) do
+		self:ApplySettings(win)
+	end
+	self:ApplyAuctionFrameSettings()
+end
+
+function EminentDKP:ApplySettings(win)
+  -- Just incase we're given a window name, not a window
+  if type(win) == "string" then
+    win = self:GetWindow(win)
+  end
+	win.display:ApplySettings(win)
+
+	-- Don't show window if we are solo, option.
+	-- Don't show window in a PvP instance, option.
+	if (self.db.profile.hidesolo and is_solo()) or (self.db.profile.hidepvp and is_in_pvp()) then
+	  win:Hide()
+	else
+		win:Show()
+		
+		-- Hide specific windows if window is marked as hidden (ie, if user manually hid the window, keep hiding it).
+		if win.settings.hidden and win:IsShown() then
+			win:Hide()
+		end
+	end
+  
+	self:UpdateDisplay(win)
+end
+
+-- Called before dataset is updated.
+function Window:UpdateInProgress()
+	for i, data in ipairs(self.dataset) do
+		data.id = nil
+	end
+end
+
+-- Loop through and update each window's display
+function EminentDKP:UpdateAllDisplays()
+  for i, win in ipairs(windows) do
+    self:UpdateDisplay(win)
+  end
+end
+
+-- Update a given window's display
+function EminentDKP:UpdateDisplay(win)
+  win:Wipe()
+	if win.selectedmode then
+		local set = win:get_selected_set()
+		
+		-- Inform window that a data update will take place.
+		--win:UpdateInProgress()
+	
+		-- Let mode update data.
+		if win.selectedmode.PopulateData then
+			win.selectedmode:PopulateData(win, set)
+		else
+			self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
+		end
+		-- Let window display the data.
+		win:UpdateDisplay()
+	elseif win.selectedset then
+		local set = win:get_selected_set()
+		
+		-- View available modes.
+		for i, mode in ipairs(modes) do
+			local d = win.dataset[i] or {}
+			win.dataset[i] = d
+			d.id, d.label, d.value = mode:GetName(), mode:GetName(), 1
+			if mode.GetSetSummary then
+				d.valuetext = mode:GetSetSummary(set)
+			end
+		end
+		-- Tell window to sort by our data order.
+		win.metadata.ordersort = true
+		-- Let window display the data.
+		win:UpdateDisplay()
+	else
+		-- View available sets.
+		local nr = 0
+    
+		for setid, set in pairs(sets) do
+			nr = nr + 1
+			local d = win.dataset[nr] or {}
+			win.dataset[nr] = d
+			d.id, d.label, d.value, d.sortnum, d.starttime = setid, set.name, 1, set.sortnum, set.starttime
+			if set.starttime > 0 then
+			  d.valuetext = date("%H:%M",set.starttime).." - "..date("%H:%M",set.endtime)
+		  else
+		    d.valuetext = nil
+	    end
+		end
+		-- Tell window to sort by our data order.
+		win.metadata.ordersort = true
+		-- Let window display the data.
+		win:UpdateDisplay()
+	end
+end
+
+local function scan_for_columns(mode)
+	-- Only process if not already scanned.
+	if not mode.scanned then
+		mode.scanned = true
+	
+		-- Add options for this mode if available.
+		if mode.metadata and mode.metadata.columns then
+			EminentDKP:AddColumnOptions(mode)
+		end
+		
+		-- Scan any linked modes.
+		if mode.metadata then
+			if mode.metadata.click1 then
+				scan_for_columns(mode.metadata.click1)
+			end
+			if mode.metadata.click2 then
+				scan_for_columns(mode.metadata.click2)
+			end
+			if mode.metadata.click3 then
+				scan_for_columns(mode.metadata.click3)
+			end
+		end
+	end
+end
+
+function EminentDKP:GetWindow(name)
+  for i, win in ipairs(windows) do
+    if win.settings.name == name then
+      return win
+    end
+  end
+  return nil
+end
+
+-- Register a mode.
+function EminentDKP:AddMode(mode)
+	table.insert(modes, mode)
+	
+	-- Add column configuration if available.
+	if mode.metadata then
+		scan_for_columns(mode)
+	end
+	
+	-- Sort modes.
+	table.sort(modes, function(a, b) return a.sortnum < b.sortnum or (not (b.sortnum < a.sortnum) and a.name < b.name) end)
+end
+
+-- Unregister a mode.
+function EminentDKP:RemoveMode(mode)
+	table.remove(modes, mode)
+end
+
+function EminentDKP:SetTooltipPosition(tooltip, frame)
+	local p = self.db.profile.tooltippos
+	if p == "default" then
+    tooltip:SetOwner(UIParent, "ANCHOR_NONE")
+    tooltip:SetPoint("BOTTOMRIGHT", "UIParent", "BOTTOMRIGHT", -40, 40)
+	elseif p == "topleft" then
+    tooltip:SetOwner(frame, "ANCHOR_NONE")
+    tooltip:SetPoint("TOPRIGHT", frame, "TOPLEFT")
+	elseif p == "topright" then
+    tooltip:SetOwner(frame, "ANCHOR_NONE")
+    tooltip:SetPoint("TOPLEFT", frame, "TOPRIGHT")
+   end
+end
+
+local function value_sort(a,b)
+	if not a or a.value == nil then
+		return false
+	elseif not b or b.value == nil then
+		return true
+	else
+		return a.value > b.value
+	end
+end
+
+-- Tooltip display. Shows subview data for a specific row.
+-- Using a fake window, the subviews are asked to populate the window's dataset normally.
+local ttwin = Window:new()
+function EminentDKP:AddSubviewToTooltip(tooltip, win, mode, id, label)
+	-- Clean dataset.
+	wipe(ttwin.dataset)
+	
+	-- Tell mode we are entering our real window.
+	mode:Enter(win, id, label)
+	
+	-- Ask mode to populate dataset in our fake window.
+	mode:PopulateData(ttwin, win:get_selected_set())
+	
+	-- Sort dataset unless we are using ordersort.
+	if not mode.metadata or not mode.metadata.ordersort then
+		table.sort(ttwin.dataset, value_sort)
+	end
+
+	-- Show title and data if we have data.
+	if #ttwin.dataset > 0 then
+		tooltip:AddLine(mode.title or mode:GetName(), 1,1,1)
+
+		-- Display the top X, default 3, rows.
+		local nr = 0
+		for i, data in ipairs(ttwin.dataset) do
+			if data.id and nr < EminentDKP.db.profile.tooltiprows then
+				nr = nr + 1
+				
+				local color = {r = 1, g = 1, b = 1}
+				if data.color then
+					-- Explicit color from dataset.
+					color = data.color
+				elseif data.class then
+					-- Class color.
+					local color = EminentDKP.classColors[data.class]
+				end
+				
+				tooltip:AddDoubleLine(nr..". "..data.label, data.valuetext, color.r, color.g, color.b)
+			end
+		end
+		
+		-- Add an empty line.
+		tooltip:AddLine(" ")
+	end
+end
+
+--[[-------------------------------------------------------------------
+  END Meter Window Functions
+---------------------------------------------------------------------]]
+
 -- Setup basic info and get database from saved variables
 function EminentDKP:OnInitialize()
+  -- Register the SharedMedia
+	media:Register("font", "Adventure",				[[Interface\Addons\EminentDKP\fonts\Adventure.ttf]])
+	media:Register("font", "ABF",					[[Interface\Addons\EminentDKP\fonts\ABF.ttf]])
+	media:Register("font", "Vera Serif",			[[Interface\Addons\EminentDKP\fonts\VeraSe.ttf]])
+	media:Register("font", "Diablo",				[[Interface\Addons\EminentDKP\fonts\Avqest.ttf]])
+	media:Register("font", "Accidental Presidency",	[[Interface\Addons\EminentDKP\fonts\Accidental Presidency.ttf]])
+	media:Register("statusbar", "Aluminium",		[[Interface\Addons\EminentDKP\statusbar\Aluminium]])
+	media:Register("statusbar", "Armory",			[[Interface\Addons\EminentDKP\statusbar\Armory]])
+	media:Register("statusbar", "BantoBar",			[[Interface\Addons\EminentDKP\statusbar\BantoBar]])
+	media:Register("statusbar", "Glaze2",			[[Interface\Addons\EminentDKP\statusbar\Glaze2]])
+	media:Register("statusbar", "Gloss",			[[Interface\Addons\EminentDKP\statusbar\Gloss]])
+	media:Register("statusbar", "Graphite",			[[Interface\Addons\EminentDKP\statusbar\Graphite]])
+	media:Register("statusbar", "Grid",				[[Interface\Addons\EminentDKP\statusbar\Grid]])
+	media:Register("statusbar", "Healbot",			[[Interface\Addons\EminentDKP\statusbar\Healbot]])
+	media:Register("statusbar", "LiteStep",			[[Interface\Addons\EminentDKP\statusbar\LiteStep]])
+	media:Register("statusbar", "Minimalist",		[[Interface\Addons\EminentDKP\statusbar\Minimalist]])
+	media:Register("statusbar", "Otravi",			[[Interface\Addons\EminentDKP\statusbar\Otravi]])
+	media:Register("statusbar", "Outline",			[[Interface\Addons\EminentDKP\statusbar\Outline]])
+	media:Register("statusbar", "Perl",				[[Interface\Addons\EminentDKP\statusbar\Perl]])
+	media:Register("statusbar", "Smooth",			[[Interface\Addons\EminentDKP\statusbar\Smooth]])
+	media:Register("statusbar", "Round",			[[Interface\Addons\EminentDKP\statusbar\Round]])
+	media:Register("statusbar", "TukTex",			[[Interface\Addons\EminentDKP\statusbar\normTex]])
+  
   -- DB
-	self.db = LibStub("AceDB-3.0"):New("EminentDKPDB", defaults, "Default")
-	LibStub("AceConfig-3.0"):RegisterOptionsTable("EminentDKP", options)
+	self.db = LibStub("AceDB-3.0"):New("EminentDKPDB", self.defaults, "Default")
+	LibStub("AceConfig-3.0"):RegisterOptionsTable("EminentDKP", self.options)
 	self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("EminentDKP", "EminentDKP")
 
 	-- Profiles
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("EminentDKP-Profiles", LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db))
 	self.profilesFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("EminentDKP-Profiles", "Profiles", "EminentDKP")
   
+  self.db.RegisterCallback(self, "OnProfileChanged", "ReloadWindows")
+	self.db.RegisterCallback(self, "OnProfileCopied", "ReloadWindows")
+	self.db.RegisterCallback(self, "OnProfileReset", "ReloadWindows")
+  
+  -- Modes
+  for name, mode in EminentDKP:IterateModules() do
+    if mode.OnEnable then
+      mode:Enable()
+    end
+  end
+  
   self.myName = UnitName("player")
   
   -- Get the current loot info as a basis
   self:PARTY_LOOT_METHOD_CHANGED()
-  
-  -- Broadcast version every 5 minutes
-  self:ScheduleRepeatingTimer("BroadcastVersion", 300)
   
   -- Remember events we have recently sycned
   self.syncRequests = {}
@@ -239,38 +957,36 @@ function EminentDKP:OnInitialize()
   self.requestedEvents = {}
   self.requestCooldown = false
   
-  if self:GetEventCount() == 0 and Standings then
-    GuildRoster()
-  end
+  self:CreateAuctionFrame()
+  self:DatabaseUpdate()
+  self:ReloadWindows()
+  
+  -- Since SharedMedia doesn't finish loading until after this executes, we need to re-apply
+  -- the settings again to ensure everything is how it should be, an unfortunate work-around...
+  self:ScheduleTimer("ApplySettingsAll", 2)
 end
 
--- DATABASE CONVERSION UPDATE FOR VERSIONS < 2.0.0
-function EminentDKP:GUILD_ROSTER_UPDATE()
-  if self:GetEventCount() == 0 and Standings then
-    if self:AmOfficer() then
-      sendchat('Older database found, attempting to convert...',nil,'self')
-      classes = {}
-      for i = 1, 1000 do
-        local name, rank, rankIndex, level, class = GetGuildRosterInfo(i)
-        if name == nil then
-          break
-        elseif Standings[name] then
-          classes[name]  = class
+-- DATABASE UPDATES
+function EminentDKP:DatabaseUpdate()
+  for name, pool in pairs(self.db.factionrealm.pools) do
+    if not pool.revision or pool.revision < 1 then
+      self:Print("Applying database revision 1 to pool: "..name)
+      -- Convert player classes to English classes
+      -- Convert all datetimes to timestamps
+      for pid, playerdata in pairs(pool.players) do
+        self.db.factionrealm.pools[name].players[pid].class = select(2,UnitClass(self:GetPlayerNameByID(pid))) or string.upper(string.gsub(playerdata.class,"%s*",""))
+        self.db.factionrealm.pools[name].players[pid].lastRaid = convertToTimestamp(playerdata.lastRaid)
+      end
+      for eid, eventdata in pairs(pool.events) do
+        self.db.factionrealm.pools[name].events[eid].datetime = convertToTimestamp(eventdata.datetime)
+        if eventdata.eventType == 'bounty' and (not eventdata.source or eventdata.source == "") then
+          self.db.factionrealm.pools[name].events[eid].source = "Default"
         end
       end
-  
-      for name,data in pairs(Standings) do
-        if not classes[name] then
-          sendchat('Could not import '..name..' (they do not exist in the guild)',nil,'self')
-        else
-          sendchat('Importing '..name..'...',nil,'self')
-          self:CreateAddPlayerEvent(name,classes[name],data["CurrentDKP"],data["LifetimeDKP"],GetTodayDateTime())
-        end
+      if self.db.factionrealm.pools[name].lastScan ~= 0 then
+        self.db.factionrealm.pools[name].lastScan = convertToTimestamp(self.db.factionrealm.pools[name].lastScan)
       end
-      sendchat('Conversion complete.',nil,'self')
-      Standings = nil
-    else
-      Standings = nil
+      pool.revision = 1
     end
   end
 end
@@ -279,20 +995,194 @@ function EminentDKP:OnEnable()
 	self:RegisterEvent("PLAYER_ENTERING_WORLD") -- version broadcast
 	self:RegisterChatEvent("CHAT_MSG_WHISPER") -- whisper commands received
 	self:RegisterChatEvent("CHAT_MSG_WHISPER_INFORM") -- whispers sent
+	self:RegisterChatEvent("CHAT_MSG_RAID") -- raid messages
+	self:RegisterChatEvent("CHAT_MSG_RAID_WARNING") -- raid warnings
+	self:RegisterEvent("ACHIEVEMENT_EARNED") -- achievement tracking
 	self:RegisterEvent("LOOT_OPENED") -- loot listing
 	self:RegisterEvent("LOOT_CLOSED") -- auction cancellation
 	self:RegisterEvent("PARTY_LOOT_METHOD_CHANGED") -- masterloot change
 	self:RegisterEvent("RAID_ROSTER_UPDATE") -- raid member list update
+	self:RegisterEvent("PARTY_MEMBERS_CHANGED") -- party member list update
 	self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
-	self:RegisterEvent("GUILD_ROSTER_UPDATE") -- database conversion
-	self:RegisterEvent("UNIT_SPELLCAST_SENT") -- loot container tracker
+	self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
+	self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
 	self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
 	-- Sync methods
 	self:RegisterComm("EminentDKP-Proposal", "ProcessSyncProposal")
 	self:RegisterComm("EminentDKP-Fulfill", "ProcessSyncFulfill")
 	self:RegisterComm("EminentDKP-Request", "ProcessSyncRequest")
 	self:RegisterComm("EminentDKP-Version", "ProcessSyncVersion")
+	self:RegisterComm("EminentDKP-Cmd", "ProcessCommand")
+	self:RegisterComm("EminentDKP-Notify", "ProcessNotification")
 	self:RegisterComm("EminentDKP", "ProcessSyncEvent")
+	-- Custom event notifications
+	self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
+	self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
+	self:RawHook("LevelUpDisplay_AnimStep", "LevelUpDisplayFinished", true)
+	-- Permission Hooks
+	self:RawHook(self,"AdminStartAuction","EnsureMasterlooter")
+	self:RawHook(self,"AdminDistributeBounty","EnsureOfficership")
+	self:RawHook(self,"AdminVanityReset","EnsureOfficership")
+	self:RawHook(self,"AdminVanityRoll","EnsureOfficership")
+	self:RawHook(self,"AdminRename","EnsureOfficership")
+	self:RawHook(self,"Bid","EnsureToMasterlooter")
+	self:RawHook(self,"Transfer","EnsureToMasterlooter")
+	
+	if type(CUSTOM_CLASS_COLORS) == "table" then
+		self.classColors = CUSTOM_CLASS_COLORS
+	end
+	
+	-- Broadcast version every 5 minutes
+  self:ScheduleRepeatingTimer("BroadcastVersion", 300)
+end
+
+-- Hook the animation step function so we can change the font size of the flavor text
+function EminentDKP:LevelUpDisplayFinished(frame)
+  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" or frame.type == "TRANSFER_MADE" then
+    frame.spellFrame.flavorText:SetFontObject("GameFontNormalLarge")
+  end
+  self.hooks["LevelUpDisplay_AnimStep"](frame)
+end
+
+function EminentDKP:LevelUpDisplayHide(frame)
+  self:ExecuteNextNotification()
+  self.hooks[frame].OnHide(frame)
+end
+
+-- Overriding the default level up display to show custom messages
+-- todo: add sound notification option in settings
+function EminentDKP:LevelUpDisplayShow(frame)
+  local texcoords = {
+    dot = { 0.64257813, 0.68359375, 0.18750000, 0.23046875 },
+    goldBG = { 0.56054688, 0.99609375, 0.24218750, 0.46679688 },
+    gLine = { 0.00195313, 0.81835938, 0.01953125, 0.03320313 },
+    textTint = { 0.67, 0.93, 0.45 },
+  }
+  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" or frame.type == "TRANSFER_MADE" then
+    frame.currSpell = 2 -- currSpell > #(unlockList)
+    frame.unlockList = { }
+    frame.levelFrame.levelText:SetFontObject("GameFont_Gigantic")
+    frame:SetHeight(72)
+    frame.levelFrame:SetHeight(72)
+    if frame.type == "BOUNTY_RECEIVED" then
+      frame.levelFrame.reachedText:SetFormattedText(L["You have received a bounty of"])
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+    elseif frame.type == "TRANSFER_RECEIVED" then
+      frame.levelFrame.reachedText:SetFormattedText(L["%s has transferred you"],self.notifyDetails.src)
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+    elseif frame.type == "TRANSFER_MADE" then
+      --self:Print("height is: "..tostring(frame.levelFrame:GetHeight()))
+      frame:SetHeight(50)
+      frame.levelFrame:SetHeight(50)
+      frame.levelFrame.reachedText:SetFormattedText(L["%s has transferred %s"],self.notifyDetails.src,self.notifyDetails.extra)
+      frame.levelFrame.levelText:SetFontObject("GameFontNormalLarge")
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+      texcoords.textTint = { 0.92, 0.49, 0.04 }
+    elseif frame.type == "AUCTION_WON" then
+      table.insert(frame.unlockList,{ icon=select(10,GetItemInfo(self.notifyDetails.desc)),
+                                      subIcon=SUBICON_TEXCOOR_ARROW,
+                                      text=string.format(L["has been won for %d DKP"],self.notifyDetails.src),
+                                      subText=select(2,GetItemInfo(self.notifyDetails.desc)),
+                                      })
+      frame.currSpell = 1
+      frame.levelFrame.reachedText:SetFormattedText(L["You Have Just"])
+      frame.levelFrame.levelText:SetFormattedText(L["Won An Auction"])
+      texcoords.textTint = nil
+    end
+    frame.gLine:SetTexCoord(unpack(texcoords.gLine))
+    frame.gLine2:SetTexCoord(unpack(texcoords.gLine))
+    if (texcoords.tint) then
+        frame.gLine:SetVertexColor(unpack(texcoords.tint))
+        frame.gLine2:SetVertexColor(unpack(texcoords.tint))
+    else
+        frame.gLine:SetVertexColor(1, 1, 1);
+        frame.gLine2:SetVertexColor(1, 1, 1);
+    end
+    if (texcoords.textTint) then
+        frame.levelFrame.levelText:SetTextColor(unpack(texcoords.textTint))
+    else
+        frame.levelFrame.levelText:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+    end
+    frame.levelFrame.levelUp:Play()
+  else
+    self.hooks[frame].OnShow(frame)
+  end
+end
+
+local animating = false
+local queued_notifications = {}
+
+function EminentDKP:ExecuteNextNotification()
+  if #(queued_notifications) > 0 then
+    local n = tremove(queued_notifications)
+    LevelUpDisplay.type = n.type
+    self.notifyDetails = n.data
+    LevelUpDisplay:Show()
+    LevelUpDisplaySide:Hide()
+  else
+    animating = false
+  end
+end
+
+function EminentDKP:NotifyOnScreen(...)
+  local eventType, received, source, extra = ...
+  local data = { src = source, desc = received, extra = extra }
+  
+  if animating then
+    table.insert(queued_notifications,1,{ type=eventType, data=data })
+  else
+    LevelUpDisplay.type = eventType
+    self.notifyDetails = data
+    animating = true
+    LevelUpDisplay:Show()
+    LevelUpDisplaySide:Hide()
+  end
+end
+
+function EminentDKP:EnsureToMasterlooter(self, ...)
+  local addon, name = ...
+  if not self.amMasterLooter then
+    self:WhisperPlayer(addon,L["That command must be sent to the master looter."],name)
+    return
+  end
+  if not self:AmOfficer() then
+    self:WhisperPlayer(addon,L["The master looter must be an officer."],name)
+    return
+  end
+  self.hooks["EnsureToMasterlooter"](...)
+end
+
+function EminentDKP:EnsureOfficership(self, ...)
+  -- Check if the command can only be used by an officer
+  if not self:AmOfficer() then
+    self:DisplayActionResult(L["That command can only be used by an officer."])
+    return
+  end
+  if self:NeedSync() then
+    self:DisplayActionResult(L["Your database must be up to date first."])
+    return
+  end
+  self.hooks["EnsureOfficership"](...)
+end
+
+function EminentDKP:EnsureMasterlooter(self, ...)
+  if not self:AmOfficer() then
+    self:DisplayActionResult(L["That command can only be used by an officer."])
+    return
+  end
+  if self.lootMethod ~= 'master' then
+    self:DisplayActionResult(L["Master looting must be enabled."])
+    return
+  end
+  if not self.amMasterLooter then
+    self:DisplayActionResult(L["Only the master looter can use that command."])
+    return
+  end
+  if self:NeedSync() then
+    self:DisplayActionResult(L["Your database must be up to date first."])
+    return
+  end
+  self.hooks["EnsureMasterlooter"](...)
 end
 
 function EminentDKP:OnDisable()
@@ -303,11 +1193,7 @@ function EminentDKP:GetVersion()
 end
 
 function EminentDKP:GetNewestVersion()
-  -- todo: reset newest version if our eventcounter increases
-  if newest_version ~= '' then
-    return newest_version
-  end
-  return self:GetVersion()
+  return (newest_version ~= '' and newest_version or self:GetVersion())
 end
 
 ---------- START SYNC FUNCTIONS ----------
@@ -319,6 +1205,10 @@ end
 
 function EminentDKP:GetEventCountDifference()
   return self:GetNewestEventCount() - self:GetEventCount()
+end
+
+function EminentDKP:NeedSync()
+  return (self:GetEventCountDifference() > 0)
 end
 
 -- Get list of events we need that aren't in the cache
@@ -346,12 +1236,9 @@ end
 -- Request the missing events
 function EminentDKP:RequestMissingEvents(cooldown)
   if cooldown then
-    if self.requestCooldown then
-      return
-    else
-      self.requestCooldown = true
-      self:ScheduleTimer("ClearRequestCooldown", 10)
-    end
+    if self.requestCooldown then return end
+    self.requestCooldown = true
+    self:ScheduleTimer("ClearRequestCooldown", 10)
   end
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
@@ -484,9 +1371,10 @@ end
 -- Compare the version against our version, and note any newer version
 function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   if sender == self.myName then return end
-  local compare = CompareVersions(self:GetVersion(),message)
+  local version, welcome = strsplit(':',message,2)
+  local compare = CompareVersions(self:GetVersion(),version)
   
-  UpdateNewestVersion(message)
+  UpdateNewestVersion(version)
   if compare.major > 0 or compare.minor > 0 then
     -- Broadcast our newer version
     self:BroadcastVersion()
@@ -504,6 +1392,24 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
       end
     end
   end
+  
+  -- If they login during an auction, and are eligible, notify them appropriately
+  if welcome and welcome == "Hello" then
+    if self:AmMasterLooter() and self.bidItem and eligible_looters[sender] then
+      -- Send them the loot
+      self:SendNotification("lootlist",{ 
+        guid=self.bidItem.srcGUID, 
+        name=self.auctionItems[self.bidItem.srcGUID].name,
+        items=self.auctionItems[self.bidItem.srcGUID].items
+      },sender)
+      -- Start the auction for them
+      self:SendNotification("auction",{ 
+        guid=self.bidItem.srcGUID, 
+        slot=self.bidItem.slotNum, 
+        start=self.bidItem.start
+      },sender)
+    end
+  end
 end
 
 -- Process an incoming synced event
@@ -517,7 +1423,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Decompress the decoded data
   local two, message = libC:Decompress(one)
   if not two then
-  	sendchat('Error occured while decoding a sync event: '..message,nil,'self')
+  	sendchat(L["Error occured while decoding a sync event:"] .. message,nil,'self')
   	return
   end
   
@@ -528,7 +1434,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Deserialize the decompressed data
   local success, event = libS:Deserialize(data)
   if not success then
-    sendchat('Error occured while deserializing a sync event.',nil,'self')
+    sendchat(L["Error occured while deserializing a sync event."],nil,'self')
   	return
   end
   
@@ -565,6 +1471,9 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   elseif event.eventType == 'expiration' then
     local sname = self:GetPlayerNameByID(event.source)
     self:CreateExpirationEvent(sname,event.datetime)
+  elseif event.eventType == 'purge' then
+    local sname = self:GetPlayerNameByID(event.source)
+    self:CreatePurgeEvent(sname,event.datetime)
   elseif event.eventType == 'vanityreset' then
     local sname = self:GetPlayerNameByID(event.source)
     self:CreateVanityResetEvent(sname,event.datetime)
@@ -583,56 +1492,94 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     -- Give 3 seconds before we request missing events
     -- This gives time to receive more events that are already being synced
     self.syncTimer = self:ScheduleTimer("RequestMissingEvents", 3, false)
+    self:ReloadSets(true)
+  else
+    self:ReloadSets(true)
   end
 end
 
 ---------- END SYNC FUNCTIONS ----------
 
+-- Formats a number into human readable form.
+function EminentDKP:FormatNumber(number)
+	if number then
+		if self.db.profile.numberformat == 1 then
+			if number > 1000000 then
+				return ("%02.2fM"):format(number / 1000000)
+			else
+				return ("%02.1fK"):format(number / 1000)
+			end
+		else
+			return self:StdNumber(number)
+		end
+	end
+end
+
+function EminentDKP:AuctionActive()
+  return auction_active
+end
+
+function EminentDKP:StdNumber(number)
+  return string.format('%.02f', number)
+end
+
 function EminentDKP:IsAnOfficer(who)
   local guildName, guildRankName, guildRankIndex = GetGuildInfo(who)
-  if guildRankIndex < 2 then
-    return true
-  end
-  return false
+  return (guildRankIndex < 2)
 end
 
 function EminentDKP:AmOfficer()
-  self.guildName, self.guildRankName, self.guildRankIndex = GetGuildInfo("player")
-  return (self.guildRankIndex < 2)
+  return self:IsAnOfficer("player")
+end
+
+function EminentDKP:GetActivePool()
+  return self.db.factionrealm.pools[self.db.profile.activepool]
 end
 
 function EminentDKP:GetLastScan()
-  return self.db.factionrealm.pools[self.db.profile.activepool].lastScan
+  return self:GetActivePool().lastScan
+end
+
+function EminentDKP:GetEventPool()
+  return self:GetActivePool().events
 end
 
 function EminentDKP:GetEvent(eventID)
-  return self.db.factionrealm.pools[self.db.profile.activepool].events[eventID]
+  return self:GetActivePool().events[eventID]
 end
 
 function EminentDKP:GetEventCount()
-  return self.db.factionrealm.pools[self.db.profile.activepool].eventCounter
+  return self:GetActivePool().eventCounter
 end
 
--- Return the data for a given player
-function EminentDKP:GetPlayer(name)
-  local pid = self:GetPlayerID(name)
-  if pid then
-    return self.db.factionrealm.pools[self.db.profile.activepool].players[pid]
+function EminentDKP:IsPlayerFresh(name)
+  local player = (type(name) == "string" and self:GetPlayerByName(name) or name)
+  if player then
+    return (not next(player.earnings) and not next(player.deductions))
+  end
+  return nil
+end
+
+function EminentDKP:GetPlayerByID(pid)
+  return self:GetActivePool().players[pid], self:GetPlayerNameByID(pid)
+end
+
+function EminentDKP:GetPlayerByName(name)
+  local pid = self:GetPlayerIDByName(name)
+  if pid ~= nil then
+    return self:GetPlayerByID(pid), pid
   end
   return nil
 end
 
 -- Get a player's ID
-function EminentDKP:GetPlayerID(name)
-  if self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[name] then
-    return self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[name]
-  end
-  return nil
+function EminentDKP:GetPlayerIDByName(name)
+  return self:GetActivePool().playerIDs[name]
 end
 
 -- Get player name from player ID
 function EminentDKP:GetPlayerNameByID(pid)
-  for name,id in pairs(self.db.factionrealm.pools[self.db.profile.activepool].playerIDs) do
+  for name,id in pairs(self:GetActivePool().playerIDs) do
     if id == pid then
       return name
     end
@@ -640,52 +1587,94 @@ function EminentDKP:GetPlayerNameByID(pid)
   return nil
 end
 
--- Check whether or not a player exists in the currently active pool
-function EminentDKP:PlayerExistsInPool(player)
-  if self:GetPlayerID(player) then
-    return true
+function EminentDKP:GetPlayerClassByID(pid)
+  if self:GetActivePool().players[pid] then
+    return self:GetActivePool().players[pid].class
   end
-  return false
+  return nil
+end
+
+-- Check whether or not a player exists in the currently active pool
+function EminentDKP:PlayerExistsInPool(name)
+  return (self:GetPlayerIDByName(name) ~= nil)
 end
 
 -- Update a player's last raid day
 function EminentDKP:UpdateLastPlayerRaid(pid,datetime)
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].lastRaid = datetime
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].active = true
+  local player = self:GetPlayerByID(pid)
+  player.lastRaid = datetime
+  player.active = true
 end
 
 -- Check if a player has a certain amount of DKP
-function EminentDKP:PlayerHasDKP(player,amount)
-  local pid = self:GetPlayerID(player)
-  if self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP >= amount then
-    return true
+function EminentDKP:PlayerHasDKP(name,amount)
+  local player = self:GetPlayerByName(name)
+  return (player ~= nil and player.currentDKP >= amount)
+end
+
+-- Get the your current DKP
+function EminentDKP:GetMyCurrentDKP()
+  local player = self:GetPlayerByName(self.myName)
+  return (player ~= nil and player.currentDKP or nil)
+end
+
+-- Get the names of everybody else in the pool
+function EminentDKP:GetOtherPlayersNames()
+  local list = {}
+  for name,pid in pairs(self:GetActivePool().playerIDs) do
+    if name ~= self.myName then
+      list[name] = name
+    end
   end
-  return false
+  return list
+end
+
+function EminentDKP:GetPlayerNames()
+  local list = {}
+  for name,pid in pairs(self:GetActivePool().playerIDs) do
+    list[name] = name
+  end
+  return list
+end
+
+function EminentDKP:GetPlayersOfClass(name,fresh)
+  local player, playerid = self:GetPlayerByName(name)
+  local list = {}
+  for pid,data in pairs(self:GetActivePool().players) do
+    if playerid ~= pid and data.class == player.class then
+      if not fresh or (fresh and self:IsPlayerFresh(player)) then
+        local name = self:GetPlayerNameByID(pid)
+        list[name] = name
+      end
+    end
+  end
+  return list
 end
 
 function EminentDKP:GetPlayerPool()
-  return self.db.factionrealm.pools[self.db.profile.activepool].players
+  return self:GetActivePool().players
 end
 
 function EminentDKP:GetTotalBounty()
-  return self.db.factionrealm.pools[self.db.profile.activepool].bounty.size
+  return self:GetActivePool().bounty.size
 end
 
 function EminentDKP:GetAvailableBounty()
-  return self.db.factionrealm.pools[self.db.profile.activepool].bounty.available
+  return self:GetActivePool().bounty.available
 end
 
 function EminentDKP:GetAvailableBountyPercent()
-  return round((self:GetAvailableBounty()/self:GetTotalBounty())*100,2)
+  return self:StdNumber((self:GetAvailableBounty()/self:GetTotalBounty())*100)
 end
 
 -- Construct list of players currently in the raid
 function EminentDKP:GetCurrentRaidMembers()
   local players = {}
   for spot = 1, 40 do
-    local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(spot);
+    local name = select(1,GetRaidRosterInfo(spot))
 		if name then
-		  players[self:GetPlayerID(name)] = self:GetPlayer(name)
+		  local player, pid = self:GetPlayerByName(name)
+		  players[pid] = player
 		end
   end
   return players
@@ -695,9 +1684,9 @@ end
 function EminentDKP:GetCurrentRaidMembersIDs()
   local players = {}
   for spot = 1, 40 do
-    local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(spot);
+    local name = select(1,GetRaidRosterInfo(spot))
 		if name then
-		  table.insert(players,self:GetPlayerID(name))
+		  table.insert(players,self:GetPlayerIDByName(name))
 		end
   end
   return players
@@ -706,50 +1695,47 @@ end
 ---------- START EARNINGS + DEDUCTIONS FUNCTIONS ----------
 
 function EminentDKP:IncreaseAvailableBounty(amount)
-  self.db.factionrealm.pools[self.db.profile.activepool].bounty.available = self:GetAvailableBounty() + amount
+  self:GetActivePool().bounty.available = self:GetAvailableBounty() + amount
 end
 
 function EminentDKP:DecreaseAvailableBounty(amount)
-  self.db.factionrealm.pools[self.db.profile.activepool].bounty.available = self:GetAvailableBounty() - amount
+  self:GetActivePool().bounty.available = self:GetAvailableBounty() - amount
 end
 
 function EminentDKP:CreatePlayerVanityDeduction(pid,eventID,amount)
-  local vdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentVanityDKP
+  local player = self:GetPlayerByID(pid)
   
   -- Set the deduction for the player
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].deductions[eventID] = amount
+  player.deductions[eventID] = amount
   
   -- Update current Vanity DKP
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentVanityDKP = vdkp - amount
+  player.currentVanityDKP = player.currentVanityDKP - amount
 end
 
 function EminentDKP:CreatePlayerDeduction(pid,eventID,amount)
-  local cdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP
+  local player = self:GetPlayerByID(pid)
   
   -- Set the deduction for the player
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].deductions[eventID] = amount
+  player.deductions[eventID] = amount
   
   -- Update current DKP
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP = cdkp - amount
+  player.currentDKP = player.currentDKP - amount
 end
 
 function EminentDKP:CreatePlayerEarning(pid,eventID,amount,earnsVanity)
-  local cdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP
-  local vdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentVanityDKP
-  local edkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnedDKP
-  local evdkp = self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnedVanityDKP
+  local player = self:GetPlayerByID(pid)
   
   -- Set the earning for the player
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnings[eventID] = amount
+  player.earnings[eventID] = amount
   
   -- Update current DKP (normal and vanity)
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentDKP = cdkp + amount
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnedDKP = edkp + amount
+  player.currentDKP = player.currentDKP + amount
+  player.earnedDKP = player.earnedDKP + amount
   
   -- Transfers do not earn vanity dkp (for obvious reasons)
   if earnsVanity then
-    self.db.factionrealm.pools[self.db.profile.activepool].players[pid].currentVanityDKP = vdkp + amount
-    self.db.factionrealm.pools[self.db.profile.activepool].players[pid].earnedVanityDKP = evdkp + amount
+    player.currentVanityDKP = player.currentVanityDKP + amount
+    player.earnedVanityDKP = player.earnedVanityDKP + amount
   end
 end
 
@@ -767,20 +1753,20 @@ function EminentDKP:SyncEvent(eventID)
 end
 
 function EminentDKP:CreateAddPlayerSyncEvent(name,className)
-  self:SyncEvent(self:CreateAddPlayerEvent(name,className,0,0,GetTodayDateTime()))
+  self:SyncEvent(self:CreateAddPlayerEvent(name,className,0,0,time()))
 end
 
 -- Add a player to the active pool
 function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
   -- Get a new player ID
-  local pc = self.db.factionrealm.pools[self.db.profile.activepool].playerCounter
+  local pc = self:GetActivePool().playerCounter
   pc = pc + 1
-  self.db.factionrealm.pools[self.db.profile.activepool].playerCounter = pc
+  self:GetActivePool().playerCounter = pc
   local pid = tostring(pc)
-  self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[name] = pid
+  self:GetActivePool().playerIDs[name] = pid
   
   -- Create the new player data
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid] = { 
+  self:GetActivePool().players[pid] = { 
     class=className, 
     lastRaid=dtime,
     currentDKP=0,
@@ -802,13 +1788,13 @@ function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
   if vanitydkp > 0 and vanitydkp > dkp then
     self:CreatePlayerEarning(pid,cid,vanitydkp,true)
     if dkp > 0 then
-      self:CreatePlayerDeduction(pid,cid,round((vanitydkp-dkp),2))
+      self:CreatePlayerDeduction(pid,cid,(vanitydkp-dkp))
     end
     self:DecreaseAvailableBounty(dkp)
   elseif vanitydkp > 0 and vanitydkp <= dkp then
     self:CreatePlayerEarning(pid,cid,dkp,true)
     if vanitydkp < dkp then
-      self:CreatePlayerVanityDeduction(pid,cid,round((dkp-vanitydkp),2))
+      self:CreatePlayerVanityDeduction(pid,cid,(dkp-vanitydkp))
     end
     self:DecreaseAvailableBounty(vanitydkp)
   elseif vanitydkp == 0 and dkp > 0 then
@@ -820,7 +1806,7 @@ function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
 end
 
 function EminentDKP:CreateBountySyncEvent(players,amount,srcName)
-  self:SyncEvent(self:CreateBountyEvent(players,amount,srcName,GetTodayDateTime()))
+  self:SyncEvent(self:CreateBountyEvent(players,amount,srcName,time()))
 end
 
 function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
@@ -831,7 +1817,7 @@ function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
   self:DecreaseAvailableBounty(amount)
   
   -- Then create all the necessary earnings for players
-  local dividend = round((amount/#(players)),2)
+  local dividend = (amount/#(players))
   for i,pid in ipairs(players) do
     self:CreatePlayerEarning(pid,cid,dividend,true)
     self:UpdateLastPlayerRaid(pid,dtime)
@@ -841,11 +1827,11 @@ function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
 end
 
 function EminentDKP:CreateAuctionSyncEvent(players,to,amount,srcName,srcExtra)
-  self:SyncEvent(self:CreateAuctionEvent(players,to,amount,srcName,srcExtra,GetTodayDateTime()))
+  self:SyncEvent(self:CreateAuctionEvent(players,to,amount,srcName,srcExtra,time()))
 end
 
 function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
-  local pid = self:GetPlayerID(to)
+  local pid = self:GetPlayerIDByName(to)
   -- Create the event
   local cid = self:CreateEvent(srcName,"auction",srcExtra,pid,implode(',',players),amount,dtime)
   
@@ -856,7 +1842,7 @@ function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
   self:UpdateLastPlayerRaid(pid,dtime)
   
   -- Then create all the necessary earnings for players
-  local dividend = round((amount/#(players)),2)
+  local dividend = (amount/#(players))
   for i,rpid in ipairs(players) do
     self:CreatePlayerEarning(rpid,cid,dividend,true)
     self:UpdateLastPlayerRaid(rpid,dtime)
@@ -866,12 +1852,12 @@ function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
 end
 
 function EminentDKP:CreateTransferSyncEvent(from,to,amount)
-  self:SyncEvent(self:CreateTransferEvent(from,to,amount,GetTodayDateTime()))
+  self:SyncEvent(self:CreateTransferEvent(from,to,amount,time()))
 end
 
 function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
-  local pfid = self:GetPlayerID(from)
-  local ptid = self:GetPlayerID(to)
+  local pfid = self:GetPlayerIDByName(from)
+  local ptid = self:GetPlayerIDByName(to)
   
   -- Create the event
   local cid = self:CreateEvent(pfid,"transfer","",ptid,"",amount,dtime)
@@ -886,13 +1872,29 @@ function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
   return cid
 end
 
-function EminentDKP:CreateExpirationSyncEvent(player)
-  self:SyncEvent(self:CreateExpirationEvent(player,GetTodayDateTime()))
+function EminentDKP:CreatePurgeSyncEvent(name)
+  self:SyncEvent(self:CreatePurgeEvent(name,time()))
 end
 
-function EminentDKP:CreateExpirationEvent(player,dtime)
-  local pid = self:GetPlayerID(player)
-  local pdata = self:GetPlayer(player)
+-- This assumes the player is fresh
+function EminentDKP:CreatePurgeEvent(name,dtime)
+  local pid = self:GetPlayerIDByName(name)
+  
+  -- Create the event
+  local cid = self:CreateEvent(pid,"purge",name,"","",0,dtime)
+  
+  self:GetActivePool().playerIDs[name] = nil
+  self:GetActivePool().players[pid] = nil
+  
+  return cid
+end
+
+function EminentDKP:CreateExpirationSyncEvent(name)
+  self:SyncEvent(self:CreateExpirationEvent(name,time()))
+end
+
+function EminentDKP:CreateExpirationEvent(name,dtime)
+  local pdata, pid = self:GetPlayerByName(name)
   local dkpAmt = pdata.currentDKP
   local vanityAmt = pdata.currentVanityDKP
   
@@ -907,18 +1909,17 @@ function EminentDKP:CreateExpirationEvent(player,dtime)
   self:IncreaseAvailableBounty(dkpAmt)
   
   -- Mark the player as inactive (to bypass future expiration checks)
-  self.db.factionrealm.pools[self.db.profile.activepool].players[pid].active = false
+  pdata.active = false
   
   return cid
 end
 
-function EminentDKP:CreateVanityResetSyncEvent(player)
-  self:SyncEvent(self:CreateVanityResetEvent(player,GetTodayDateTime()))
+function EminentDKP:CreateVanityResetSyncEvent(name)
+  self:SyncEvent(self:CreateVanityResetEvent(name,time()))
 end
 
-function EminentDKP:CreateVanityResetEvent(player,dtime)
-  local pid = self:GetPlayerID(player)
-  local pdata = self:GetPlayer(player)
+function EminentDKP:CreateVanityResetEvent(name,dtime)
+  local pdata, pid = self:GetPlayerByName(name)
   local amount = pdata.currentVanityDKP
   
   -- Create the event
@@ -934,36 +1935,48 @@ function EminentDKP:CreateVanityResetEvent(player,dtime)
 end
 
 function EminentDKP:CreateRenameSyncEvent(from,to)
-  self:SyncEvent(self:CreateRenameEvent(from,to,GetTodayDateTime()))
+  self:SyncEvent(self:CreateRenameEvent(from,to,time()))
 end
 
 function EminentDKP:CreateRenameEvent(from,to,dtime)
-  local pfid = self:GetPlayerID(from)
+  -- This event assumes that the "to" player is fresh
+  local pfid = self:GetPlayerIDByName(from)
+  local ptid = self:GetPlayerIDByName(to)
   
   -- Create the event
   local cid = self:CreateEvent(pfid,"rename",from,"","",to,dtime)
   
-  self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[to] = pfid
-  self.db.factionrealm.pools[self.db.profile.activepool].playerIDs[from] = nil
+  -- Delete the "to" person
+  local player = self:GetPlayerByID(ptid)
+  player = nil
+  -- Delete the name for the "from" person
+  self:GetActivePool().playerIDs[from] = nil
+  -- Re-route the "to" person to the "from" person
+  self:GetActivePool().playerIDs[to] = pfid
   
   return cid
 end
 
 -- Creates an event and increments the event counter
-function EminentDKP:CreateEvent(src,etype,extra,t,b,amount,dtime)
-  local c = self.db.factionrealm.pools[self.db.profile.activepool].eventCounter
+function EminentDKP:CreateEvent(src,etype,extra,t,b,val,dtime)
+  local c = self:GetActivePool().eventCounter
   c = c + 1
-  self.db.factionrealm.pools[self.db.profile.activepool].eventCounter = c
+  self:GetActivePool().eventCounter = c
   local cid = tostring(c)
-  self.db.factionrealm.pools[self.db.profile.activepool].events[cid] = {
+  self:GetActivePool().events[cid] = {
     source = src,
     eventType = etype,
     extraInfo = extra,
     target = t,
     beneficiary = b,
-    value = amount,
+    value = val,
     datetime = dtime
   }
+  
+  -- Update newest_version (since it may be out of date now)
+  local old_newest_version = self:GetNewestVersion()
+  newest_version = ""
+  UpdateNewestVersion(old_newest_version)
   
   return cid
 end
@@ -980,49 +1993,116 @@ function EminentDKP:UpdateLootEligibility()
 	end
 end
 
--- Broadcast version
-function EminentDKP:PLAYER_ENTERING_WORLD()
-  self:BroadcastVersion()
-end
-
--- Announcements (and expirations) occur at the first entry of combat
--- This ensures nobody is accidently expired and everybody sees the announcements
-function EminentDKP:PLAYER_REGEN_DISABLED()
-  if self:AmOfficer() and self.amMasterLooter then
-    if self:GetLastScan() == '' or GetDayDifference(self:GetLastScan(),GetTodayDateTime()) < 0 then
-      sendchat('Performing database scan...', nil, 'self')
-      for pid,data in pairs(self.db.factionrealm.pools[self.db.profile.activepool].players) do
-        if data.active and data.earnedDKP > 0 then
-          local days = math.floor(GetDayDifference(GetTodayDateTime(),data.lastRaid))
-          if days >= self.db.profile.raid.expiretime then
-            -- If deemed inactive then reset their DKP and vanity DKP
-            local name = self:GetPlayerNameByID(pid)
-            sendchat('The DKP for '..name..' has expired. Bounty has increased by '..numstring(data.currentDKP)..' DKP.', "raid", "preset")
-            self:CreateExpirationSyncEvent(name)
-          end
-        end
-      end
-      if self:GetAvailableBountyPercent() > 50 then
-        sendchat('There is more than 50% of the bounty available, you should distribute some.', nil, 'self')
-      end
-      sendchat('Current bounty is '..numstring(self:GetAvailableBounty())..' DKP.', "raid", "preset")
-      self.db.factionrealm.pools[self.db.profile.activepool].lastScan = GetTodayDateTime()
-      self:PrintStandings()
+-- Keep track of any creature deaths
+function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
+  if not self:AmOfficer() and not UnitInRaid("player") then return end
+  if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
+    table.insert(recent_deaths,1,dstName)
+    if #(recent_deaths) > 10 then
+      tremove(recent_deaths)
     end
   end
 end
 
+-- Keep track of any earned achievements
+function EminentDKP:ACHIEVEMENT_EARNED(event, achievementID)
+  if not self:AmOfficer() and not UnitInRaid("player") then return end
+  table.insert(recent_achievements,1,select(2,GetAchievementInfo(tonumber(achievementID))))
+  if #(recent_achievements) > 10 then
+    tremove(recent_achievements)
+  end
+end
+
+-- Broadcast version
+function EminentDKP:PLAYER_ENTERING_WORLD()
+  self:SendCommMessage('EminentDKP-Version',self:GetVersion()..":Hello",'GUILD')
+  -- Hide the meters if we're PVPing and we want it hidden
+  if self.db.profile.hidepvp then
+    if is_in_pvp() then
+      self:ToggleMeters(false)
+    else
+      self:ToggleMeters(true)
+    end
+  end
+end
+
+-- Check if we're not dead and raid is not in combat, then we're out of combat
+function EminentDKP:CheckCombatStatus()
+  if not UnitIsDead("player") and not IsRaidInCombat() then
+    self:CancelTimer(self.combatCheckTimer,true)
+    self:ToggleMeters(true)
+  end
+end
+
+-- Possibility we are out of combat
+function EminentDKP:PLAYER_REGEN_ENABLED()
+  if self.db.profile.hidecombat then
+    self.combatCheckTimer = self:ScheduleRepeatingTimer("CheckCombatStatus",1)
+  end
+end
+
+-- Announcements, prunes, and expirations occur at the first entry of combat
+function EminentDKP:PLAYER_REGEN_DISABLED()
+  -- Hide meters if we're in combat and want it hidden
+  if self.db.profile.hidecombat then
+    self:CancelTimer(self.combatCheckTimer,true)
+    self:ToggleMeters(false)
+  end
+  if not self:AmMasterLooter() then return end
+  
+  if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) > 0 then
+    sendchat('Performing database scan...', nil, 'self')
+    for pid,data in pairs(self:GetActivePool().players) do
+      if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
+        local name = self:GetPlayerNameByID(pid)
+        if self:IsPlayerFresh(name) then
+          -- purge
+          self:CreatePurgeSyncEvent(name)
+        elseif data.active then
+          -- If deemed inactive then reset their DKP and vanity DKP
+          self:CreateExpirationSyncEvent(name)
+        end
+      end
+    end
+    if self:GetAvailableBountyPercent() > 50 then
+      sendchat('There is more than 50% of the bounty available, you should distribute some.', nil, 'self')
+    end
+    sendchat(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
+    self:GetActivePool().lastScan = time()
+    self:SendNotification("scan",{ time=self:GetLastScan() })
+    self:PrintStandings()
+  end
+end
+
+-- Tracking for hide when solo option
+function EminentDKP:PARTY_MEMBERS_CHANGED()
+  if self.db.profile.hidesolo then
+    if is_solo() then
+		  self:ToggleMeters(false)
+	  else
+	    self:ToggleMeters(true)
+    end
+	end
+end
+
 -- Keep track of people in the raid
 function EminentDKP:RAID_ROSTER_UPDATE()
+  if self.db.profile.hidesolo then
+    if is_solo() then
+		  self:ToggleMeters(false)
+	  else
+	    self:ToggleMeters(true)
+    end
+	end
+  
   -- This only needs to be run by the masterlooter
-  if not self:AmOfficer() then return end
-  if not self.amMasterLooter then return end
+  if not self:AmMasterLooter() then return end
   
   -- Make sure players exist in the pool
   for d = 1, GetNumRaidMembers() do
-		name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(d)
+		local name = select(1,GetRaidRosterInfo(d))
 		if not self:PlayerExistsInPool(name) then
-		  self:CreateAddPlayerSyncEvent(name,class)
+		  self:CreateAddPlayerSyncEvent(name,select(2,UnitClass(name)))
 		end
 	end
 end
@@ -1043,12 +2123,18 @@ function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
   end
 end
 
+function EminentDKP:AmMasterLooter()
+  return (self.amMasterLooter and self:AmOfficer())
+end
+
 -- Loot window closing means cancel auction
 function EminentDKP:LOOT_CLOSED()
-  if UnitInRaid("player") and self.amMasterLooter and auction_active then
-    sendchat('Auction cancelled. All bids have been voided.', "raid", "preset")
+  if self:AmMasterLooter() and auction_active then
+    sendchat(L["Auction cancelled. All bids have been voided."], "raid", "preset")
+    self:SendNotification("auctioncancel",{ guid = self.bidItem.srcGUID, item = self.bidItem.itemString })
     auction_active = false
     self:CancelTimer(self.bidTimer)
+    table.insert(recent_loots[self.bidItem.srcGUID].slots,self.bidItem.slotNum)
     self.bidItem = nil
   end
 end
@@ -1056,8 +2142,7 @@ end
 -- Prints out the loot to the raid when looting a corpse
 function EminentDKP:LOOT_OPENED()
   -- This only needs to be run by the masterlooter
-  if not self:AmOfficer() then return end
-  if not self.amMasterLooter then return end
+  if not self:AmMasterLooter() then return end
   
   if UnitInRaid("player") then
     -- Query some info about this unit...
@@ -1069,12 +2154,15 @@ function EminentDKP:LOOT_OPENED()
     end
     if not recent_loots[guid] and GetNumLootItems() > 0 then
       local eligible_items = {}
-      local eligible_slots = {}
+      local slotlist = {}
+      local itemlist = {}
       for slot = 1, GetNumLootItems() do 
 				local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-				if lootQuantity > 0 and rarity >= self.db.profile.raid.itemRarity then
-				  table.insert(eligible_items,GetLootSlotLink(slot))
-				  table.insert(eligible_slots,slot)
+				if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
+				  local link = GetLootSlotLink(slot)
+				  table.insert(eligible_items,link)
+				  table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), slot=slot })
+				  table.insert(slotlist,1,slot)
 				end
 			end
 			
@@ -1083,37 +2171,80 @@ function EminentDKP:LOOT_OPENED()
 			  for i,loot in ipairs(eligible_items) do
 			    sendchat(loot,"raid", "preset")
 		    end
+		    
+		    -- Share loot list with raid
+		    self:SendNotification("lootlist",{ guid=guid, name=unitName, items=itemlist })
 			end
 			-- Ensure that we only print once by keeping track of the GUID
-			recent_loots[guid] = { name=unitName, realm=unitRealm, slots=eligible_slots }
+			recent_loots[guid] = { name=unitName, slots=slotlist }
     end
   end
 end
 
+function EminentDKP:WhisperPlayer(addon, method, msg, who, accept)
+  if addon then
+    local nt = (accept and "accept" or "reject")
+    self:SendNotification(nt,{ from=method, message=msg },who)
+  else
+    sendchat(msg, who, 'whisper')
+  end
+end
+
 -- Place a bid on an active auction
-function EminentDKP:Bid(amount, from)
+function EminentDKP:Bid(addon,from,amount)
   if auction_active then
-    if UnitInRaid(from) then
-      if eligible_looters[from] then
-        local bid = math.floor(tonumber(amount) or 0)
-        if bid > 0 then
-          if self:PlayerHasDKP(from,bid) then
-            self.bidItem.bids[from] = bid
-            sendchat('Your bid of '.. bid .. ' has been accepted.', from, 'whisper')
-          else
-            sendchat('The bid amount must not exceed your current DKP.', from, 'whisper')
-          end
+    if eligible_looters[from] then
+      local bid = math.floor(tonumber(amount))
+      if bid > 0 then
+        if self:PlayerHasDKP(from,bid) then
+          self.bidItem.bids[from] = bid
+          self:WhisperPlayer(addon,"bid",L["Your bid of %d has been accepted."]:format(bid), from, true)
         else
-          sendchat('Bid must be a number greater than 0.', from, 'whisper')
+          self:WhisperPlayer(addon,"bid",L["The DKP amount must not exceed your current DKP."], from)
         end
       else
-        sendchat('You are not eligible to receive loot.', from, 'whisper')
+        self:WhisperPlayer(addon,"bid",L["DKP amount must be a number greater than 0."], from)
       end
     else
-      sendchat('You must be present in the raid.', from, 'whisper')
+      self:WhisperPlayer(addon,"bid",L["You are not eligible to receive loot."], from)
     end
   else
-    sendchat("There is currently no auction active.", from, 'whisper')
+    self:WhisperPlayer(addon,"bid",L["There is currently no auction active."], from)
+  end
+end
+
+-- Transfer DKP from one player to another
+function EminentDKP:Transfer(addon,from,amount,to)
+  if not auction_active then
+    if to ~= from then
+      if self:PlayerExistsInPool(from) then
+        if self:PlayerExistsInPool(to) then
+          local dkp = tonumber(amount)
+          if dkp > 0 then
+            if self:PlayerHasDKP(from,dkp) then
+              self:CreateTransferSyncEvent(from,to,dkp)
+              
+              self:SendNotification("transfer",{ amount = dkp, sender=from, receiver=to })
+              sendchat(L["Succesfully transferred %.02f DKP to %s."]:format(dkp,to), from, 'whisper')
+              sendchat(L["%s just transferred %.02f DKP to you."]:format(from,dkp), to, 'whisper')
+              sendchat(L["%s has transferred %.02f DKP to %s."]:format(from,dkp,to), "raid", "preset")
+            else
+              self:WhisperPlayer(addon,"transfer",L["The DKP amount must not exceed your current DKP."], from)
+            end
+          else
+            self:WhisperPlayer(addon,"transfer",L["DKP amount must be a number greater than 0."], from)
+          end
+        else
+          self:WhisperPlayer(addon,"transfer",L["%s does not exist in the DKP pool."]:format(to), from)
+        end
+      else
+        self:WhisperPlayer(addon,"transfer",L["You do not exist in the DKP pool."], from)
+      end
+    else
+      self:WhisperPlayer(addon,"transfer",L["You cannot transfer DKP to yourself."], from)
+    end
+  else
+    self:WhisperPlayer(addon,"transfer",L["You cannot transfer DKP during an auction."], from)
   end
 end
 
@@ -1128,12 +2259,7 @@ function EminentDKP:GetStandings(stat)
     players = self:GetPlayerPool()
   end
   for id,data in pairs(players) do
-    local b = data.currentDKP
-    if stat == 'earnedDKP' then
-      b = data.earnedDKP
-    else
-      b = data.currentDKP
-    end
+    local b = (data[stat] ~= nil and data[stat] or data.currentDKP)
 		table.insert(a, { n=self:GetPlayerNameByID(id), dkp=b })
 	end
   table.sort(a, function(a,b) return a.dkp>b.dkp end)
@@ -1143,85 +2269,51 @@ end
 function EminentDKP:PrintStandings()
   local a = self:GetStandings('currentDKP')
   
-  sendchat('Current DKP standings:', "raid", "preset")
+  sendchat(L["Current DKP standings:"], "raid", "preset")
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..numstring(data.dkp), "raid", "preset")
+    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), "raid", "preset")
   end
 end
 
 function EminentDKP:WhisperStandings(to)
   local a = self:GetStandings('currentDKP')
   
-  sendchat('Current DKP standings:', to, 'whisper')
+  sendchat(L["Current DKP standings:"], to, 'whisper')
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..numstring(data.dkp), to, 'whisper')
+    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), to, 'whisper')
   end
 end
 
 function EminentDKP:WhisperLifetime(to)
   local a = self:GetStandings('earnedDKP')
   
-  sendchat('Lifetime Earned DKP standings:', to, 'whisper')
+  sendchat(L["Lifetime Earned DKP standings:"], to, 'whisper')
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..numstring(data.dkp), to, 'whisper')
-  end
-end
-
--- Transfer DKP from one player to another
-function EminentDKP:WhisperTransfer(amount, to, from)
-  if to ~= from then
-    if self:PlayerExistsInPool(from) then
-      if self:PlayerExistsInPool(to) then
-        if not auction_active then
-          local dkp = round(tonumber(amount) or 0,2)
-          if dkp > 0 then
-            if self:PlayerHasDKP(from,dkp) then
-              self:CreateTransferSyncEvent(from,to,dkp)
-              sendchat('Succesfully transferred '.. dkp ..' DKP to ' .. to .. '.', from, 'whisper')
-              sendchat(from .. ' just transferred '.. dkp .. ' DKP to you.', to, 'whisper')
-              sendchat(from .. " has transferred " .. dkp .. " DKP to " .. to .. ".", "raid", "preset")
-            else
-              sendchat('The DKP amount must not exceed your current DKP.', from, 'whisper')
-            end
-          else
-            sendchat('DKP amount must be a number greater than 0.', from, 'whisper')
-          end
-        else
-          sendchat("You cannot transfer DKP during an auction.", from, 'whisper')
-        end
-      else
-        sendchat(to.." does not exist in the DKP pool.", from, 'whisper')
-      end
-    else
-      sendchat("You do not exist in the DKP pool.", from, 'whisper')
-    end
-  else
-    sendchat("You cannot transfer DKP to yourself.", from, 'whisper')
+    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), to, 'whisper')
   end
 end
 
 function EminentDKP:WhisperBounty(to)
-  sendchat('The current bounty is '..numstring(self:GetAvailableBounty())..' DKP.', to, 'whisper')
+  sendchat(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()), to, 'whisper')
 end
 
 function EminentDKP:WhisperCheck(who, to)
   if self:PlayerExistsInPool(who) then
-    local data = self:GetPlayer(who)
-    local days =  math.floor(GetDayDifference(GetTodayDateTime(),data.lastRaid))
-    sendchat('Player Report for '..who, to, 'whisper')
-    sendchat('Current DKP: '..numstring(data.currentDKP), to, 'whisper')
-    sendchat('Lifetime DKP: '..numstring(data.earnedDKP), to, 'whisper')
-    sendchat('Vanity DKP: '..numstring(data.currentVanityDKP), to, 'whisper')
-    sendchat('Last Raid: '..days..' day(s) ago.', to, 'whisper')
+    local data = self:GetPlayerByName(who)
+    sendchat(L["Player Report for %s:"]:format(who), to, 'whisper')
+    sendchat(L["Current DKP:"].. ' '..self:StdNumber(data.currentDKP), to, 'whisper')
+    sendchat(L["Lifetime DKP:"].. ' '..self:StdNumber(data.earnedDKP), to, 'whisper')
+    sendchat(L["Vanity DKP:"].. ' '..self:StdNumber(data.currentVanityDKP), to, 'whisper')
+    sendchat(L["Last Raid: %d day(s) ago."]:format(GetDaysSince(data.lastRaid)), to, 'whisper')
   else
-    sendchat(who.." does not exist in the DKP pool.", to, 'whisper')
+    sendchat(L["%s does not exist in the DKP pool."]:format(who), to, 'whisper')
   end
 end
 
 ------------- START ADMIN FUNCTIONS -------------
 
 function EminentDKP:AdminStartAuction()
-  if self.amMasterLooter then
+  if self:AmMasterLooter() then
     if GetNumLootItems() > 0 then
       local guid = 'container'
       if UnitExists("target") then
@@ -1233,18 +2325,22 @@ function EminentDKP:AdminStartAuction()
           self:UpdateLootEligibility()
   		
       		-- Fast forward to next eligible slot
-      		local slot = recent_loots[guid].slots[1]
-      		local itemLink = GetLootSlotLink(slot)
+      		local slot
+      		local itemLink
       		
-      		while itemLink == nil do
-      		  table.remove(recent_loots[guid].slots,1)
-      		  slot = recent_loots[guid].slots[1]
+      		while not itemLink and #(recent_loots[guid].slots) > 0 do
+      		  slot = tremove(recent_loots[guid].slots)
       		  itemLink = GetLootSlotLink(slot)
     		  end
     		  
+    		  if not itemLink then
+    		    self:DisplayActionResult(L["There is no loot available to auction."])
+    		    return
+  		    end
+    		  
       		-- Gather some info about this item
       		local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-			
+			    
     			auction_active = true
     			self.bidItem = { 
     			  name=lootName, 
@@ -1252,24 +2348,25 @@ function EminentDKP:AdminStartAuction()
     			  elapsed=0, 
     			  bids={}, 
     			  slotNum=slot,
-    			  srcGUID=guid
+    			  srcGUID=guid,
+    			  start=time(),
     			}
+    			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
     			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
 			
-    			sendchat(itemLink .. ' bid now!', "raid_warning", "preset")
-    			sendchat(itemLink .. ' now up for auction! Auction ends in 30 seconds.', "raid", "preset")
-      		--local itemString = string.match(itemLink, "item[%-?%d:]+")
+    			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
+    			sendchat(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink), "raid", "preset")
         else
-          sendchat('An auction is already active.', nil, 'self')
+          self:DisplayActionResult(L["An auction is already active."])
         end
       else
-        sendchat('There is no loot available to auction.', nil, 'self')
+        self:DisplayActionResult(L["There is no loot available to auction."])
       end
     else
-      sendchat('You must be looting to start an auction.', nil, 'self')
+      self:DisplayActionResult(L["You must be looting a corpse to start an auction."])
     end
   else
-    sendchat('You must be the master looter to initiate an auction.', nil, 'self')
+    self:DisplayActionResult(L["You must be the master looter to initiate an auction."])
   end
 end
 
@@ -1279,7 +2376,7 @@ function EminentDKP:AuctionBidTimer()
   
   -- If 30 seconds has elapsed, then close it
   if self.bidItem.elapsed == 30 then
-    sendchat('Auction has closed. Determining winner...', "raid", "preset")
+    sendchat(L["Auction has closed. Determining winner..."], "raid", "preset")
     auction_active = false
     self:CancelTimer(self.bidTimer)
     
@@ -1291,11 +2388,11 @@ function EminentDKP:AuctionBidTimer()
     
     if next(self.bidItem.bids) == nil then
       -- No bids received, so disenchant
-      sendchat('No bids received. Disenchanting.', "raid", "preset")
-      if eligible_looters[self.db.profile.raid.disenchanter] then
-        looter = self.db.profile.raid.disenchanter
+      sendchat(L["No bids received. Disenchanting."], "raid", "preset")
+      if eligible_looters[self.db.profile.disenchanter] then
+        looter = self.db.profile.disenchanter
       else
-        sendchat(self.db.profile.raid.disenchanter..' was not eligible to receive loot to disenchant.', nil, 'self')
+        sendchat(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter), nil, 'self')
       end
     else
       local bids = 0
@@ -1323,37 +2420,31 @@ function EminentDKP:AuctionBidTimer()
         looter = winners[1]
       else
         -- We have a tie to break
-        local tiebreak = math.random(#(winners))
-        looter = winners[tiebreak]
+        looter = winners[math.random(#(winners))]
         secondHighestBid = winningBid
-        sendchat('A tie was broken with a random roll.', "raid", "preset")
+        sendchat(L["A tie was broken with a random roll."], "raid", "preset")
       end
       
       -- Construct list of players to receive dkp
       local players = self:GetCurrentRaidMembersIDs()
-      local dividend = round((secondHighestBid/#(players)),2)
+      local dividend = (secondHighestBid/#(players))
       
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
-      sendchat(looter..' has won '..GetLootSlotLink(self.bidItem.slotNum)..' for '..secondHighestBid..' DKP!', "raid", "preset")
-      sendchat('Each player has received '..dividend..' DKP.', "raid", "preset")
+      sendchat(L["%s has won %s for %d DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid), "raid", "preset")
+      sendchat(L["Each player has received %d DKP."]:format(dividend), "raid", "preset")
+      self:SendNotification("auctionwon",{ guid = self.bidItem.srcGUID, amount = secondHighestBid, receiver = looter, item = self.bidItem.itemString, slot = self.bidItem.slotNum })
     end
     
     -- Distribute the loot
-    table.remove(recent_loots[guid].slots,1)
-    if eligible_looters[looter] then
-      GiveMasterLoot(self.bidItem.slotNum, eligible_looters[looter])
-    else
-      GiveMasterLoot(self.bidItem.slotNum, eligible_looters[self.myName])
-    end
-    self.bidItem = nil
+    GiveMasterLoot(self.bidItem.slotNum, eligible_looters[looter])
     
     -- Re-run the auction routine...
     if #(recent_loots[guid].slots) > 0 then
-      sendchat('The next auction will begin in 3 seconds.', "raid", "preset")
-      self:ScheduleTimer("AdminStartAuction", 3)
+      self:AdminStartAuction()
     else
-      recent_loots[guid] = nil
-      sendchat('No more loot found.', "raid", "preset")
+      self.bidItem = nil
+      sendchat(L["No more loot found."], "raid", "preset")
+      self:SendNotification("lootdone",{ guid = self.bidItem.srcGUID })
     end
   else
     local timeLeft = (30 - self.bidItem.elapsed)
@@ -1361,37 +2452,40 @@ function EminentDKP:AuctionBidTimer()
   end
 end
 
-function EminentDKP:AdminDistributeBounty(percent,reason)
-  -- todo: maybe offer a config option to automatically run this after a boss death?
+function EminentDKP:GetBountyReasons()
+  local reasons = { ["Default"] = "Default" }
+  for i,mob in pairs(recent_deaths) do
+    reasons[mob] = L["Kill: %s"]:format(mob)
+  end
+  for i,achiev in pairs(recent_achievements) do
+    reasons[achiev] = L["Achievement: %s"]:format(achiev)
+  end
+  return reasons
+end
+
+function EminentDKP:AdminDistributeBounty(percent,value,reason)
   if not auction_active then
-    local p = tonumber(percent) or 0
-    if p <= 100 and p > 0 then
-      sendchat('Distributing '.. percent ..'% of the bounty to the raid.', nil, 'self')
-      
+    local p = tonumber(value) or 0
+    if (percent and p <= 100 and p > 0) or (not percent and p <= self:GetAvailableBounty() and p > 0) then
       -- Construct list of players to receive bounty
       local players = self:GetCurrentRaidMembersIDs()
       
-      -- todo: solidify the process by which a "reason" is acquired
-      local name = UnitName("target")
-      if not name then
-        if not reason then
-          name = "Default"
-        else
-          name = reason
-        end
-      end
-      local amount = round((self:GetAvailableBounty() * (p/100)),2)
-      local dividend = round((amount/#(players)),2)
+      local amount = (percent and (self:GetAvailableBounty() * (p/100)) or p)
+      local dividend = (amount/#(players))
       
-      self:CreateBountySyncEvent(players,amount,name)
-      sendchat('A bounty of '..amount..' ('..tostring(p)..'%) has been awarded to '..#(players)..' players.', "raid", "preset")
-      sendchat('Each player has received '..dividend..' DKP.', "raid", "preset")
-      sendchat('New bounty is '..numstring(self:GetAvailableBounty())..' DKP.', "raid", "preset")
+      self:CreateBountySyncEvent(players,amount,reason)
+      
+      -- Announce bounty to the other addons
+	    self:SendNotification("bounty",{ amount = dividend })
+      
+      sendchat(L["A bounty of %.02f has been awarded to %d players."]:format(amount,#(players)), "raid", "preset")
+      sendchat(L["Each player has received %.02f DKP."]:format(dividend), "raid", "preset")
+      sendchat(L["The bounty pool is now %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
     else
-      sendchat('You must enter a percent between 0 and 100.', nil, 'self')
+      self:DisplayActionResult(L["ERROR: Invalid bounty amount given."])
     end
   else
-    sendchat('An auction must not be active.', nil, 'self')
+    self:DisplayActionResult(L["ERROR: An auction must not be active."])
   end
   
 end
@@ -1401,9 +2495,9 @@ function EminentDKP:AdminVanityRoll()
   if not auction_active then
     local ranks = {}
     for r = 1, GetNumRaidMembers() do
-  		name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(r)
+  		local name = select(1,GetRaidRosterInfo(r))
   		if name then
-  		  local data = self:GetPlayer(name)
+  		  local data = self:GetPlayerByName(name)
   			if data.currentVanityDKP > 0 then
   			  local roll = math.random(math.floor(data.currentVanityDKP))/1000
   			  table.insert(ranks, { n=name, v=data.currentVanityDKP, r=roll })
@@ -1417,70 +2511,52 @@ function EminentDKP:AdminVanityRoll()
 	    sendchat(rank..'. '..data.n..' ('..tostring(data.v)..') - '..tostring(data.r)..'.', "raid", "preset")
     end
   else
-    sendchat('An auction must not be active.', nil, 'self')
+    self:DisplayActionResult(L["ERROR: An auction must not be active."])
   end
 end
 
 function EminentDKP:AdminVanityReset(who)
   if self:PlayerExistsInPool(who) then
     self:CreateVanityResetSyncEvent(who)
-    sendchat('Reseting current vanity DKP for '.. who ..'.', nil, 'self')
+    self:DisplayActionResult(L["Successfully reset vanity DKP for %s."]:format(who))
   else
-    sendchat('The player '..who..' does not exist in the DKP pool.', nil, 'self')
+    self:DisplayActionResult(L["ERROR: %s does not exist in the DKP pool."]:format(who))
   end
 end
 
 function EminentDKP:AdminRename(from,to)
   if self:PlayerExistsInPool(from) then
-    if not self:PlayerExistsInPool(to) then
-      self:CreateRenameSyncEvent(from,to)
-      sendchat('Succesfully renamed '..from..' -> '..to..'!', nil, 'self')
+    if self:PlayerExistsInPool(to) then
+      if self:IsPlayerFresh(to) then
+        self:CreateRenameSyncEvent(from,to)
+        self:DisplayActionResult(L["Successfully renamed %s to %s."]:format(from,to))
+      else
+        self:DisplayActionResult(L["ERROR: %s is not a fresh player."]:format(to))
+      end
     else
-      sendchat('The player '..to..' already exists in the DKP pool.', nil, 'self')
+      self:DisplayActionResult(L["ERROR: %s does not exist in the DKP pool."]:format(to))
     end
   else
-    sendchat('The player '..from..' does not exist in the DKP pool.', nil, 'self')
+    self:DisplayActionResult(L["ERROR: %s does not exist in the DKP pool."]:format(from))
+  end
+end
+
+function EminentDKP:DisplayActionResult(status)
+  if self.actionpanel then
+    self.actionpanel:SetStatusText(status)
+  else
+    sendchat(status, nil, 'self')
   end
 end
 
 ------------- END ADMIN FUNCTIONS -------------
 
--- Handle slash commands (currently accepts only admin commands)
+-- Handle slash commands
 function EminentDKP:ProcessSlashCmd(input)
   local command, arg1, arg2, e = self:GetArgs(input, 3)
   
-  -- Check if the command can only be used by an officer
-  if officer_cmds[command] and not self:AmOfficer() then
-    sendchat("This command can only be used by an officer.", nil, 'self')
-    return
-  end
-  
-  -- Check if the command can only be used by the masterlooter
-  if ml_cmds[command] then
-    if self.lootMethod ~= 'master' then
-      sendchat("Master looting must be enabled.", nil, 'self')
-      return
-    end
-    if self.masterLooterPartyID ~= 0 then
-      sendchat("Only the master looter can use this command.", nil, 'self')
-      return
-    end
-  end
-  
   if command == 'auction' then
     self:AdminStartAuction()
-  elseif command == 'bounty' then
-    self:AdminDistributeBounty(arg1,arg2)
-  elseif command == 'reset' then
-    self:AdminReset(arg1)
-  elseif command == 'vanity' then
-    if arg1 then
-      self:AdminVanityReset(arg1)
-    else
-      self:AdminVanityRoll()
-    end
-  elseif command == 'rename' then
-    self:AdminRename(arg1,arg2)
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
@@ -1490,11 +2566,22 @@ function EminentDKP:ProcessSlashCmd(input)
   elseif command == 'admin' then
     sendchat("Admin Commands:", nil, 'self')
 		sendchat("'/edkp auction' to begin an auction (must be looting)", nil, 'self')
-		sendchat("'/edkp bounty X Y' to distribute X% of the bounty pool to the raid for a given reason Y", nil, 'self')
-		sendchat("'/edkp vanity X' to clear the vanity DKP for player X. If X is not given, a vanity roll is performed instead. Each roll is weighted by that player's current vanity dkp.", nil, 'self')
-	  sendchat("'/edkp rename X Y' to rename a player from X to Y (Y must not already exist)", nil, 'self')
 	else
 	  sendchat("Unrecognized command. Type '/edkp admin' for a list of valid commands.", nil, 'self')
+  end
+end
+
+function EminentDKP:CHAT_MSG_RAID_CONTROLLER(eventController, message, from, ...)
+  -- Ensure all correspondence from the addon is hidden (option)
+  if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
+    eventController:BlockFromChatFrame()
+  end
+end
+
+function EminentDKP:CHAT_MSG_RAID_WARNING_CONTROLLER(eventController, message, from, ...)
+  -- Ensure all correspondence from the addon is hidden (option)
+  if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
+    eventController:BlockFromChatFrame()
   end
 end
 
@@ -1512,25 +2599,122 @@ function EminentDKP:CHAT_MSG_WHISPER_CONTROLLER(eventController, message, from, 
   end
 end
 
+function EminentDKP:SendNotification(...)
+  local notifyType, rawdata, target = ...
+  local data = notifyType .. "_" .. libS:Serialize(rawdata)
+  local tosync = libCE:Encode(libC:CompressHuffman(data))
+  if not target then
+    self:SendCommMessage('EminentDKP-Notify',tosync,'RAID')
+  else
+    self:SendCommMessage('EminentDKP-Notify',tosync,'WHISPER',target)
+  end
+end
+
+local last_notification = {}
+
+function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
+  if not self:IsAnOfficer(sender) then return end
+  -- Decode the compressed data
+  local one = libCE:Decode(message)
+
+  -- Decompress the decoded data
+  local two, message = libC:Decompress(one)
+  if not two then
+  	sendchat('Error occured while decoding a notification: '..message,nil,'self')
+  	return
+  end
+  
+  local notifyType, rawdata = strsplit('_',two,2)
+  
+  -- Deserialize the decompressed data
+  local success, data = libS:Deserialize(rawdata)
+  if not success then
+    sendchat('Error occured while deserializing notification data.',nil,'self')
+  	return
+  end
+  
+  self:ActuateNotification(notifyType,data)
+end
+
+function EminentDKP:ActuateNotification(notifyType,data)
+  if notifyType == "accept" or notifyType == "reject" then
+    if data.from == "transfer" then
+      self:DisplayActionResult(data.message)
+    elseif data.from == "bid" then
+      if notifyType == "accept" then
+        self:AcceptLastItemBid()
+      else
+        self:RejectLastItemBid()
+      end
+    end
+  elseif notifyType == "lootlist" then
+    local guid = data.guid
+    -- We only set the loot list once
+    if not self.auctionItems[guid] then
+      data.guid = nil
+      self.auctionItems[guid] = data
+    end
+  elseif notifyType == "bounty" then
+    self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
+  elseif notifyType == "transfer" then
+    if data.receiver == self.myName then
+      self:NotifyOnScreen("TRANSFER_RECEIVED",data.amount,data.sender)
+    else
+      self:NotifyOnScreen("TRANSFER_MADE",data.amount,data.sender,data.receiver)
+    end
+  elseif notifyType == "auction" then
+    if not self:AmMasterLooter() then auction_active = true end
+    self:ShowAuctionItems(data.guid)
+    self:StartAuction(data.slot,tonumber(data.start))
+  elseif notifyType == "auctioncancel" then
+    if not self:AmMasterLooter() then auction_active = false end
+    self:ShowAuctionItems(data.guid)
+    self:CancelAuction(data.slot)
+  elseif notifyType == "auctionwon" then
+    if not self:AmMasterLooter() then auction_active = false end
+    self:ShowAuctionItems(data.guid)
+    self:ShowAuctionWinner(data.slot,data.receiver,data.amount)
+    if data.receiver == self.myName then
+      self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
+    end
+  elseif notifyType == "lootdone" then
+    self:RecycleAuctionItems()
+  elseif notifyType == "scan" then
+    self:GetActivePool().lastScan = data.time
+  end
+end
+
+function EminentDKP:SendCommand(...)
+  if not UnitInRaid("player") or not self.masterLooterName then
+    self:DisplayActionResult(L["ERROR: Must be in a raid with a masterlooter."])
+    return
+  end
+  local cmd, arg1, arg2 = ...
+  local tbl = {}
+  table.insert(tbl,cmd)
+  table.insert(tbl,arg1)
+  table.insert(tbl,arg2)
+  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self.masterLooterName,'ALERT')
+end
+
+function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
+  if not self:AmMasterLooter() then return end
+  local command, arg1, arg2 = strsplit(",", message, 3)
+  
+  if command == 'bid' then
+    self:Bid(true,sender,arg1)
+  elseif command == 'transfer' then
+    self:Transfer(true,sender,arg1,arg2)
+  end
+end
+
 function EminentDKP:CHAT_MSG_WHISPER(message, from)
   -- Only interpret messages starting with $
   local a, command, arg1, arg2 = strsplit(" ", message, 4)
 	if a ~= "$" then return end
 	
-	-- Check if the command can only be used by the masterlooter
-  if ml_cmds[command] then
-    if self.lootMethod ~= 'master' then
-      sendchat("Master looting must be enabled.", from, 'whisper')
-      return
-    end
-    if self.masterLooterPartyID ~= 0 then
-      sendchat("That command must be sent to the master looter.", from, 'whisper')
-      return
-    end
-  end
-  
   if command == 'bid' then
-    self:Bid(arg1,from)
+    self:Bid(false,from,arg1)
   elseif command == 'balance' then
     self:WhisperBalance(from)
   elseif command == 'check' then
@@ -1544,7 +2728,7 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
   elseif command == 'lifetime' then
     self:WhisperLifetime(from)
   elseif command == 'transfer' then
-    self:WhisperTransfer(arg1,arg2,from)
+    self:Transfer(false,from,arg1,arg2)
   elseif command == 'help' then
 	  sendchat("Available Commands:", from, 'whisper')
 		sendchat("'$ balance' to check your current balance", from, 'whisper')
@@ -1554,12 +2738,6 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
 		sendchat("'$ bid X' (*) to enter a bid of X on the active auction", from, 'whisper')
 		sendchat("'$ transfer X Y' (*) to transfer X dkp to player Y", from, 'whisper')						
 		sendchat("* - these commands can only be sent to the master looter and only during a raid", from, 'whisper')
-  elseif command == 'tutorial' then
-    sendchat("I have many jobs here. I keep track of the raiders and their dkp. I announce loot to the raid and conduct auctions. When an auction ends, I award loot to the winner and distribute dkp to the raid.", from, 'whisper')
-		sendchat("Most of my functionality is automated, but users (like you) can interact with me by whispering commands to the master looter. If you are a new user, there are two commands that you should learn right away: '$ balance' and '$ bid X'.", from, 'whisper')
-		sendchat("'$ balance' will show you how much dkp you have available to spend. You can whisper this command to the master looter at any time. '$ bid X' will enter your bid of X dkp on the active auction.", from, 'whisper')
-		sendchat("Once I announce an auction to the raid, you have 30 seconds to enter your bid. If you make the highest bid, you will win the auction and pay whatever the second highest bid was. This is the Vickrey auction model.", from, 'whisper')
-		sendchat("You will start earning dkp immediately and, as far as I am concerned, you are free to start bidding on auctions right away. You can view a list of the other commands by whispering '$ help'.", from, 'whisper')
   else
     sendchat("Unrecognized command. Whisper '$ help' for a list of valid commands.", from, 'whisper')
   end
