@@ -1079,7 +1079,7 @@ function EminentDKP:LevelUpDisplayShow(frame)
     elseif frame.type == "AUCTION_WON" then
       table.insert(frame.unlockList,{ icon=select(10,GetItemInfo(self.notifyDetails.desc)),
                                       subIcon=SUBICON_TEXCOOR_ARROW,
-                                      text=string.format(L["has been won for %.0f DKP"],self.notifyDetails.src),
+                                      text=string.format(L["has been won for %d DKP"],self.notifyDetails.src),
                                       subText=select(2,GetItemInfo(self.notifyDetails.desc)),
                                       })
       frame.currSpell = 1
@@ -1421,7 +1421,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Decompress the decoded data
   local two, message = libC:Decompress(one)
   if not two then
-  	sendchat('Error occured while decoding a sync event: '..message,nil,'self')
+  	sendchat(L["Error occured while decoding a sync event:"] .. message,nil,'self')
   	return
   end
   
@@ -1432,7 +1432,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Deserialize the decompressed data
   local success, event = libS:Deserialize(data)
   if not success then
-    sendchat('Error occured while deserializing a sync event.',nil,'self')
+    sendchat(L["Error occured while deserializing a sync event."],nil,'self')
   	return
   end
   
@@ -2058,7 +2058,6 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
           self:CreatePurgeSyncEvent(name)
         elseif data.active then
           -- If deemed inactive then reset their DKP and vanity DKP
-          sendchat('The DKP for '..name..' has expired. Bounty has increased by '..self:StdNumber(data.currentDKP)..' DKP.', "raid", "preset")
           self:CreateExpirationSyncEvent(name)
         end
       end
@@ -2066,7 +2065,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
     if self:GetAvailableBountyPercent() > 50 then
       sendchat('There is more than 50% of the bounty available, you should distribute some.', nil, 'self')
     end
-    sendchat('Current bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', "raid", "preset")
+    sendchat(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
     self:GetActivePool().lastScan = time()
     self:SendNotification("scan",{ time=self:GetLastScan() })
     self:PrintStandings()
@@ -2120,7 +2119,7 @@ end
 -- Loot window closing means cancel auction
 function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
-    sendchat('Auction cancelled. All bids have been voided.', "raid", "preset")
+    sendchat(L["Auction cancelled. All bids have been voided."], "raid", "preset")
     self:SendNotification("auctioncancel",{ guid = self.bidItem.srcGUID, item = self.bidItem.itemString })
     auction_active = false
     self:CancelTimer(self.bidTimer)
@@ -2184,7 +2183,7 @@ function EminentDKP:Bid(addon,from,amount)
       if bid > 0 then
         if self:PlayerHasDKP(from,bid) then
           self.bidItem.bids[from] = bid
-          self:WhisperPlayer(addon,"bid",L["Your bid of %.0f has been accepted."]:format(bid), from, true)
+          self:WhisperPlayer(addon,"bid",L["Your bid of %d has been accepted."]:format(bid), from, true)
         else
           self:WhisperPlayer(addon,"bid",L["The DKP amount must not exceed your current DKP."], from)
         end
@@ -2255,42 +2254,42 @@ end
 function EminentDKP:PrintStandings()
   local a = self:GetStandings('currentDKP')
   
-  sendchat('Current DKP standings:', "raid", "preset")
+  sendchat(L["Current DKP standings:"], "raid", "preset")
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..self:StdNumber(data.dkp), "raid", "preset")
+    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), "raid", "preset")
   end
 end
 
 function EminentDKP:WhisperStandings(to)
   local a = self:GetStandings('currentDKP')
   
-  sendchat('Current DKP standings:', to, 'whisper')
+  sendchat(L["Current DKP standings:"], to, 'whisper')
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..self:StdNumber(data.dkp), to, 'whisper')
+    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), to, 'whisper')
   end
 end
 
 function EminentDKP:WhisperLifetime(to)
   local a = self:GetStandings('earnedDKP')
   
-  sendchat('Lifetime Earned DKP standings:', to, 'whisper')
+  sendchat(L["Lifetime Earned DKP standings:"], to, 'whisper')
   for rank,data in ipairs(a) do
-    sendchat(rank..'. '..data.n..' - '..self:StdNumber(data.dkp), to, 'whisper')
+    sendchat("%d. %s - %.02f":format(rank,data.n,data.dkp), to, 'whisper')
   end
 end
 
 function EminentDKP:WhisperBounty(to)
-  sendchat('The current bounty is '..self:StdNumber(self:GetAvailableBounty())..' DKP.', to, 'whisper')
+  sendchat(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()), to, 'whisper')
 end
 
 function EminentDKP:WhisperCheck(who, to)
   if self:PlayerExistsInPool(who) then
     local data = self:GetPlayerByName(who)
-    sendchat('Player Report for '..who, to, 'whisper')
-    sendchat('Current DKP: '..self:StdNumber(data.currentDKP), to, 'whisper')
-    sendchat('Lifetime DKP: '..self:StdNumber(data.earnedDKP), to, 'whisper')
-    sendchat('Vanity DKP: '..self:StdNumber(data.currentVanityDKP), to, 'whisper')
-    sendchat('Last Raid: '..GetDaysSince(data.lastRaid)..' day(s) ago.', to, 'whisper')
+    sendchat(L["Player Report for %s:"]:format(who), to, 'whisper')
+    sendchat(L["Current DKP:"].. ' '..self:StdNumber(data.currentDKP), to, 'whisper')
+    sendchat(L["Lifetime DKP:"].. ' '..self:StdNumber(data.earnedDKP), to, 'whisper')
+    sendchat(L["Vanity DKP:"].. ' '..self:StdNumber(data.currentVanityDKP), to, 'whisper')
+    sendchat(L["Last Raid: %d day(s) ago."]:format(GetDaysSince(data.lastRaid)), to, 'whisper')
   else
     sendchat(L["%s does not exist in the DKP pool."]:format(who), to, 'whisper')
   end
@@ -2413,8 +2412,8 @@ function EminentDKP:AuctionBidTimer()
       local dividend = (secondHighestBid/#(players))
       
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
-      sendchat(L["%s has won %s for %.0f DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid), "raid", "preset")
-      sendchat(L["Each player has received %.0f DKP."]:format(dividend), "raid", "preset")
+      sendchat(L["%s has won %s for %d DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid), "raid", "preset")
+      sendchat(L["Each player has received %d DKP."]:format(dividend), "raid", "preset")
       self:SendNotification("auctionwon",{ guid = self.bidItem.srcGUID, amount = secondHighestBid, receiver = looter, item = self.bidItem.itemString, slot = self.bidItem.slotNum })
     end
     
@@ -2461,7 +2460,7 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
       -- Announce bounty to the other addons
 	    self:SendNotification("bounty",{ amount = dividend })
       
-      sendchat(L["A bounty of %.02f has been awarded to %.0f players."]:format(amount,#(players)), "raid", "preset")
+      sendchat(L["A bounty of %.02f has been awarded to %d players."]:format(amount,#(players)), "raid", "preset")
       sendchat(L["Each player has received %.02f DKP."]:format(dividend), "raid", "preset")
       sendchat(L["The bounty pool is now %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
     else
@@ -2511,7 +2510,7 @@ function EminentDKP:AdminRename(from,to)
   if self:PlayerExistsInPool(from) then
     if self:PlayerExistsInPool(to) then
       if self:IsPlayerFresh(to) then
-        --self:CreateRenameSyncEvent(from,to)
+        self:CreateRenameSyncEvent(from,to)
         self:DisplayActionResult(L["Successfully renamed %s to %s."]:format(from,to))
       else
         self:DisplayActionResult(L["ERROR: %s is not a fresh player."]:format(to))
@@ -2622,7 +2621,7 @@ end
 function EminentDKP:ActuateNotification(notifyType,data)
   if notifyType == "accept" or notifyType == "reject" then
     if data.from == "transfer" then
-      self:DisplayActionResult(data.msg)
+      self:DisplayActionResult(data.message)
     elseif data.from == "bid" then
       -- todo: show message on auction frame
     end
@@ -2664,6 +2663,10 @@ function EminentDKP:ActuateNotification(notifyType,data)
 end
 
 function EminentDKP:SendCommand(...)
+  if not UnitInRaid("player") or not self.masterLooterName then
+    self:DisplayActionResult(L["ERROR: Must be in a raid with a masterlooter."])
+    return
+  end
   local cmd, arg1, arg2 = ...
   local tbl = {}
   table.insert(tbl,cmd)

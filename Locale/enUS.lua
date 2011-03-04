@@ -177,6 +177,7 @@ L["ERROR: %s does not exist in the DKP pool."] = "ERROR: %s does not exist in th
 L["ERROR: %s is not a fresh player."] = "ERROR: %s is not a fresh player."
 L["ERROR: Invalid bounty amount given."] = "ERROR: Invalid bounty amount given."
 L["ERROR: An auction must not be active."] = "ERROR: An auction must not be active."
+L["ERROR: Must be in a raid with a masterlooter."] = "ERROR: Must be in a raid with a masterlooter."
 
 L["Successfully renamed %s to %s."] = "Successfully renamed %s to %s."
 L["Successfully reset vanity DKP for %s."] = "Successfully reset vanity DKP for %s."
@@ -187,7 +188,7 @@ L["You have received a bounty of"] = "You have received a bounty of"
 L["You've won an auction for"] = "You've won an auction for"
 L["You Have Just"] = "You Have Just"
 L["Won An Auction"] = "Won An Auction"
-L["has been won for %.0f DKP"] = "has been won for %.0f DKP"
+L["has been won for %d DKP"] = "has been won for %d DKP"
 
 L["You must be the master looter to initiate an auction."] = "You must be the master looter to initiate an auction."
 L["You must be looting a corpse to start an auction."] = "You must be looting a corpse to start an auction."
@@ -204,18 +205,18 @@ L["No bids received. Disenchanting."] = "No bids received. Disenchanting."
 L["%s was not eligible to receive loot to disenchant."] = "%s was not eligible to receive loot to disenchant."
 L["A tie was broken with a random roll."] = "A tie was broken with a random roll."
 
-L["%s has won %s for %.0f DKP!"] = "%s has won %s for %.0f DKP!"
-L["Each player has received %.0f DKP."] = "Each player has received %.0f DKP."
+L["%s has won %s for %d DKP!"] = "%s has won %s for %d DKP!"
+L["Each player has received %d DKP."] = "Each player has received %d DKP."
 L["No more loot found."] = "No more loot found."
 
-L["A bounty of %.02f has been awarded to %.0f players."] = "A bounty of %.02f has been awarded to %.0f players."
+L["A bounty of %.02f has been awarded to %d players."] = "A bounty of %.02f has been awarded to %d players."
 L["Each player has received %.02f DKP."] = "Each player has received %.02f DKP."
 L["The bounty pool is now %.02f DKP."] = "The bounty pool is now %.02f DKP."
 
 L["There is no loot available to auction."] = "There is no loot available to auction."
 L["There is currently no auction active."] = "There is currently no auction active."
 L["You are not eligible to receive loot."] = "You are not eligible to receive loot."
-L["Your bid of %.0f has been accepted."] = "Your bid of %.0f has been accepted."
+L["Your bid of %d has been accepted."] = "Your bid of %d has been accepted."
 
 L["%s has transferred %.02f DKP to %s."] = "%s has transferred %.02f DKP to %s."
 L["%s just transferred %.02f DKP to you."] = "%s just transferred %.02f DKP to you."
@@ -223,5 +224,19 @@ L["Succesfully transferred %.02f DKP to %s."] = "Succesfully transferred %.02f D
 
 L["%s now up for auction! Auction ends in 30 seconds."] = "%s now up for auction! Auction ends in 30 seconds."
 L["Bids for %s"] = "Bids for %s"
-L["Won by %s (%.0f)"] = "Won by %s (%.0f)"
+L["Won by %s (%d)"] = "Won by %s (%d)"
 L["Auction cancelled"] = "Auction cancelled"
+
+L["Error occured while decoding a sync event:"] = "Error occured while decoding a sync event:"
+L["Error occured while deserializing a sync event."] = "Error occured while deserializing a sync event."
+
+L["Current bounty is %.02f DKP."] = "Current bounty is %.02f DKP."
+L["Auction cancelled. All bids have been voided."] = "Auction cancelled. All bids have been voided."
+L["Current DKP standings:"] = "Current DKP standings:"
+L["Lifetime Earned DKP standings:"] = "Lifetime Earned DKP standings:"
+
+L["Player Report for %s:"] = "Player Report for %s:"
+L["Current DKP:"] = "Current DKP:"
+L["Lifetime DKP:"] = "Lifetime DKP:"
+L["Vanity DKP:"] = "Vanity DKP:"
+L["Last Raid: %d day(s) ago."] = "Last Raid: %d day(s) ago."

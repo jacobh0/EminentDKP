@@ -188,7 +188,7 @@ local function VerifyBid(frame)
   elseif num_value > my_dkp then
     frame:SetText(tostring(my_dkp))
   else
-    frame:SetText(string.format("%.0f",value))
+    frame:SetText(string.format("%d",value))
   end
 end
 
@@ -429,7 +429,7 @@ function EminentDKP:ShowAuctionWinner(slot,name,amount)
     if frame.slot == slot then
       frame.bid:Hide()
       frame.bid.bidamt:Hide()
-      frame.winner:SetText(L["Won by %s (%.0f)"]:format(name,amount))
+      frame.winner:SetText(L["Won by %s (%d)"]:format(name,amount))
       frame.winner:Show()
       frame.status:Hide()
       frame.status.spark:Hide()

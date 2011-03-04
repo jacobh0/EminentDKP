@@ -141,7 +141,7 @@ local classModePrototype = {
   	  -- This is the "all-time" set, so use the actual pool
   	  for pid, player in pairs(EminentDKP:GetPlayerPool()) do
         -- Iterate through the player's relevant events and calculate data!
-        if tContains(classFilter[self:GetName()],player.class) then
+        if player.active and tContains(classFilter[self:GetName()],player.class) then
           set.modedata[self:GetName()].currentDKP = set.modedata[self:GetName()].currentDKP + player.currentDKP
           set.modedata[self:GetName()].earnedDKP = set.modedata[self:GetName()].earnedDKP + player.earnedDKP
         end
@@ -181,7 +181,7 @@ local classModePrototype = {
     
   	for pid, player in pairs(get_players(set)) do
   	  local class = (player.class and player.class or EminentDKP:GetPlayerClassByID(player.id))
-  		if tContains(classFilter[self:GetName()],class) then
+  		if tContains(classFilter[self:GetName()],class) and (player.active == nil or player.active) then
   		  local earned = player.earnedDKP or player.modedata.earnedDKP
   		  -- Only show people who have had any activity in the system...
   		  if earned > 0 then
