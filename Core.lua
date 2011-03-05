@@ -23,8 +23,8 @@ TODO:
 
 1. Organize meter display code and move to GUI.lua
 2. Revamp version system
-3. Bounty bar?
-4. Vanity rolls?
+3. Bounty bar? (have to modify SpecializedLibBars)
+4. Vanity rolls? (custom view mode)
 
 ]]
 
@@ -2219,7 +2219,7 @@ end
 function EminentDKP:Bid(addon,from,amount)
   if auction_active then
     if eligible_looters[from] then
-      local bid = math.floor(tonumber(amount))
+      local bid = math.floor(tonumber(amount) or 0)
       if bid > 0 then
         if self:PlayerHasDKP(from,bid) then
           self.bidItem.bids[from] = bid
@@ -2244,7 +2244,7 @@ function EminentDKP:Transfer(addon,from,amount,to)
     if to ~= from then
       if self:PlayerExistsInPool(from) then
         if self:PlayerExistsInPool(to) then
-          local dkp = tonumber(amount)
+          local dkp = tonumber(amount) or 0
           if dkp > 0 then
             if self:PlayerHasDKP(from,dkp) then
               self:CreateTransferSyncEvent(from,to,dkp)

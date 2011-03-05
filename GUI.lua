@@ -423,67 +423,61 @@ function EminentDKP:ShowAuctionItems(guid)
   auction_guid = guid
 end
 
--- Cancel the auction for a specified slots
-function EminentDKP:CancelAuction(slot)
+local function GetItemFrameBySlot(slot)
   for i, frame in ipairs(item_frames) do
     if frame.slot == slot then
-      frame.status:SetValue(-1)
-      frame.winner:SetText(L["Auction cancelled"])
-      frame.winner:Show()
-      return
+      return frame
     end
   end
+  return nil
+end
+
+local function HideBidApparatus(frame)
+  frame.bid:Hide()
+  frame.bid.bidamt:Hide()
+  frame.status:Hide()
+  frame.status.spark:Hide()
+end
+
+-- Cancel the auction for a specified slots
+function EminentDKP:CancelAuction(slot)
+  local frame = GetItemFrameBySlot(slot)
+  HideBidApparatus(frame)
+  frame.winner:SetText(L["Auction cancelled"])
+  frame.winner:Show()
 end
 
 -- Start the timer and show bid box/button for an item
 function EminentDKP:StartAuction(slot,start)
-  for i, frame in ipairs(item_frames) do
-    if frame.slot == slot then
-      frame.bid:Show()
-      frame.bid.bidamt:SetBackdropBorderColor(0,0,0,1)
-      frame.bid.bidamt:Show()
-      frame.time = start + 30
-      frame.status:SetMinMaxValues(0, 30)
-      frame.status:SetValue(30)
-      frame.status:Show()
-      frame.status.spark:Show()
-      frame.winner:Hide()
-      return
-    end
-  end
+  local frame = GetItemFrameBySlot(slot)
+  frame.bid:Show()
+  frame.bid.bidamt:SetBackdropBorderColor(0,0,0,1)
+  frame.bid.bidamt:Show()
+  frame.time = start + 30
+  frame.status:SetMinMaxValues(0, 30)
+  frame.status:SetValue(30)
+  frame.status:Show()
+  frame.status.spark:Show()
+  frame.winner:Hide()
 end
 
 function EminentDKP:ShowAuctionDisenchant(slot)
-  for i, frame in ipairs(item_frames) do
-    if frame.slot == slot then
-      frame.bid:Hide()
-      frame.bid.bidamt:Hide()
-      frame.winner:SetText(L["Disenchanted"])
-      frame.winner:Show()
-      frame.status:Hide()
-      frame.status.spark:Hide()
-      return
-    end
-  end
+  local frame = GetItemFrameBySlot(slot)
+  HideBidApparatus(frame)
+  frame.winner:SetText(L["Disenchanted"])
+  frame.winner:Show()
 end
 
 -- Label an item with a winner
 function EminentDKP:ShowAuctionWinner(slot,name,amount,tie)
-  for i, frame in ipairs(item_frames) do
-    if frame.slot == slot then
-      frame.bid:Hide()
-      frame.bid.bidamt:Hide()
-      if tie then
-        frame.winner:SetText(L["Tie won by %s (%d)"]:format(name,amount))
-      else
-        frame.winner:SetText(L["Won by %s (%d)"]:format(name,amount))
-      end
-      frame.winner:Show()
-      frame.status:Hide()
-      frame.status.spark:Hide()
-      return
-    end
+  local frame = GetItemFrameBySlot(slot)
+  HideBidApparatus(frame)
+  if tie then
+    frame.winner:SetText(L["Tie won by %s (%d)"]:format(name,amount))
+  else
+    frame.winner:SetText(L["Won by %s (%d)"]:format(name,amount))
   end
+  frame.winner:Show()
 end
 
 -- Cleanup and recycle all the frames for re-use later (saves memory)
@@ -494,11 +488,8 @@ function EminentDKP:RecycleAuctionItems()
     frame.time = nil
     frame.bid.bidamt:SetText("")
     frame.winner:SetText("")
-    frame.bid:Hide()
-    frame.bid.bidamt:Hide()
+    HideBidApparatus(frame)
     frame.winner:Hide()
-    frame.status:Hide()
-    frame.status.spark:Hide()
     table.insert(recycled_item_frames,frame)
     frame:Hide()
   end
