@@ -24,12 +24,11 @@ local classFilter = {
                          "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" },
 }
 
+local green = {r = 0, g = 255, b = 0, a = 1}
+local red = {r = 255, g = 0, b = 0, a = 1}
+
 local balanceMode = EminentDKP:NewModule(L["Earnings & Deductions"])
 local itemMode = EminentDKP:NewModule(L["Items Won"])
-
-local function Debug(message)
-  EminentDKP:Print(message)
-end
 
 local function item_tooltip(win, id, label, tooltip)
   tooltip:SetHyperlink(label)
@@ -84,6 +83,7 @@ local function GetPlayers(set)
   return set.players
 end
 
+-- Get relevant events from a set
 local function GetEvents(set, typefilter)
   local event_list = {}
   if set.sortnum == 1 then
@@ -110,6 +110,7 @@ local function GetEvents(set, typefilter)
   return event_list
 end
 
+-- Group events based on a given attribute
 local function GetEventGroups(events, groupby)
   local group_list = {}
   for i,eid in ipairs(events) do
@@ -406,14 +407,6 @@ function balanceMode:Enter(win, id, label)
 	self.title = label..L["'s Earnings & Deductions"]
 end
 
-function itemMode:Enter(win, id, label)
-  self.playerid = id
-	self.title = L["Items won by"].." "..label
-end
-
-local green = {r = 0, g = 255, b = 0, a = 1}
-local red = {r = 255, g = 0, b = 0, a = 1}
-
 function balanceMode:PopulateData(win, set) 
   local player = FindPlayer(set,self.playerid)
   local playerData = (player.currentDKP and player or EminentDKP:GetPlayerByID(self.playerid))
@@ -454,6 +447,11 @@ function balanceMode:PopulateData(win, set)
     end
   end
   win.metadata.maxvalue = max
+end
+
+function itemMode:Enter(win, id, label)
+  self.playerid = id
+	self.title = L["Items won by"].." "..label
 end
 
 function itemMode:PopulateData(win, set) 
