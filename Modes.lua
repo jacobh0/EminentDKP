@@ -24,8 +24,8 @@ local classFilter = {
                          "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" },
 }
 
-local balancemode = EminentDKP:NewModule(L["Earnings & Deductions"])
-local itemmode = EminentDKP:NewModule(L["Items Won"])
+local balanceMode = EminentDKP:NewModule(L["Earnings & Deductions"])
+local itemMode = EminentDKP:NewModule(L["Items Won"])
 
 local function Debug(message)
   EminentDKP:Print(message)
@@ -84,7 +84,7 @@ local function GetPlayers(set)
   return set.players
 end
 
-local function GetEvents(set, typefilter, ...)
+local function GetEvents(set, typefilter)
   local event_list = {}
   if set.sortnum == 1 then
     -- This is the "all-time" set, so use the actual pool
@@ -93,7 +93,7 @@ local function GetEvents(set, typefilter, ...)
     while eventid > 0 and eventcount < EminentDKP.db.profile.maxmodeevents do
       local eid = tostring(eventid)
       local e = EminentDKP:GetEvent(eid)
-      if typefilter(e,...) then
+      if typefilter(e,eid) then
         eventcount = eventcount + 1
         table.insert(event_list,eid)
       end
@@ -102,7 +102,7 @@ local function GetEvents(set, typefilter, ...)
   else
     for i, eid in ipairs(set.events) do
       local e = EminentDKP:GetEvent(eid)
-      if typefilter(e,...) then
+      if typefilter(e,eid) then
         table.insert(event_list,eid)
       end
     end
@@ -134,7 +134,7 @@ local function GetPlayerEvents(set, playerid, typefilter)
     while eventid > 0 and eventcount < EminentDKP.db.profile.maxplayerevents do
       local eid = tostring(eventid)
       local e = EminentDKP:GetEvent(eid)
-      if typefilter(e,playerid) then
+      if typefilter(e,eid,player,playerid) then
         eventcount = eventcount + 1
         table.insert(event_list,eid)
       end
@@ -143,7 +143,7 @@ local function GetPlayerEvents(set, playerid, typefilter)
   else
     for i, eid in ipairs(set.events) do
       local e = EminentDKP:GetEvent(eid)
-      if typefilter(e,playerid) then
+      if typefilter(e,eid,player,playerid) then
         table.insert(event_list,eid)
       end
     end
@@ -151,27 +151,32 @@ local function GetPlayerEvents(set, playerid, typefilter)
   return event_list
 end
 
-local function event_filter_balance(event,pid)
-  return (event.eventType ~= "vanityreset" and event.eventType ~= "rename")
+local function player_event_filter_balance(event,eventid,player,playerid)
+  if event.eventType ~= "vanityreset" and event.eventType ~= "rename" then
+    if player.earnings[eventid] or player.deductions[eventid] then
+      return true
+    end
+  end
+  return false
 end
 
-local function event_filter_auction_won(event,pid)
-  return (event.eventType == "auction" and event.target == pid)
+local function player_event_filter_auction_target(event,eventid,player,playerid)
+  return (event.eventType == "auction" and event.target == playerid)
 end
 
-local function event_filter_auction(event)
+local function event_filter_auction(event,eventid)
   return (event.eventType == "auction")
 end
 
-local function event_filter_auction_source(event,source)
+local function custom_filter_auction_source(event,source)
   return (event.eventType == "auction" and event.source == source)
 end
 
 local classModePrototype = {
   OnEnable = function(self) 
-    self.metadata	        = {showspots = true, ordersort = true, click1 = itemmode, click2 = balancemode, columns = { DKP = true, Percent = true }}
-  	balancemode.metadata	= {showspots = false, ordersort = true, columns = { DKP = true, Source = true, Time = true }}
-  	itemmode.metadata   	= {showspots = false, ordersort = true, tooltip = item_tooltip, click = linkitem, columns = { DKP = true }}
+    self.metadata	        = {showspots = true, ordersort = true, click1 = itemMode, click2 = balanceMode, columns = { DKP = true, Percent = true }}
+  	balanceMode.metadata	= {showspots = false, ordersort = true, columns = { DKP = true, Source = true, Time = true }}
+  	itemMode.metadata   	= {showspots = false, ordersort = true, tooltip = item_tooltip, click = linkitem, columns = { DKP = true }}
     
   	EminentDKP:AddMode(self)
   end,
@@ -376,7 +381,7 @@ function winnerMode:PopulateData(win, set)
   
   for i, eid in ipairs(set.events) do
     local event = EminentDKP:GetEvent(eid)
-    if event_filter_auction_source(event,self.creaturesource) then
+    if custom_filter_auction_source(event,self.creaturesource) then
       local d = win.dataset[nr] or {}
   		win.dataset[nr] = d
   		d.id = eid
@@ -396,12 +401,12 @@ function winnerMode:PopulateData(win, set)
   win.metadata.maxvalue = max
 end
 
-function balancemode:Enter(win, id, label)
+function balanceMode:Enter(win, id, label)
   self.playerid = id
 	self.title = label..L["'s Earnings & Deductions"]
 end
 
-function itemmode:Enter(win, id, label)
+function itemMode:Enter(win, id, label)
   self.playerid = id
 	self.title = L["Items won by"].." "..label
 end
@@ -409,13 +414,13 @@ end
 local green = {r = 0, g = 255, b = 0, a = 1}
 local red = {r = 255, g = 0, b = 0, a = 1}
 
-function balancemode:PopulateData(win, set) 
+function balanceMode:PopulateData(win, set) 
   local player = FindPlayer(set,self.playerid)
   local playerData = (player.currentDKP and player or EminentDKP:GetPlayerByID(self.playerid))
   local nr = 1
   local max = 0
   
-  for i, eid in ipairs(GetPlayerEvents(set,self.playerid,event_filter_balance)) do
+  for i, eid in ipairs(GetPlayerEvents(set,self.playerid,player_event_filter_balance)) do
     local event = EminentDKP:GetEvent(eid)
     local debits = {}
     debits.e = playerData.earnings[eid]
@@ -451,12 +456,12 @@ function balancemode:PopulateData(win, set)
   win.metadata.maxvalue = max
 end
 
-function itemmode:PopulateData(win, set) 
+function itemMode:PopulateData(win, set) 
   local player = FindPlayer(set,self.playerid)
   local nr = 1
   local max = 0
   
-  for i, eid in ipairs(GetPlayerEvents(set,self.playerid,event_filter_auction_won)) do
+  for i, eid in ipairs(GetPlayerEvents(set,self.playerid,player_event_filter_auction_target)) do
     local event = EminentDKP:GetEvent(eid)
     local d = win.dataset[nr] or {}
 		win.dataset[nr] = d
