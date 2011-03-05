@@ -16,6 +16,10 @@ local classFilter = {
   [L["Conqueror"]] = { "PALADIN", "PRIEST", "WARLOCK" },
   [L["Vanquisher"]] = { "DEATHKNIGHT", "DRUID", "MAGE", "ROGUE" },
   [L["Protector"]] = { "HUNTER", "SHAMAN", "WARRIOR" },
+  [L["Cloth"]] = { "MAGE", "PRIEST", "WARLOCK" },
+  [L["Leather"]] = { "DRUID", "ROGUE" },
+  [L["Mail"]] = { "HUNTER", "SHAMAN" },
+  [L["Plate"]] = { "DEATHKNIGHT", "PALADIN", "WARRIOR" },
   [L["All Classes"]] = { "DEATHKNIGHT", "DRUID", "HUNTER", "MAGE", "PALADIN", 
                          "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" },
 }
@@ -197,7 +201,7 @@ local classModePrototype = {
     			  showpercent = false
   			  end
     			d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
-    			                              EminentDKP:StdNumber((d.value / set.modedata[self:GetName()].currentDKP) * 100), showpercent)
+    			                              EminentDKP:StdNumber((d.value / set.modedata[self:GetName()].currentDKP) * 100).."%", showpercent)
     			if d.value > max then
     				max = d.value
     			end
@@ -233,21 +237,27 @@ local rogueMode = EminentDKP:NewModule(L["Rogue"],classModePrototype)
 local shamanMode = EminentDKP:NewModule(L["Shaman"],classModePrototype)
 local warlockMode = EminentDKP:NewModule(L["Warlock"],classModePrototype)
 local warriorMode = EminentDKP:NewModule(L["Warrior"],classModePrototype)
-deathknightMode.sortnum = 3
-druidMode.sortnum = 3
-hunterMode.sortnum = 3
-mageMode.sortnum = 3
-paladinMode.sortnum = 3
-priestMode.sortnum = 3
-rogueMode.sortnum = 3
-shamanMode.sortnum = 3
-warlockMode.sortnum = 3
-warriorMode.sortnum = 3
+deathknightMode.sortnum = 6
+druidMode.sortnum = 6
+hunterMode.sortnum = 6
+mageMode.sortnum = 6
+paladinMode.sortnum = 6
+priestMode.sortnum = 6
+rogueMode.sortnum = 6
+shamanMode.sortnum = 6
+warlockMode.sortnum = 6
+warriorMode.sortnum = 6
+
+local clothMode = EminentDKP:NewModule(L["Cloth"],classModePrototype)
+local leatherMode = EminentDKP:NewModule(L["Leather"],classModePrototype)
+local mailMode = EminentDKP:NewModule(L["Mail"],classModePrototype)
+local plateMode = EminentDKP:NewModule(L["Plate"],classModePrototype)
+clothMode.sortnum, leatherMode.sortnum, mailMode.sortnum, plateMode.sortnum = 3, 3, 3, 3
 
 local conqMode = EminentDKP:NewModule(L["Conqueror"],classModePrototype)
 local vanqMode = EminentDKP:NewModule(L["Vanquisher"],classModePrototype)
 local protMode = EminentDKP:NewModule(L["Protector"],classModePrototype)
-conqMode.sortnum, vanqMode.sortnum, protMode.sortnum = 2, 2, 2
+conqMode.sortnum, vanqMode.sortnum, protMode.sortnum = 4, 4, 4
 
 local allMode = EminentDKP:NewModule(L["All Classes"],classModePrototype)
 allMode.sortnum = 1
