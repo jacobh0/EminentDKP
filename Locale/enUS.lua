@@ -13,6 +13,8 @@ L["Earnings & Deductions"] = "Earnings & Deductions"
 L["'s Earnings & Deductions"] = "'s Earnings & Deductions"
 L["Items Won"] = "Items Won"
 L["Items won by"] = "Items won by"
+L["Auction Winners"] = "Auction Winners"
+L["'s Auctions"] = "'s Auctions"
 
 L["All Classes"] = "All Classes"
 L["Death Knight"] = "Death Knight"
@@ -32,10 +34,14 @@ L["Cloth"] = "Cloth"
 L["Leather"] = "Leather"
 L["Mail"] = "Mail"
 L["Plate"] = "Plate"
+L["Auctions"] = "Auctions"
 
+-- Mode columns
 L["Percent"] = "Percent"
 L["DKP"] = "DKP"
 L["Source"] = "Source"
+L["Count"] = "Count"
+L["Receiver"] = "Receiver"
 L["Time"] = "Time"
 
 -- Options
@@ -70,8 +76,11 @@ L["Show rank numbers"] = "Show rank numbers"
 L["Shows numbers for relative ranks for modes where it is applicable."] = "Shows numbers for relative ranks for modes where it is applicable."
 L["Days to show"] = "Days to show"
 L["The number of days prior to today to show in the day listing."] = "The number of days prior to today to show in the day listing."
-L["Maximum Events"] = "Maximum Events"
+L["Maximum Mode Events"] = "Maximum Mode Events"
+L["The maximum number of events to include for certain modes."] = "The maximum number of events to include for certain modes."
+L["Maximum Player Events"] = "Maximum Player Events"
 L["The maximum number of events to show for a specific player."] = "The maximum number of events to show for a specific player."
+
 L["Hide Raid Messages"] = "Hide Raid Messages"
 L["Prevents raid messages sent by EminentDKP from being shown."] = "Prevents raid messages sent by EminentDKP from being shown."
 
