@@ -23,8 +23,8 @@ TODO:
 
 1. Organize meter display code and move to GUI.lua
 2. Convert all static messages into localized messages
-3. Investigate bar recycling (specifically when wiping the window, etc)
-4. Revamp version system
+3. Revamp version system
+4. Bounty bar?
 5. Vanity rolls?
 
 ]]
@@ -47,6 +47,7 @@ local recent_loots = {}
 local eligible_looters = {}
 
 local events_cache = {}
+local synced_dates = {}
 
 local lastContainerName = nil
 
@@ -615,6 +616,7 @@ function EminentDKP:ReloadWindows()
 	end
 end
 
+-- Reload all the "days" on the meter display
 function EminentDKP:ReloadSets(updatedisplays)
   sets = self:GetMeterSets()
   wipe(sets)
@@ -659,6 +661,20 @@ function EminentDKP:ReloadSets(updatedisplays)
   if updatedisplays then
     self:UpdateAllDisplays()
   end
+end
+
+-- Only update the sets that have changed in the last sync
+function EminentDKP:UpdateSyncedDays()
+  for date,b in pairs(synced_dates) do
+    if sets[date] then
+      sets[date].changed = true
+    elseif sets.today.date == date then
+      sets.today.changed = true
+    end
+  end
+  sets.alltime.changed = true
+  wipe(synced_dates)
+  self:VerifyAllSets()
 end
 
 -- For a set, give each mode a chance to calculate the data they need
@@ -1396,7 +1412,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
     end
   end
   
-  -- If they login during an auction, and are eligible, notify them appropriately
+  -- If they load during an auction, and are eligible, notify them appropriately
   if welcome and welcome == "Hello" then
     if self:AmMasterLooter() and self.bidItem and eligible_looters[sender] then
       -- Send them the loot
@@ -1486,6 +1502,7 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   
   local next_eventID = tostring(tonumber(eventID) + 1)
   events_cache[eventID] = nil
+  synced_dates[GetDate(event.datetime)] = true
   
   if events_cache[next_eventID] then
     -- We have the next event we need to proceed with updating...
@@ -1495,9 +1512,9 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     -- Give 3 seconds before we request missing events
     -- This gives time to receive more events that are already being synced
     self.syncTimer = self:ScheduleTimer("RequestMissingEvents", 3, false)
-    self:ReloadSets(true)
+    self:UpdateSyncedDays()
   else
-    self:ReloadSets(true)
+    self:UpdateSyncedDays()
   end
 end
 
