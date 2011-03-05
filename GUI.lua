@@ -453,6 +453,20 @@ function EminentDKP:StartAuction(slot,start)
   end
 end
 
+function EminentDKP:ShowAuctionDisenchant(slot)
+  for i, frame in ipairs(item_frames) do
+    if frame.slot == slot then
+      frame.bid:Hide()
+      frame.bid.bidamt:Hide()
+      frame.winner:SetText(L["Disenchanted"])
+      frame.winner:Show()
+      frame.status:Hide()
+      frame.status.spark:Hide()
+      return
+    end
+  end
+end
+
 -- Label an item with a winner
 function EminentDKP:ShowAuctionWinner(slot,name,amount,tie)
   for i, frame in ipairs(item_frames) do

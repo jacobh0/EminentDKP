@@ -1995,9 +1995,11 @@ function EminentDKP:CreateEvent(src,etype,extra,t,b,val,dtime)
   }
   
   -- Update newest_version (since it may be out of date now)
-  local old_newest_version = self:GetNewestVersion()
-  newest_version = ""
-  UpdateNewestVersion(old_newest_version)
+  if newest_version ~= "" then
+    local old_newest_version = self:GetNewestVersion()
+    newest_version = ""
+    UpdateNewestVersion(old_newest_version)
+  end
   
   return cid
 end
@@ -2188,7 +2190,7 @@ function EminentDKP:LOOT_OPENED()
 			end
 			
 			if #(eligible_items) > 0 then
-  			sendchat('Loot from '.. unitName ..':',"raid", "preset")
+  			sendchat(L["Loot from %s:"]:format(unitName),"raid", "preset")
 			  for i,loot in ipairs(eligible_items) do
 			    sendchat(loot,"raid", "preset")
 		    end
@@ -2415,6 +2417,7 @@ function EminentDKP:AuctionBidTimer()
       else
         sendchat(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter), nil, 'self')
       end
+      self:SendNotification("auctiondisenchant",{ slot = self.bidItem.slotNum })
     else
       local bids = 0
       local secondHighestBid = 0
@@ -2470,9 +2473,9 @@ function EminentDKP:AuctionBidTimer()
     if #(recent_loots[guid].slots) > 0 then
       self:AdminStartAuction()
     else
-      self.bidItem = nil
       sendchat(L["No more loot found."], "raid", "preset")
       self:SendNotification("lootdone",{ guid = self.bidItem.srcGUID })
+      self.bidItem = nil
     end
   else
     local timeLeft = (30 - self.bidItem.elapsed)
@@ -2703,6 +2706,9 @@ function EminentDKP:ActuateNotification(notifyType,data)
     if data.receiver == self.myName then
       self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
     end
+  elseif notifyType == "auctiondisenchant" then
+    self:ShowAuctionItems(data.guid)
+    self:ShowAuctionDisenchant(data.slot)
   elseif notifyType == "lootdone" then
     self:RecycleAuctionItems()
   elseif notifyType == "scan" then

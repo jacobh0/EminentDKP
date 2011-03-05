@@ -226,7 +226,9 @@ L["%s now up for auction! Auction ends in 30 seconds."] = "%s now up for auction
 L["Bids for %s"] = "Bids for %s"
 L["Tie won by %s (%d)"] = "Tie won by %s (%d)"
 L["Won by %s (%d)"] = "Won by %s (%d)"
+L["Disenchanted"] = "Disenchanted"
 L["Auction cancelled"] = "Auction cancelled"
+L["Loot from %s:"] = "Loot from %s:"
 
 L["Error occured while decoding a sync event:"] = "Error occured while decoding a sync event:"
 L["Error occured while deserializing a sync event."] = "Error occured while deserializing a sync event."
