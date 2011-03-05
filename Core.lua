@@ -22,10 +22,9 @@ end
 TODO:
 
 1. Organize meter display code and move to GUI.lua
-2. Convert all static messages into localized messages
-3. Revamp version system
-4. Bounty bar?
-5. Vanity rolls?
+2. Revamp version system
+3. Bounty bar?
+4. Vanity rolls?
 
 ]]
 
@@ -1101,7 +1100,7 @@ function EminentDKP:LevelUpDisplayShow(frame)
     elseif frame.type == "AUCTION_WON" then
       table.insert(frame.unlockList,{ icon=select(10,GetItemInfo(self.notifyDetails.desc)),
                                       subIcon=SUBICON_TEXCOOR_ARROW,
-                                      text=string.format(L["has been won for %d DKP"],self.notifyDetails.src),
+                                      text=string.format(L["has been acquired for %d DKP"],self.notifyDetails.src),
                                       subText=select(2,GetItemInfo(self.notifyDetails.desc)),
                                       })
       frame.currSpell = 1
@@ -1443,7 +1442,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Decompress the decoded data
   local two, message = libC:Decompress(one)
   if not two then
-  	sendchat(L["Error occured while decoding a sync event:"] .. message,nil,'self')
+  	sendchat("Error occured while decoding a sync event:" .. message,nil,'self')
   	return
   end
   
@@ -1454,7 +1453,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Deserialize the decompressed data
   local success, event = libS:Deserialize(data)
   if not success then
-    sendchat(L["Error occured while deserializing a sync event."],nil,'self')
+    sendchat("Error occured while deserializing a sync event.",nil,'self')
   	return
   end
   
@@ -2074,7 +2073,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
   if not self:AmMasterLooter() then return end
   
   if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) > 0 then
-    sendchat('Performing database scan...', nil, 'self')
+    sendchat(L["Performing database scan..."], nil, 'self')
     for pid,data in pairs(self:GetActivePool().players) do
       if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
         local name = self:GetPlayerNameByID(pid)
@@ -2088,7 +2087,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
       end
     end
     if self:GetAvailableBountyPercent() > 50 then
-      sendchat('There is more than 50% of the bounty available, you should distribute some.', nil, 'self')
+      sendchat(L["There is more than 50% of the bounty available. You should distribute some."], nil, 'self')
     end
     sendchat(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
     self:GetActivePool().lastScan = time()
@@ -2537,9 +2536,9 @@ function EminentDKP:AdminVanityRoll()
 	  end
 	  table.sort(ranks, function(a,b) return a.r>b.r end)
 	  
-	  sendchat('Vanity item rolls weighted by current vanity DKP:', "raid", "preset")
+	  sendchat(L["Vanity item rolls weighted by current vanity DKP:"], "raid", "preset")
 	  for rank,data in ipairs(ranks) do
-	    sendchat(rank..'. '..data.n..' ('..tostring(data.v)..') - '..tostring(data.r)..'.', "raid", "preset")
+	    sendchat(("%d. %s (%.02f) - %.02f"):format(rank,data.n,data.v,data.r), "raid", "preset")
     end
   else
     self:DisplayActionResult(L["ERROR: An auction must not be active."])
@@ -2581,26 +2580,6 @@ function EminentDKP:DisplayActionResult(status)
 end
 
 ------------- END ADMIN FUNCTIONS -------------
-
--- Handle slash commands
-function EminentDKP:ProcessSlashCmd(input)
-  local command, arg1, arg2, e = self:GetArgs(input, 3)
-  
-  if command == 'auction' then
-    self:AdminStartAuction()
-  elseif command == 'version' then
-    local say_what = "Current version is "..self:GetVersion()
-    if self:GetNewestVersion() ~= self:GetVersion() then
-      say_what = say_what .. " (latest is "..self:GetNewestVersion()..")"
-    end
-    sendchat(say_what, nil, 'self')
-  elseif command == 'admin' then
-    sendchat("Admin Commands:", nil, 'self')
-		sendchat("'/edkp auction' to begin an auction (must be looting)", nil, 'self')
-	else
-	  sendchat("Unrecognized command. Type '/edkp admin' for a list of valid commands.", nil, 'self')
-  end
-end
 
 function EminentDKP:CHAT_MSG_RAID_CONTROLLER(eventController, message, from, ...)
   -- Ensure all correspondence from the addon is hidden (option)
@@ -2740,6 +2719,21 @@ function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
   end
 end
 
+-- Handle slash commands
+function EminentDKP:ProcessSlashCmd(input)
+  local command, arg1, arg2, e = self:GetArgs(input, 3)
+  
+  if command == 'auction' then
+    self:AdminStartAuction()
+  elseif command == 'version' then
+    local say_what = "Current version is "..self:GetVersion()
+    if self:GetNewestVersion() ~= self:GetVersion() then
+      say_what = say_what .. " (latest is "..self:GetNewestVersion()..")"
+    end
+    sendchat(say_what, nil, 'self')
+  end
+end
+
 function EminentDKP:CHAT_MSG_WHISPER(message, from)
   -- Only interpret messages starting with $
   local a, command, arg1, arg2 = strsplit(" ", message, 4)
@@ -2762,15 +2756,15 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
   elseif command == 'transfer' then
     self:Transfer(false,from,arg1,arg2)
   elseif command == 'help' then
-	  sendchat("Available Commands:", from, 'whisper')
-		sendchat("'$ balance' to check your current balance", from, 'whisper')
-		sendchat("'$ check X' to check the current balance of player X", from, 'whisper')						
-		sendchat("'$ standings' to display the current dkp standings", from, 'whisper')
-		sendchat("'$ lifetime' to display the lifetime earned dkp standings", from, 'whisper')
-		sendchat("'$ bid X' (*) to enter a bid of X on the active auction", from, 'whisper')
-		sendchat("'$ transfer X Y' (*) to transfer X dkp to player Y", from, 'whisper')						
-		sendchat("* - these commands can only be sent to the master looter and only during a raid", from, 'whisper')
+	  sendchat(L["Available Commands:"], from, 'whisper')
+		sendchat("$ balance -- " .. L["Check your current balance"], from, 'whisper')
+		sendchat("$ check X -- " .. L["Check the current balance of player X"], from, 'whisper')						
+		sendchat("$ standings -- " .. L["Display the current dkp standings"], from, 'whisper')
+		sendchat("$ lifetime -- " .. L["Display the lifetime earned dkp standings"], from, 'whisper')
+		sendchat("$ bid X -- " .. L["Place a bid of X DKP on the active auction"] .. " **", from, 'whisper')
+		sendchat("$ transfer X Y -- " .. L["Transfer X DKP to player Y"] .. " **", from, 'whisper')						
+		sendchat("** " .. L["These commands can only be sent to the master looter and only during a raid"], from, 'whisper')
   else
-    sendchat("Unrecognized command. Whisper '$ help' for a list of valid commands.", from, 'whisper')
+    sendchat(L["Unrecognized command. Whisper %s for a list of valid commands."]:format("'$ help'"), from, 'whisper')
   end
 end
