@@ -587,7 +587,11 @@ EminentDKP.options = {
           max= 40,
           step= 1,
           get= function() return EminentDKP.db.profile.maxplayerevents end,
-          set= function(self, val) EminentDKP.db.profile.maxplayerevents = val end,
+          set= function(self, val)
+            EminentDKP.db.profile.maxplayerevents = val
+            EminentDKP:CancelTimer(EminentDKP.setHistoryTimer, true)
+            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("ReloadSets",1,true)
+          end,
           order= 10,
 				},
 				maxmodeevents = {
@@ -598,7 +602,11 @@ EminentDKP.options = {
           max= 120,
           step= 1,
           get= function() return EminentDKP.db.profile.maxmodeevents end,
-          set= function(self, val) EminentDKP.db.profile.maxmodeevents = val end,
+          set= function(self, val)
+            EminentDKP.db.profile.maxmodeevents = val
+            EminentDKP:CancelTimer(EminentDKP.setHistoryTimer, true)
+            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("ReloadSets",1,true)
+          end,
           order= 11,
 				},
 				hideraidmessages = {
