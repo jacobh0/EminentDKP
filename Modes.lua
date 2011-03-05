@@ -350,7 +350,7 @@ end
 
 function auctionMode:OnEnable()
   self.metadata	      = {showspots = false, ordersort = true, sortfunc = label_sort, click1 = winnerMode, columns = { Count = true }}
-  winnerMode.metadata = {showspots = false, ordersort = true, tooltip = item_tooltip, click = linkitem, columns = { DKP = true, Receiver = true }}
+  winnerMode.metadata = {showspots = false, ordersort = true, tooltip = item_tooltip, click = linkitem, columns = { DKP = true, Winner = true }}
   
 	EminentDKP:AddMode(self)
 end
@@ -384,7 +384,7 @@ function winnerMode:PopulateData(win, set)
   		d.label = select(2, GetItemInfo(event.extraInfo)) or "(Querying Item)"
   		d.value = event.value
   		d.valuetext = FormatValueText(event.value, self.metadata.columns.DKP,
-  		                              EminentDKP:GetPlayerNameByID(event.target), self.metadata.columns.Receiver)
+  		                              EminentDKP:GetPlayerNameByID(event.target), self.metadata.columns.Winner)
   		d.icon = select(10, GetItemInfo(event.extraInfo))
 		
   		if d.value > max then

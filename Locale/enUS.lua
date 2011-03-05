@@ -41,7 +41,7 @@ L["Percent"] = "Percent"
 L["DKP"] = "DKP"
 L["Source"] = "Source"
 L["Count"] = "Count"
-L["Receiver"] = "Receiver"
+L["Winner"] = "Winner"
 L["Time"] = "Time"
 
 -- Options
