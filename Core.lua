@@ -722,12 +722,11 @@ end
 
 -- Update a given window's display
 function EminentDKP:UpdateDisplay(win)
-  win:Wipe()
 	if win.selectedmode then
 		local set = win:get_selected_set()
 		
 		-- Inform window that a data update will take place.
-		--win:UpdateInProgress()
+		win:UpdateInProgress()
 	
 		-- Let mode update data.
 		if win.selectedmode.PopulateData then
@@ -739,6 +738,8 @@ function EminentDKP:UpdateDisplay(win)
 		win:UpdateDisplay()
 	elseif win.selectedset then
 		local set = win:get_selected_set()
+		
+		win:Wipe()
 		
 		-- View available modes.
 		for i, mode in ipairs(modes) do
@@ -754,6 +755,8 @@ function EminentDKP:UpdateDisplay(win)
 		-- Let window display the data.
 		win:UpdateDisplay()
 	else
+	  win:Wipe()
+	  
 		-- View available sets.
 		local nr = 0
     
@@ -2432,7 +2435,14 @@ function EminentDKP:AuctionBidTimer()
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
       sendchat(L["%s has won %s for %d DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid), "raid", "preset")
       sendchat(L["Each player has received %d DKP."]:format(dividend), "raid", "preset")
-      self:SendNotification("auctionwon",{ guid = self.bidItem.srcGUID, amount = secondHighestBid, receiver = looter, item = self.bidItem.itemString, slot = self.bidItem.slotNum })
+      self:SendNotification("auctionwon",{
+        guid = self.bidItem.srcGUID, 
+        amount = secondHighestBid, 
+        receiver = looter, 
+        item = self.bidItem.itemString, 
+        slot = self.bidItem.slotNum,
+        tie = (#(winners) > 1)
+      })
     end
     
     -- Distribute the loot
@@ -2671,7 +2681,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
   elseif notifyType == "auctionwon" then
     if not self:AmMasterLooter() then auction_active = false end
     self:ShowAuctionItems(data.guid)
-    self:ShowAuctionWinner(data.slot,data.receiver,data.amount)
+    self:ShowAuctionWinner(data.slot,data.receiver,data.amount,data.tie)
     if data.receiver == self.myName then
       self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
     end

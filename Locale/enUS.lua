@@ -224,6 +224,7 @@ L["Succesfully transferred %.02f DKP to %s."] = "Succesfully transferred %.02f D
 
 L["%s now up for auction! Auction ends in 30 seconds."] = "%s now up for auction! Auction ends in 30 seconds."
 L["Bids for %s"] = "Bids for %s"
+L["Tie won by %s (%d)"] = "Tie won by %s (%d)"
 L["Won by %s (%d)"] = "Won by %s (%d)"
 L["Auction cancelled"] = "Auction cancelled"
 

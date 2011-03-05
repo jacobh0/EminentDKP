@@ -454,12 +454,16 @@ function EminentDKP:StartAuction(slot,start)
 end
 
 -- Label an item with a winner
-function EminentDKP:ShowAuctionWinner(slot,name,amount)
+function EminentDKP:ShowAuctionWinner(slot,name,amount,tie)
   for i, frame in ipairs(item_frames) do
     if frame.slot == slot then
       frame.bid:Hide()
       frame.bid.bidamt:Hide()
-      frame.winner:SetText(L["Won by %s (%d)"]:format(name,amount))
+      if tie then
+        frame.winner:SetText(L["Tie won by %s (%d)"]:format(name,amount))
+      else
+        frame.winner:SetText(L["Won by %s (%d)"]:format(name,amount))
+      end
       frame.winner:Show()
       frame.status:Hide()
       frame.status.spark:Hide()
