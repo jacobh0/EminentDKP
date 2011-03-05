@@ -983,6 +983,9 @@ function EminentDKP:OnInitialize()
   -- Since SharedMedia doesn't finish loading until after this executes, we need to re-apply
   -- the settings again to ensure everything is how it should be, an unfortunate work-around...
   self:ScheduleTimer("ApplySettingsAll", 2)
+  
+  DEFAULT_CHAT_FRAME:AddMessage("|rYou are using |cFFEBAA32EminentDKP |cFFAAEB32v"..VERSION.."|r")
+  DEFAULT_CHAT_FRAME:AddMessage("|rVisit |cFF9932CChttp://eminent.enjin.com|r for feedback and support.")
 end
 
 -- DATABASE UPDATES
