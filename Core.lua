@@ -675,6 +675,7 @@ function EminentDKP:UpdateSyncedDays()
   sets.alltime.changed = true
   wipe(synced_dates)
   self:VerifyAllSets()
+  self:UpdateAllDisplays()
 end
 
 -- For a set, give each mode a chance to calculate the data they need
