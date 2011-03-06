@@ -58,10 +58,6 @@ local function convertToTimestamp(datetime)
   return time({day=day,month=month,year=year,hour=hour,min=min,sec=0})
 end
 
-local function GetTime()
-  
-end
-
 local function GetDate(timestamp)
   return date("%x",timestamp)
 end
