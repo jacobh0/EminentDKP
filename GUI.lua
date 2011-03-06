@@ -296,10 +296,10 @@ local function CreateNewItemFrame()
 	itemframe.status = status
 	
 	local spark = itemframe:CreateTexture(nil, "OVERLAY")
-	spark:Width(14)
 	spark:SetPoint("CENTER", status, "RIGHT", 0, 0)
 	spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
 	spark:SetBlendMode("ADD")
+	spark:Width(14)
 	spark:Hide()
 	status.spark = spark
 	
