@@ -84,6 +84,12 @@ local function IsRaidInCombat()
 	end
 end
 
+local function MergeTables(source,other)
+  for i,val in ipairs(other) do
+    table.insert(source,val)
+  end
+end
+
 local function implode(delim,list)
   return table.concat(list,delim)
 end
@@ -664,10 +670,12 @@ end
 
 -- Only update the sets that have changed in the last sync
 function EminentDKP:UpdateSyncedDays()
-  for date,b in pairs(synced_dates) do
+  for date,events in pairs(synced_dates) do
     if sets[date] then
+      MergeTables(sets[date].events,events)
       sets[date].changed = true
     elseif sets.today.date == date then
+      MergeTables(sets.today.events,events)
       sets.today.changed = true
     end
   end
@@ -1493,7 +1501,12 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   
   local next_eventID = tostring(tonumber(eventID) + 1)
   events_cache[eventID] = nil
-  synced_dates[GetDate(event.datetime)] = true
+  local event_date = GetDate(event.datetime)
+  if synced_dates[event_date] then
+    table.insert(synced_dates[event_date],eventID)
+  else
+    synced_dates[event_date] = { eventID }
+  end
   
   if events_cache[next_eventID] then
     -- We have the next event we need to proceed with updating...
@@ -2706,30 +2719,6 @@ function EminentDKP:ProcessSlashCmd(input)
   
   if command == 'auction' then
     self:AdminStartAuction()
-  elseif command == 'test' then
-    self:SendNotification("lootlist",{ 
-      guid='test', 
-      name="DAVID",
-      items={ { slot = "1", info = 65135 }, 
-              { slot = "2", info = 59483 },
-              { slot = "3", info = 59220 },
-              { slot = "4", info = 59500 },
-              { slot = "5", info = 59513 } }
-    })
-  elseif command == 'test2' then
-    self:SendNotification("auction",{ 
-      guid='test', 
-      slot=arg1, 
-      start=time()
-    })
-  elseif command == 'test3' then
-    self:SendNotification("auctionwon",{ 
-      guid='test', 
-      slot="2",
-      receiver="Thanah",
-      amount="5000",
-      item=59483
-    })
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
