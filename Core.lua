@@ -1178,7 +1178,7 @@ function EminentDKP:EnsureToMasterlooter(obj, ...)
     return
   end
   Debug("executing hook")
-  self.hooks[obj]["EnsureToMasterlooter"](...)
+  self.hooks["EnsureToMasterlooter"](...)
 end
 
 function EminentDKP:EnsureOfficership(obj, ...)
