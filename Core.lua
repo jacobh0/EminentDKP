@@ -2705,6 +2705,30 @@ function EminentDKP:ProcessSlashCmd(input)
   
   if command == 'auction' then
     self:AdminStartAuction()
+  elseif command == 'test' then
+    self:SendNotification("lootlist",{ 
+      guid='test', 
+      name="DAVID",
+      items={ { slot = 1, item = 65135 }, 
+              { slot = 2, item = 59483 },
+              { slot = 3, item = 59220 },
+              { slot = 4, item = 59500 },
+              { slot = 5, item = 59513 } }
+    },sender)
+  elseif command == 'test2' then
+    self:SendNotification("auction",{ 
+      guid='test', 
+      slot=arg1, 
+      start=time()
+    },sender)
+  elseif command == 'test3' then
+    self:SendNotification("auctionwon",{ 
+      guid='test', 
+      slot=2,
+      receiver="Thanah",
+      amount=5000,
+      item=59483
+    },sender)
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
