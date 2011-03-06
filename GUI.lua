@@ -340,12 +340,12 @@ local function CreateNewItemFrame()
 	
 	bid.bidamt = bidamt
 	
-	local loot = frame:CreateFontString(nil, "ARTWORK")
+	local loot = itemframe:CreateFontString(nil, "ARTWORK")
 	loot:Point("LEFT", button, "RIGHT", 4, 0)
 	loot:SetJustifyH("LEFT")
 	itemframe.loot = loot
 	
-	local winner = frame:CreateFontString(nil, "ARTWORK")
+	local winner = itemframe:CreateFontString(nil, "ARTWORK")
 	winner:Point("RIGHT", itemframe, "RIGHT", -1, 0)
 	winner:SetJustifyH("RIGHT")
 	winner:SetVertexColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
