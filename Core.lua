@@ -1044,14 +1044,6 @@ function EminentDKP:OnEnable()
 	self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
 	self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
 	self:RawHook("LevelUpDisplay_AnimStep", "LevelUpDisplayFinished", true)
-	-- Permission Hooks
-	self:RawHook(self,"AdminStartAuction","EnsureMasterlooter")
-	self:RawHook(self,"AdminDistributeBounty","EnsureOfficership")
-	self:RawHook(self,"AdminVanityReset","EnsureOfficership")
-	self:RawHook(self,"AdminVanityRoll","EnsureOfficership")
-	self:RawHook(self,"AdminRename","EnsureOfficership")
-	self:RawHook(self,"Bid","EnsureToMasterlooter")
-	self:RawHook(self,"Transfer","EnsureToMasterlooter")
 	
 	if type(CUSTOM_CLASS_COLORS) == "table" then
 		self.classColors = CUSTOM_CLASS_COLORS
@@ -1163,55 +1155,43 @@ function EminentDKP:NotifyOnScreen(...)
   end
 end
 
-function EminentDKP:EnsureToMasterlooter(obj, ...)
-  local addon, name, arg1, arg2 = ...
-  local from = "bid"
-  if arg2 ~= nil then
-    from = "transfer"
-  end
+function EminentDKP:EnsureToMasterlooter(addon,method,from)
   if not self.amMasterLooter then
-    self:WhisperPlayer(addon,from,L["That command must be sent to the master looter."],name)
-    return
+    self:WhisperPlayer(addon,method,L["That command must be sent to the master looter."],from)
+    return false
   end
   if not self:AmOfficer() then
-    self:WhisperPlayer(addon,from,L["The master looter must be an officer."],name)
-    return
+    self:WhisperPlayer(addon,method,L["The master looter must be an officer."],from)
+    return false
   end
-  Debug("executing hook")
-  self.hooks["EnsureToMasterlooter"](...)
+  return true
 end
 
-function EminentDKP:EnsureOfficership(obj, ...)
-  -- Check if the command can only be used by an officer
+-- Check if the command can only be used by an officer
+function EminentDKP:EnsureOfficership()
   if not self:AmOfficer() then
     self:DisplayActionResult(L["That command can only be used by an officer."])
-    return
+    return false
   end
   if self:NeedSync() then
     self:DisplayActionResult(L["Your database must be up to date first."])
-    return
+    return false
   end
-  self.hooks[obj]["EnsureOfficership"](...)
+  return true
 end
 
-function EminentDKP:EnsureMasterlooter(obj, ...)
-  if not self:AmOfficer() then
-    self:DisplayActionResult(L["That command can only be used by an officer."])
-    return
-  end
+-- Check if the command can only be used by masterlooter (and officer)
+function EminentDKP:EnsureMasterlooter()
+  if not self:EnsureOfficership() then return false end
   if self.lootMethod ~= 'master' then
     self:DisplayActionResult(L["Master looting must be enabled."])
-    return
+    return false
   end
   if not self.amMasterLooter then
     self:DisplayActionResult(L["Only the master looter can use that command."])
-    return
+    return false
   end
-  if self:NeedSync() then
-    self:DisplayActionResult(L["Your database must be up to date first."])
-    return
-  end
-  self.hooks[obj]["EnsureMasterlooter"](...)
+  return true
 end
 
 function EminentDKP:OnDisable()
@@ -2223,6 +2203,7 @@ end
 
 -- Place a bid on an active auction
 function EminentDKP:Bid(addon,from,amount)
+  if not self:EnsureToMasterlooter(addon,"transfer",from) then return end
   if auction_active then
     if eligible_looters[from] then
       local bid = math.floor(tonumber(amount) or 0)
@@ -2246,7 +2227,7 @@ end
 
 -- Transfer DKP from one player to another
 function EminentDKP:Transfer(addon,from,amount,to)
-  Debug("got this far?")
+  if not self:EnsureToMasterlooter(addon,"transfer",from) then return end
   if not auction_active then
     if to ~= from then
       if self:PlayerExistsInPool(from) then
@@ -2336,60 +2317,57 @@ end
 ------------- START ADMIN FUNCTIONS -------------
 
 function EminentDKP:AdminStartAuction()
-  if self:AmMasterLooter() then
-    if GetNumLootItems() > 0 then
-      local guid = 'container'
-      if UnitExists("target") then
-        guid = UnitGUID("target")
-      end
-      if #(recent_loots[guid].slots) > 0 then
-        if not auction_active then
-          -- Update eligibility list
-          self:UpdateLootEligibility()
-  		
-      		-- Fast forward to next eligible slot
-      		local slot
-      		local itemLink
-      		
-      		while not itemLink and #(recent_loots[guid].slots) > 0 do
-      		  slot = tremove(recent_loots[guid].slots)
-      		  itemLink = GetLootSlotLink(slot)
-    		  end
-    		  
-    		  if not itemLink then
-    		    self:DisplayActionResult(L["There is no loot available to auction."])
-    		    return
-  		    end
-    		  
-      		-- Gather some info about this item
-      		local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-			    
-    			auction_active = true
-    			self.bidItem = { 
-    			  name=lootName, 
-    			  itemString=string.match(itemLink, "item[%-?%d:]+"), 
-    			  elapsed=0, 
-    			  bids={}, 
-    			  slotNum=slot,
-    			  srcGUID=guid,
-    			  start=time(),
-    			}
-    			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
-    			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
-			
-    			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
-    			sendchat(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink), "raid", "preset")
-        else
-          self:DisplayActionResult(L["An auction is already active."])
-        end
+  if not self:EnsureMasterlooter() then return end
+  if GetNumLootItems() > 0 then
+    local guid = 'container'
+    if UnitExists("target") then
+      guid = UnitGUID("target")
+    end
+    if #(recent_loots[guid].slots) > 0 then
+      if not auction_active then
+        -- Update eligibility list
+        self:UpdateLootEligibility()
+		
+    		-- Fast forward to next eligible slot
+    		local slot
+    		local itemLink
+    		
+    		while not itemLink and #(recent_loots[guid].slots) > 0 do
+    		  slot = tremove(recent_loots[guid].slots)
+    		  itemLink = GetLootSlotLink(slot)
+  		  end
+  		  
+  		  if not itemLink then
+  		    self:DisplayActionResult(L["There is no loot available to auction."])
+  		    return
+		    end
+  		  
+    		-- Gather some info about this item
+    		local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
+		    
+  			auction_active = true
+  			self.bidItem = { 
+  			  name=lootName, 
+  			  itemString=string.match(itemLink, "item[%-?%d:]+"), 
+  			  elapsed=0, 
+  			  bids={}, 
+  			  slotNum=slot,
+  			  srcGUID=guid,
+  			  start=time(),
+  			}
+  			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
+  			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
+		
+  			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
+  			sendchat(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink), "raid", "preset")
       else
-        self:DisplayActionResult(L["There is no loot available to auction."])
+        self:DisplayActionResult(L["An auction is already active."])
       end
     else
-      self:DisplayActionResult(L["You must be looting a corpse to start an auction."])
+      self:DisplayActionResult(L["There is no loot available to auction."])
     end
   else
-    self:DisplayActionResult(L["You must be the master looter to initiate an auction."])
+    self:DisplayActionResult(L["You must be looting a corpse to start an auction."])
   end
 end
 
@@ -2495,6 +2473,7 @@ function EminentDKP:GetBountyReasons()
 end
 
 function EminentDKP:AdminDistributeBounty(percent,value,reason)
+  if not self:EnsureOfficership() then return end
   if not auction_active then
     local p = tonumber(value) or 0
     if (percent and p <= 100 and p > 0) or (not percent and p <= self:GetAvailableBounty() and p > 0) then
@@ -2523,6 +2502,7 @@ end
 
 -- Perform a vanity roll weighted by current vanity DKP
 function EminentDKP:AdminVanityRoll()
+  if not self:EnsureOfficership() then return end
   if not auction_active then
     local ranks = {}
     for pid, data in pairs(self:GetCurrentRaidMembers()) do
@@ -2544,6 +2524,7 @@ function EminentDKP:AdminVanityRoll()
 end
 
 function EminentDKP:AdminVanityReset(who)
+  if not self:EnsureOfficership() then return end
   if self:PlayerExistsInPool(who) then
     self:CreateVanityResetSyncEvent(who)
     self:DisplayActionResult(L["Successfully reset vanity DKP for %s."]:format(who))
@@ -2553,6 +2534,7 @@ function EminentDKP:AdminVanityReset(who)
 end
 
 function EminentDKP:AdminRename(from,to)
+  if not self:EnsureOfficership() then return end
   if self:PlayerExistsInPool(from) then
     if self:PlayerExistsInPool(to) then
       if self:IsPlayerFresh(to) then
@@ -2695,10 +2677,12 @@ function EminentDKP:ActuateNotification(notifyType,data)
 end
 
 function EminentDKP:SendCommand(...)
+  --[[
   if not self.masterLooterName or not self:IsAnOfficer(self.masterLooterName) then
     self:DisplayActionResult(L["ERROR: Must be in a raid with a masterlooter."])
     return
   end
+  ]]
   local cmd, arg1, arg2 = ...
   local tbl = {}
   table.insert(tbl,cmd)
