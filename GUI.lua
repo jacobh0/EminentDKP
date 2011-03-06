@@ -257,26 +257,26 @@ end
 
 -- Create a new item frame absent any settings
 local function CreateNewItemFrame()
-  local frame = CreateFrame("Frame", nil, auction_frame)
-	frame:SetBackdrop(backdrop_default)
-	frame:SetBackdropColor(0.1, 0.1, 0.1, 1)
-	frame:Hide()
+  local itemframe = CreateFrame("ItemFrame", nil, auction_frame)
+	itemframe:SetBackdrop(backdrop_default)
+	itemframe:SetBackdropColor(0.1, 0.1, 0.1, 1)
+	itemframe:Hide()
 	
-	local button = CreateFrame("Button", nil, frame)
+	local button = CreateFrame("Button", nil, itemframe)
 	button:SetPoint("LEFT", 0, 0)
 	button:SetScript("OnEnter", SetItemTip)
 	button:SetScript("OnLeave", HideTip2)
 	button:SetScript("OnUpdate", ItemOnUpdate)
 	button:SetScript("OnClick", LootClick)
 
-	frame.button = button
+	itemframe.button = button
 
 	local buttonborder = CreateFrame("Frame", nil, button)
 	buttonborder:SetPoint("CENTER", button, "CENTER")
 	buttonborder:SetBackdrop(backdrop_default)
 	buttonborder:SetBackdropColor(1, 1, 1, 0)
 	
-	frame.buttonborder = buttonborder
+	itemframe.buttonborder = buttonborder
 	
 	local buttonborder2 = CreateFrame("Frame", nil, button)
 	buttonborder2:SetFrameLevel(buttonborder:GetFrameLevel()+1)
@@ -285,17 +285,17 @@ local function CreateNewItemFrame()
 	buttonborder2:SetBackdropColor(0, 0, 0, 0)
 	buttonborder2:SetBackdropBorderColor(0,0,0,1)
 	
-	frame.buttonborder2 = buttonborder2
+	itemframe.buttonborder2 = buttonborder2
 	
-	local status = CreateFrame("StatusBar", nil, frame)
-	status:SetPoint("RIGHT", frame, "RIGHT", -1, 0)
+	local status = CreateFrame("StatusBar", nil, itemframe)
+	status:SetPoint("RIGHT", itemframe, "RIGHT", -1, 0)
 	status:SetScript("OnUpdate", TimerUpdate)
 	status:SetFrameLevel(status:GetFrameLevel()-1)
 	status:SetStatusBarColor(.8, .8, .8, .9)
 	status:Hide()
-	frame.status = status
+	itemframe.status = status
 	
-	local spark = frame:CreateTexture(nil, "OVERLAY")
+	local spark = itemframe:CreateTexture(nil, "OVERLAY")
 	spark:Width(14)
 	spark:SetPoint("CENTER", status, "RIGHT", 0, 0)
 	spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
@@ -303,8 +303,8 @@ local function CreateNewItemFrame()
 	spark:Hide()
 	status.spark = spark
 	
-	local bid = CreateFrame("Button", nil, frame)
-	bid:SetPoint("RIGHT", frame, "RIGHT", -1, -2)
+	local bid = CreateFrame("Button", nil, itemframe)
+	bid:SetPoint("RIGHT", itemframe, "RIGHT", -1, -2)
 	bid:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Up")
 	bid:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Down")
 	bid:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Highlight")
@@ -320,9 +320,9 @@ local function CreateNewItemFrame()
 	SetDesaturation(bid:GetNormalTexture(), true)
   bid:Disable()
 	bid:Hide()
-	frame.bid = bid
+	itemframe.bid = bid
 	
-	local bidamt = CreateFrame("EditBox", nil, frame)
+	local bidamt = CreateFrame("EditBox", nil, itemframe)
 	bidamt:SetPoint("RIGHT", bid, "LEFT", -2, 2)
 	bidamt:Width(45)
 	bidamt:Height(20)
@@ -343,17 +343,17 @@ local function CreateNewItemFrame()
 	local loot = frame:CreateFontString(nil, "ARTWORK")
 	loot:Point("LEFT", button, "RIGHT", 4, 0)
 	loot:SetJustifyH("LEFT")
-	frame.loot = loot
+	itemframe.loot = loot
 	
 	local winner = frame:CreateFontString(nil, "ARTWORK")
-	winner:Point("RIGHT", frame, "RIGHT", -1, 0)
+	winner:Point("RIGHT", itemframe, "RIGHT", -1, 0)
 	winner:SetJustifyH("RIGHT")
 	winner:SetVertexColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
 	winner:Hide()
-	frame.winner = winner
+	itemframe.winner = winner
   
-	ApplyItemFrameSettings(frame)
-	return frame
+	ApplyItemFrameSettings(itemframe)
+	return itemframe
 end
 
 -- Either get a recycled frame or create a new one
