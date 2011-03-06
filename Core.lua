@@ -2710,11 +2710,11 @@ function EminentDKP:ProcessSlashCmd(input)
     self:SendNotification("lootlist",{ 
       guid='test', 
       name="DAVID",
-      items={ { slot = 1, info = 65135 }, 
-              { slot = 2, info = 59483 },
-              { slot = 3, info = 59220 },
-              { slot = 4, info = 59500 },
-              { slot = 5, info = 59513 } }
+      items={ { slot = "1", info = 65135 }, 
+              { slot = "2", info = 59483 },
+              { slot = "3", info = 59220 },
+              { slot = "4", info = 59500 },
+              { slot = "5", info = 59513 } }
     })
   elseif command == 'test2' then
     self:SendNotification("auction",{ 

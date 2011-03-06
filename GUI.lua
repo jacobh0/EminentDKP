@@ -439,6 +439,8 @@ local function HideBidApparatus(frame)
   frame.status.spark:Hide()
 end
 
+-- todo: deal with case when frame is nil
+
 -- Cancel the auction for a specified slots
 function EminentDKP:CancelAuction(slot)
   local frame = GetItemFrameBySlot(slot)
