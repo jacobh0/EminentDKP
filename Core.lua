@@ -2095,7 +2095,6 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
     sendchat(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
     self:GetActivePool().lastScan = time()
     self:SendNotification("scan",{ time=self:GetLastScan() })
-    self:PrintStandings()
   end
 end
 
@@ -2289,15 +2288,6 @@ function EminentDKP:GetStandings(stat)
 	end
   table.sort(a, function(a,b) return a.dkp>b.dkp end)
   return a
-end
-
-function EminentDKP:PrintStandings()
-  local a = self:GetStandings('currentDKP')
-  
-  sendchat(L["Current DKP standings:"], "raid", "preset")
-  for rank,data in ipairs(a) do
-    sendchat(("%d. %s - %.02f"):format(rank,data.n,data.dkp), "raid", "preset")
-  end
 end
 
 function EminentDKP:WhisperStandings(to)
