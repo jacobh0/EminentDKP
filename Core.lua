@@ -972,6 +972,7 @@ function EminentDKP:OnInitialize()
   
   -- Get the current loot info as a basis
   self:PARTY_LOOT_METHOD_CHANGED()
+  self.auctionItems = {}
   
   -- Remember events we have recently sycned
   self.syncRequests = {}
