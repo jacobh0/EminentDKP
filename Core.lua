@@ -2677,12 +2677,10 @@ function EminentDKP:ActuateNotification(notifyType,data)
 end
 
 function EminentDKP:SendCommand(...)
-  --[[
   if not self.masterLooterName or not self:IsAnOfficer(self.masterLooterName) then
     self:DisplayActionResult(L["ERROR: Must be in a raid with a masterlooter."])
     return
   end
-  ]]
   local cmd, arg1, arg2 = ...
   local tbl = {}
   table.insert(tbl,cmd)
