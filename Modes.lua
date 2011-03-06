@@ -204,6 +204,10 @@ local classModePrototype = {
   CalculateData = function(self, set)
     -- Ensure these calculations are only done once
     if not set.changed then return end
+    -- Reset the totals
+    set.modedata[self:GetName()].currentDKP = 0
+    set.modedata[self:GetName()].earnedDKP = 0
+    
     if set.sortnum == 1 then
   	  -- This is the "all-time" set, so use the actual pool
   	  for pid, player in pairs(EminentDKP:GetPlayerPool()) do
@@ -219,7 +223,7 @@ local classModePrototype = {
     for i, p in pairs(set.players) do
       -- Iterate through the player's relevant events and calculate data!
       local player = EminentDKP:GetPlayerByID(p.id)
-      if tContains(classFilter[self:GetName()],player.class) then
+      if player.active and tContains(classFilter[self:GetName()],player.class) then
         if p.modedata.earnedDKP == 0 then
           for j, eid in ipairs(set.events) do
             local event = EminentDKP:GetEvent(eid)
