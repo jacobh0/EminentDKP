@@ -15,6 +15,7 @@ L["Items Won"] = "Items Won"
 L["Items won by"] = "Items won by"
 L["Auction Winners"] = "Auction Winners"
 L["'s Auctions"] = "'s Auctions"
+L["Awardees"] = "Awardees"
 
 L["All Classes"] = "All Classes"
 L["Death Knight"] = "Death Knight"
@@ -35,6 +36,7 @@ L["Leather"] = "Leather"
 L["Mail"] = "Mail"
 L["Plate"] = "Plate"
 L["Auctions"] = "Auctions"
+L["Bounties"] = "Bounties"
 
 -- Mode columns
 L["Percent"] = "Percent"

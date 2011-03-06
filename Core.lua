@@ -887,6 +887,9 @@ function EminentDKP:AddSubviewToTooltip(tooltip, win, mode, id, label)
 	if not mode.metadata or not mode.metadata.ordersort then
 		table.sort(ttwin.dataset, value_sort)
 	end
+	if mode.metadata and mode.metadata.sortfunc then
+	  table.sort(ttwin.dataset, mode.metadata.sortfunc)
+  end
 
 	-- Show title and data if we have data.
 	if #ttwin.dataset > 0 then
@@ -1093,7 +1096,6 @@ function EminentDKP:LevelUpDisplayShow(frame)
       frame.levelFrame.reachedText:SetFormattedText(L["%s has transferred you"],self.notifyDetails.src)
       frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
     elseif frame.type == "TRANSFER_MADE" then
-      --self:Print("height is: "..tostring(frame.levelFrame:GetHeight()))
       frame:SetHeight(50)
       frame.levelFrame:SetHeight(50)
       frame.levelFrame.reachedText:SetFormattedText(L["%s has transferred %s"],self.notifyDetails.src,self.notifyDetails.extra)
@@ -2517,14 +2519,11 @@ end
 function EminentDKP:AdminVanityRoll()
   if not auction_active then
     local ranks = {}
-    for r = 1, GetNumRaidMembers() do
-  		local name = select(1,GetRaidRosterInfo(r))
-  		if name then
-  		  local data = self:GetPlayerByName(name)
-  			if data.currentVanityDKP > 0 then
-  			  local roll = math.random(math.floor(data.currentVanityDKP))/1000
-  			  table.insert(ranks, { n=name, v=data.currentVanityDKP, r=roll })
-			  end
+    for pid, data in pairs(self:GetCurrentRaidMembers()) do
+  		local name = self:GetPlayerNameByID(pid)
+			if data.currentVanityDKP > 0 then
+			  local roll = math.random(math.floor(data.currentVanityDKP))/1000
+			  table.insert(ranks, { n=name, v=data.currentVanityDKP, r=roll })
 		  end
 	  end
 	  table.sort(ranks, function(a,b) return a.r>b.r end)
@@ -2679,6 +2678,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
       self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
     end
   elseif notifyType == "auctiondisenchant" then
+    if not self:AmMasterLooter() then auction_active = false end
     self:ShowAuctionItems(data.guid)
     self:ShowAuctionDisenchant(data.slot)
   elseif notifyType == "lootdone" then

@@ -169,8 +169,22 @@ local function event_filter_auction(event,eventid)
   return (event.eventType == "auction")
 end
 
+local function event_filter_bounty(event,eventid)
+  return (event.eventType == "bounty")
+end
+
 local function custom_filter_auction_source(event,source)
   return (event.eventType == "auction" and event.source == source)
+end
+
+local function MergeTables(source,other)
+  for i,val in ipairs(other) do
+    table.insert(source,val)
+  end
+end
+
+local function label_sort(a,b)
+  return a.label < b.label
 end
 
 local classModePrototype = {
@@ -283,27 +297,27 @@ local rogueMode = EminentDKP:NewModule(L["Rogue"],classModePrototype)
 local shamanMode = EminentDKP:NewModule(L["Shaman"],classModePrototype)
 local warlockMode = EminentDKP:NewModule(L["Warlock"],classModePrototype)
 local warriorMode = EminentDKP:NewModule(L["Warrior"],classModePrototype)
-deathknightMode.sortnum = 6
-druidMode.sortnum = 6
-hunterMode.sortnum = 6
-mageMode.sortnum = 6
-paladinMode.sortnum = 6
-priestMode.sortnum = 6
-rogueMode.sortnum = 6
-shamanMode.sortnum = 6
-warlockMode.sortnum = 6
-warriorMode.sortnum = 6
+deathknightMode.sortnum = 10
+druidMode.sortnum = 10
+hunterMode.sortnum = 10
+mageMode.sortnum = 10
+paladinMode.sortnum = 10
+priestMode.sortnum = 10
+rogueMode.sortnum = 10
+shamanMode.sortnum = 10
+warlockMode.sortnum = 10
+warriorMode.sortnum = 10
 
 local clothMode = EminentDKP:NewModule(L["Cloth"],classModePrototype)
 local leatherMode = EminentDKP:NewModule(L["Leather"],classModePrototype)
 local mailMode = EminentDKP:NewModule(L["Mail"],classModePrototype)
 local plateMode = EminentDKP:NewModule(L["Plate"],classModePrototype)
-clothMode.sortnum, leatherMode.sortnum, mailMode.sortnum, plateMode.sortnum = 3, 3, 3, 3
+clothMode.sortnum, leatherMode.sortnum, mailMode.sortnum, plateMode.sortnum = 5, 5, 5, 5
 
 local conqMode = EminentDKP:NewModule(L["Conqueror"],classModePrototype)
 local vanqMode = EminentDKP:NewModule(L["Vanquisher"],classModePrototype)
 local protMode = EminentDKP:NewModule(L["Protector"],classModePrototype)
-conqMode.sortnum, vanqMode.sortnum, protMode.sortnum = 4, 4, 4
+conqMode.sortnum, vanqMode.sortnum, protMode.sortnum = 8, 8, 8
 
 local allMode = EminentDKP:NewModule(L["All Classes"],classModePrototype)
 allMode.sortnum = 1
@@ -311,6 +325,89 @@ allMode.sortnum = 1
 local auctionMode = EminentDKP:NewModule(L["Auctions"])
 local winnerMode = EminentDKP:NewModule(L["Auction Winners"])
 auctionMode.sortnum = 2
+
+local bountyMode = EminentDKP:NewModule(L["Bounties"])
+local awardeeMode = EminentDKP:NewModule(L["Awardees"])
+bountyMode.sortnum = 3
+
+function bountyMode:PopulateData(win, set)
+  local nr = 1
+  local max = 0
+  
+  for i, eid in ipairs(GetEvents(set,event_filter_bounty)) do
+    local event = EminentDKP:GetEvent(eid)
+    local d = win.dataset[nr] or {}
+		win.dataset[nr] = d
+		d.id = eid
+		d.label = event.source
+		d.value = event.value
+		d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP)
+	
+		if d.value > max then
+			max = d.value
+		end
+		nr = nr + 1
+  end
+  win.metadata.maxvalue = max
+end
+
+function bountyMode:CalculateData(set)
+  -- Ensure these calculations are only done once
+  if not set.changed then return end
+  if set.sortnum == 1 then
+    -- This is the alltime set, so go find events that are bountys
+    local filtered_events = GetEvents(set,event_filter_bounty)
+    MergeTables(set.events,filtered_events)
+    set.modedata[self:GetName()].bountyCount = #(filtered_events)
+  else
+    set.modedata[self:GetName()].bountyCount = #(GetEvents(set,event_filter_bounty))
+  end
+end
+
+function bountyMode:GetSetSummary(set) 
+  return set.modedata[self:GetName()].bountyCount
+end
+
+function bountyMode:OnEnable()
+  self.metadata	       = {showspots = false, ordersort = true, click1 = awardeeMode, columns = { DKP = true }}
+  awardeeMode.metadata = {showspots = true, ordersort = true, sortfunc = label_sort, columns = { DKP = true }}
+  
+	EminentDKP:AddMode(self)
+end
+
+function bountyMode:AddPlayerAttributes(player)
+end
+
+function bountyMode:AddSetAttributes(set)
+  -- Called when a new set is created.
+  if not set.modedata[self:GetName()] then
+    set.modedata[self:GetName()] = { bountyCount = 0 }
+	end
+end
+
+function awardeeMode:Enter(win, id, label)
+  self.eventid = id
+	self.title = label.." "..L["Awardees"]
+end
+
+function awardeeMode:PopulateData(win, set)
+  local event = EminentDKP:GetEvent(self.eventid)
+  local nr = 1
+  
+  for i, pid in ipairs({ strsplit(',',event.beneficiary) }) do
+    local pdata, name = EminentDKP:GetPlayerByID(pid)
+    local d = win.dataset[nr] or {}
+		win.dataset[nr] = d
+		d.id = pid
+		d.label = name
+		d.value = pdata.earnings[self.eventid]
+		d.class = pdata.class
+		d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP)
+	  
+		nr = nr + 1
+		win.metadata.maxvalue = d.value
+  end
+end
 
 function auctionMode:PopulateData(win, set)
   local nr = 1
@@ -338,20 +435,16 @@ function auctionMode:CalculateData(set)
   if not set.changed then return end
   if set.sortnum == 1 then
     -- This is the alltime set, so go find events that are auctions
-    -- todo: this is sort of dirty since we store events only for this mode...
-    set.events = GetEvents(set,event_filter_auction)
-    set.modedata[self:GetName()].sourceCount = #(set.events)
+    local filtered_events = GetEvents(set,event_filter_auction)
+    MergeTables(set.events,filtered_events)
+    set.modedata[self:GetName()].auctionCount = #(filtered_events)
   else
-    set.modedata[self:GetName()].sourceCount = #(GetEvents(set,event_filter_auction))
+    set.modedata[self:GetName()].auctionCount = #(GetEvents(set,event_filter_auction))
   end
 end
 
 function auctionMode:GetSetSummary(set) 
-  return set.modedata[self:GetName()].sourceCount
-end
-
-local function label_sort(a,b)
-  return a.label < b.label
+  return set.modedata[self:GetName()].auctionCount
 end
 
 function auctionMode:OnEnable()
@@ -367,7 +460,7 @@ end
 function auctionMode:AddSetAttributes(set)
   -- Called when a new set is created.
   if not set.modedata[self:GetName()] then
-    set.modedata[self:GetName()] = { sourceCount = 0 }
+    set.modedata[self:GetName()] = { auctionCount = 0 }
 	end
 end
 
