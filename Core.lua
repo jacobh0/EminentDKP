@@ -50,6 +50,18 @@ local synced_dates = {}
 
 local lastContainerName = nil
 
+local function convertToTimestamp(datetime)
+  local t, d = strsplit(' ',datetime)
+  local hour, min = strsplit(':',t)
+  local month, day, year = strsplit('/',d)
+  
+  return time({day=day,month=month,year=year,hour=hour,min=min,sec=0})
+end
+
+local function GetTime()
+  
+end
+
 local function GetDate(timestamp)
   return date("%x",timestamp)
 end
@@ -96,14 +108,6 @@ end
 
 local function implode(delim,list)
   return table.concat(list,delim)
-end
-
-local function convertToTimestamp(datetime)
-  local t, d = strsplit(' ',datetime)
-  local hour, min = strsplit(':',t)
-  local month, day, year = strsplit('/',d)
-  
-  return time({day=day,month=month,year=year,hour=hour,min=min,sec=0})
 end
 
 local function sendchat(msg, chan, chantype)
@@ -680,8 +684,8 @@ function EminentDKP:UpdateSyncedDays()
     end
     if set then
       MergeTables(set.events,events,true)
-      set.starttime = self:GetEvent(set.events[1]).datetime
-      set.endtime = self:GetEvent(set.events[#(set.events)]).datetime
+      set.endtime = self:GetEvent(set.events[1]).datetime
+      set.starttime = self:GetEvent(set.events[#(set.events)]).datetime
       wipe(set.players)
       for i, eid in ipairs(set.events) do
         MarkPlayersSeen(seen, set, self:GetEvent(eid))
