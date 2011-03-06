@@ -2725,9 +2725,9 @@ function EminentDKP:ProcessSlashCmd(input)
   elseif command == 'test3' then
     self:SendNotification("auctionwon",{ 
       guid='test', 
-      slot=2,
+      slot="2",
       receiver="Thanah",
-      amount=5000,
+      amount="5000",
       item=59483
     })
   elseif command == 'version' then
