@@ -680,6 +680,8 @@ function EminentDKP:UpdateSyncedDays()
     end
     if set then
       MergeTables(set.events,events,true)
+      set.starttime = self:GetEvent(set.events[1]).datetime
+      set.endtime = self:GetEvent(set.events[#(set.events)]).datetime
       wipe(set.players)
       for i, eid in ipairs(set.events) do
         MarkPlayersSeen(seen, set, self:GetEvent(eid))
