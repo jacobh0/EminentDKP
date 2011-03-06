@@ -483,7 +483,7 @@ function winnerMode:PopulateData(win, set)
   		-- Because Blizzard is slow and doesn't always return the itemlink in time
   		d.label = select(2, GetItemInfo(event.extraInfo)) or "(Querying Item)"
   		d.value = event.value
-  		d.valuetext = FormatValueText(event.value, self.metadata.columns.DKP,
+  		d.valuetext = FormatValueText(EminentDKP:FormatNumber(event.value), self.metadata.columns.DKP,
   		                              EminentDKP:GetPlayerNameByID(event.target), self.metadata.columns.Winner)
   		d.icon = select(10, GetItemInfo(event.extraInfo))
 		
@@ -520,10 +520,10 @@ function balanceMode:PopulateData(win, set)
 			d.value = amount
 			if event.eventType == 'transfer' or event.eventType == 'addplayer' then
 			  local source = (debitType == 'd' and event.target or event.source)
-			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
+			  d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP, 
 			                                EminentDKP:GetPlayerNameByID(source), self.metadata.columns.Source)
 		  else
-			  d.valuetext = FormatValueText(d.value, self.metadata.columns.DKP, 
+			  d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP, 
 			                                event.source, self.metadata.columns.Source)
 	    end
 	    if debitType == 'e' then
@@ -561,7 +561,7 @@ function itemMode:PopulateData(win, set)
 		-- Because Blizzard is slow and doesn't always return the itemlink in time
 		d.label = select(2, GetItemInfo(event.extraInfo)) or "(Querying Item)"
 		d.value = event.value
-		d.valuetext = FormatValueText(event.value, self.metadata.columns.DKP)
+		d.valuetext = FormatValueText(EminentDKP:FormatNumber(event.value), self.metadata.columns.DKP)
 		d.icon = select(10, GetItemInfo(event.extraInfo))
 		
 		if d.value > max then

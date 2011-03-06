@@ -1183,6 +1183,10 @@ function EminentDKP:EnsureToMasterlooter(addon,method,from)
     self:WhisperPlayer(addon,method,L["The master looter must be an officer."],from)
     return false
   end
+  if not UnitInRaid(from) then
+    self:WhisperPlayer(addon,method,L["You are not in the current raid group."],from)
+    return false
+  end
   return true
 end
 
