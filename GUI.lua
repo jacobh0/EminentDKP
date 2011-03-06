@@ -208,7 +208,7 @@ local function TimerUpdate(frame)
   local now = time()
   local left = frame:GetParent().time - now
   if left > 0 then
-  	frame.spark:Point("CENTER", frame, "LEFT", (left / 30) * frame:GetWidth(), 0)
+  	frame.spark:SetPoint("CENTER", frame, "LEFT", (left / 30) * frame:GetWidth(), 0)
   	frame:SetValue(left)
   else
     frame.spark:Hide()
@@ -365,7 +365,7 @@ local function GetItemFrame()
     frame = CreateNewItemFrame()
   end
   
-	frame:Point("TOPLEFT", #(item_frames) > 0 and item_frames[#(item_frames)] or auction_frame.title, "BOTTOMLEFT", 0, -(EminentDKP.db.profile.auctionframe.itemspacing))
+	frame:SetPoint("TOPLEFT", #(item_frames) > 0 and item_frames[#(item_frames)] or auction_frame.title, "BOTTOMLEFT", 0, -(EminentDKP.db.profile.auctionframe.itemspacing))
 	table.insert(item_frames, frame)
 	return frame
 end
@@ -384,7 +384,7 @@ end
 function EminentDKP:ReApplyItemFrameSettings()
   for i, frame in ipairs(item_frames) do
     ApplyItemFrameSettings(frame)
-    frame:Point("TOPLEFT", i > 1 and item_frames[i] or auction_frame.title, "BOTTOMLEFT", 0, -(self.db.profile.auctionframe.itemspacing))
+    frame:SetPoint("TOPLEFT", i > 1 and item_frames[i] or auction_frame.title, "BOTTOMLEFT", 0, -(self.db.profile.auctionframe.itemspacing))
   end
 end
 
