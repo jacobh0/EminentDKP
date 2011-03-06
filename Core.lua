@@ -1163,7 +1163,7 @@ function EminentDKP:NotifyOnScreen(...)
   end
 end
 
-function EminentDKP:EnsureToMasterlooter(self, ...)
+function EminentDKP:EnsureToMasterlooter(obj, ...)
   local addon, name, arg1, arg2 = ...
   local from = "bid"
   if arg2 ~= nil then
@@ -1178,10 +1178,10 @@ function EminentDKP:EnsureToMasterlooter(self, ...)
     return
   end
   Debug("executing hook")
-  self.hooks[self]["EnsureToMasterlooter"](...)
+  self.hooks[obj]["EnsureToMasterlooter"](...)
 end
 
-function EminentDKP:EnsureOfficership(self, ...)
+function EminentDKP:EnsureOfficership(obj, ...)
   -- Check if the command can only be used by an officer
   if not self:AmOfficer() then
     self:DisplayActionResult(L["That command can only be used by an officer."])
@@ -1191,10 +1191,10 @@ function EminentDKP:EnsureOfficership(self, ...)
     self:DisplayActionResult(L["Your database must be up to date first."])
     return
   end
-  self.hooks[self]["EnsureOfficership"](...)
+  self.hooks[obj]["EnsureOfficership"](...)
 end
 
-function EminentDKP:EnsureMasterlooter(self, ...)
+function EminentDKP:EnsureMasterlooter(obj, ...)
   if not self:AmOfficer() then
     self:DisplayActionResult(L["That command can only be used by an officer."])
     return
@@ -1211,7 +1211,7 @@ function EminentDKP:EnsureMasterlooter(self, ...)
     self:DisplayActionResult(L["Your database must be up to date first."])
     return
   end
-  self.hooks[self]["EnsureMasterlooter"](...)
+  self.hooks[obj]["EnsureMasterlooter"](...)
 end
 
 function EminentDKP:OnDisable()
