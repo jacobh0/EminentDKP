@@ -225,33 +225,33 @@ local last_bid_frame
 local function ApplyItemFrameSettings(frame)
   local p = EminentDKP.db.profile.auctionframe
   
-  frame:Width(p.itemwidth)
-	frame:Height(p.itemheight)
+  frame:SetWidth(p.itemwidth)
+	frame:SetHeight(p.itemheight)
 	
-	frame.button:Width(frame:GetHeight())
-	frame.button:Height(frame:GetHeight())
+	frame.button:SetWidth(frame:GetHeight())
+	frame.button:SetHeight(frame:GetHeight())
 	
-	frame.buttonborder:Width(frame.button:GetWidth())
-	frame.buttonborder:Height(frame.button:GetHeight())
+	frame.buttonborder:SetWidth(frame.button:GetWidth())
+	frame.buttonborder:SetHeight(frame.button:GetHeight())
 	
-	frame.buttonborder2:Width(frame.button:GetWidth() + 2)
-	frame.buttonborder2:Height(frame.button:GetHeight() + 2)
+	frame.buttonborder2:SetWidth(frame.button:GetWidth() + 2)
+	frame.buttonborder2:SetHeight(frame.button:GetHeight() + 2)
 	
-	frame.status:Width(frame:GetWidth() - 2 - frame.button:GetWidth())
-	frame.status:Height(frame:GetHeight() - 2)
+	frame.status:SetWidth(frame:GetWidth() - 2 - frame.button:GetWidth())
+	frame.status:SetHeight(frame:GetHeight() - 2)
 	frame.status:SetStatusBarTexture(media:Fetch("statusbar", p.itemtexture))
 	
-	frame.status.spark:Height(frame.status:GetHeight() + 10)
+	frame.status.spark:SetHeight(frame.status:GetHeight() + 10)
 	
-	frame.bid:Width(frame:GetHeight() - 2)
-	frame.bid:Height(frame:GetHeight() - 2)
+	frame.bid:SetWidth(frame:GetHeight() - 2)
+	frame.bid:SetHeight(frame:GetHeight() - 2)
 	
-	frame.loot:Height(frame:GetHeight() - 4)
-	frame.loot:Width(frame:GetWidth() / 2)
+	frame.loot:SetHeight(frame:GetHeight() - 4)
+	frame.loot:SetWidth(frame:GetWidth() / 2)
 	frame.loot:SetFont(media:Fetch('font', p.itemfont), p.itemfontsize, "OUTLINE")
 	
-	frame.winner:Height(frame:GetHeight() - 2)
-	frame.winner:Width(frame:GetWidth() - frame.loot:GetWidth() - frame.button:GetWidth())
+	frame.winner:SetHeight(frame:GetHeight() - 2)
+	frame.winner:SetWidth(frame:GetWidth() - frame.loot:GetWidth() - frame.button:GetWidth())
   frame.winner:SetFont(media:Fetch('font', p.itemfont), p.itemfontsize - 2, "OUTLINE")
 end
 
@@ -299,7 +299,7 @@ local function CreateNewItemFrame()
 	spark:SetPoint("CENTER", status, "RIGHT", 0, 0)
 	spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
 	spark:SetBlendMode("ADD")
-	spark:Width(14)
+	spark:SetWidth(14)
 	spark:Hide()
 	status.spark = spark
 	
@@ -324,8 +324,8 @@ local function CreateNewItemFrame()
 	
 	local bidamt = CreateFrame("EditBox", nil, itemframe)
 	bidamt:SetPoint("RIGHT", bid, "LEFT", -2, 2)
-	bidamt:Width(45)
-	bidamt:Height(20)
+	bidamt:SetWidth(45)
+	bidamt:SetHeight(20)
 	bidamt:SetTextInsets(3, 3, 3, 3)
 	bidamt:SetMaxLetters(6)
 	bidamt:SetBackdrop(backdrop_default)
@@ -341,12 +341,12 @@ local function CreateNewItemFrame()
 	bid.bidamt = bidamt
 	
 	local loot = itemframe:CreateFontString(nil, "ARTWORK")
-	loot:Point("LEFT", button, "RIGHT", 4, 0)
+	loot:SetPoint("LEFT", button, "RIGHT", 4, 0)
 	loot:SetJustifyH("LEFT")
 	itemframe.loot = loot
 	
 	local winner = itemframe:CreateFontString(nil, "ARTWORK")
-	winner:Point("RIGHT", itemframe, "RIGHT", -1, 0)
+	winner:SetPoint("RIGHT", itemframe, "RIGHT", -1, 0)
 	winner:SetJustifyH("RIGHT")
 	winner:SetVertexColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
 	winner:Hide()
