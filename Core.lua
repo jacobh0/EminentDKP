@@ -12,7 +12,7 @@ local newest_version = ''
 local needs_update = false
 
 local function Debug(message)
-  if false then
+  if true then
     EminentDKP:Print(message)
   end
 end
@@ -1177,6 +1177,7 @@ function EminentDKP:EnsureToMasterlooter(self, ...)
     self:WhisperPlayer(addon,from,L["The master looter must be an officer."],name)
     return
   end
+  Debug("executing hook")
   self.hooks[self]["EnsureToMasterlooter"](...)
 end
 
@@ -2245,6 +2246,7 @@ end
 
 -- Transfer DKP from one player to another
 function EminentDKP:Transfer(addon,from,amount,to)
+  Debug("got this far?")
   if not auction_active then
     if to ~= from then
       if self:PlayerExistsInPool(from) then
