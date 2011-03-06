@@ -988,7 +988,7 @@ function EminentDKP:OnInitialize()
   self:ScheduleTimer("ApplySettingsAll", 2)
   
   DEFAULT_CHAT_FRAME:AddMessage("|rYou are using |cFFEBAA32EminentDKP |cFFAAEB32v"..VERSION.."|r")
-  DEFAULT_CHAT_FRAME:AddMessage("|rVisit |cFF9932CChttp://eminent.enjin.com|r for feedback and support.")
+  DEFAULT_CHAT_FRAME:AddMessage("|rVisit |cFFD2691Ehttp://eminent.enjin.com|r for feedback and support.")
 end
 
 -- DATABASE UPDATES
@@ -1164,16 +1164,20 @@ function EminentDKP:NotifyOnScreen(...)
 end
 
 function EminentDKP:EnsureToMasterlooter(self, ...)
-  local addon, name = ...
+  local addon, name, arg1, arg2 = ...
+  local from = "bid"
+  if arg2 ~= nil then
+    from = "transfer"
+  end
   if not self.amMasterLooter then
-    self:WhisperPlayer(addon,L["That command must be sent to the master looter."],name)
+    self:WhisperPlayer(addon,from,L["That command must be sent to the master looter."],name)
     return
   end
   if not self:AmOfficer() then
-    self:WhisperPlayer(addon,L["The master looter must be an officer."],name)
+    self:WhisperPlayer(addon,from,L["The master looter must be an officer."],name)
     return
   end
-  self.hooks["EnsureToMasterlooter"](...)
+  self.hooks[self]["EnsureToMasterlooter"](...)
 end
 
 function EminentDKP:EnsureOfficership(self, ...)
@@ -1186,7 +1190,7 @@ function EminentDKP:EnsureOfficership(self, ...)
     self:DisplayActionResult(L["Your database must be up to date first."])
     return
   end
-  self.hooks["EnsureOfficership"](...)
+  self.hooks[self]["EnsureOfficership"](...)
 end
 
 function EminentDKP:EnsureMasterlooter(self, ...)
@@ -1206,7 +1210,7 @@ function EminentDKP:EnsureMasterlooter(self, ...)
     self:DisplayActionResult(L["Your database must be up to date first."])
     return
   end
-  self.hooks["EnsureMasterlooter"](...)
+  self.hooks[self]["EnsureMasterlooter"](...)
 end
 
 function EminentDKP:OnDisable()
@@ -2689,7 +2693,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
 end
 
 function EminentDKP:SendCommand(...)
-  if not UnitInRaid("player") or not self.masterLooterName then
+  if not self.masterLooterName or not self:IsAnOfficer(self.masterLooterName) then
     self:DisplayActionResult(L["ERROR: Must be in a raid with a masterlooter."])
     return
   end
@@ -2698,11 +2702,10 @@ function EminentDKP:SendCommand(...)
   table.insert(tbl,cmd)
   table.insert(tbl,arg1)
   table.insert(tbl,arg2)
-  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self.masterLooterName,'ALERT')
+  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self.masterLooterName)
 end
 
 function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
-  if not self:AmMasterLooter() then return end
   local command, arg1, arg2 = strsplit(",", message, 3)
   
   if command == 'bid' then
