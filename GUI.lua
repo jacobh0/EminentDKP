@@ -257,7 +257,7 @@ end
 
 -- Create a new item frame absent any settings
 local function CreateNewItemFrame()
-  local itemframe = CreateFrame("ItemFrame", nil, auction_frame)
+  local itemframe = CreateFrame("Frame", nil, auction_frame)
 	itemframe:SetBackdrop(backdrop_default)
 	itemframe:SetBackdropColor(0.1, 0.1, 0.1, 1)
 	itemframe:Hide()
