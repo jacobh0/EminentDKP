@@ -995,7 +995,7 @@ function EminentDKP:OnInitialize()
   -- Remember events we have recently sycned
   self.syncRequests = {}
   self.syncProposals = {}
-  self.requestedEvents = {}
+  self.requestedRanges = {}
   self.requestCooldown = false
   
   self:CreateAuctionFrame()
@@ -1270,8 +1270,8 @@ function EminentDKP:GetMissingEventList()
   return range_list
 end
 
-function EminentDKP:ClearRequestedEvents()
-  wipe(self.requestedEvents)
+function EminentDKP:ClearRequestedRanges()
+  wipe(self.requestedRanges)
 end
 
 function EminentDKP:ClearRequestCooldown()
@@ -1288,7 +1288,7 @@ function EminentDKP:RequestMissingEvents(cooldown)
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
     self:SendCommMessage('EminentDKP-Request',self:GetVersion() .. '_' ..implode(',',mlist),'GUILD')
-    self:ClearRequestedEvents()
+    self:ClearRequestedRanges()
   end
 end
 
