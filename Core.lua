@@ -1243,18 +1243,31 @@ function EminentDKP:NeedSync()
   return (self:GetEventCountDifference() > 0)
 end
 
--- Get list of events we need that aren't in the cache
--- But also omit any recently requested events
+-- Get range of events we need that aren't in the cache
+-- But also omit any recently requested ranges
 function EminentDKP:GetMissingEventList()
   local start = self:GetEventCount() + 1
-  local missing = {}
-  for i = start, self:GetNewestEventCount() do
-    local eid = tostring(i)
-    if not events_cache[eid] and tContains(self.requestedEvents,eid) ~= 1 then
-      table.insert(missing,eid)
+  local finish = self:GetNewestEventCount()
+  local range_list = {}
+  -- Assuming there are no overlapping ranges, and they are ordered
+  for i, range in ipairs(self.requestedRanges) do
+    local s, f = strsplit("-",range)
+    if i == 1 then
+      if start < s then
+        table.insert(range_list,start.."-"..(s-1))
+      end
+    elseif i == #(self.requestedRanges)
+      local n_s, n_f = strsplit("-",self.requestedRanges[i-1])
+      table.insert(range_list,(n_f+1).."-"..(s-1))
+      if finish > f then
+        table.insert(range_list,(f+1).."-"..finish)
+      end
+    else
+      local n_s, n_f = strsplit("-",self.requestedRanges[i-1])
+      table.insert(range_list,(n_f+1).."-"..(s-1))
     end
   end
-  return missing
+  return range_list
 end
 
 function EminentDKP:ClearRequestedEvents()
@@ -1277,6 +1290,43 @@ function EminentDKP:RequestMissingEvents(cooldown)
     self:SendCommMessage('EminentDKP-Request',self:GetVersion() .. '_' ..implode(',',mlist),'GUILD')
     self:ClearRequestedEvents()
   end
+end
+
+function EminentDKP:LogRequestedEventRange(newrange)
+  local found = false
+  for i, range in ipairs(self.requestedRanges) do
+    local sf_new = { strsplit("-",newrange) }
+    local sf = { strsplit("-",range) }
+    if sf_new[2] > sf[2] and sf_new[1] < sf[1] then
+      -- New range is bigger than the current range
+      self.requestedRanges[i] = newrange
+      found = true
+      break
+    elseif sf_new[2] <= sf[2] and sf_new[1] >= sf[1] then
+      -- New range is within current range, do nothing
+      found = true
+      break
+    elseif sf_new[1] <= sf[2] then
+      -- New range clips the end of the current, so extend current
+      self.requestedRanges[i] = sf[1].."-"..sf_new[2]
+      found = true
+      break
+    elseif sf_new[2] >= sf[1] then
+      -- New range clips the front of the current, so extend current
+      self.requestedRanges[i] = sf_new[1].."-"..sf[2]
+      found = true
+      break
+    end
+  end
+  if not found then
+    table.insert(self.requestedRanges,newrange)
+  end
+  -- Sort by range start
+  table.sort(self.requestedRanges,function(a,b)
+    local a_s, a_f = strsplit("-",a)
+    local b_s, b_f = strsplit("-",b)
+    return a_s < b_s
+  end)
 end
 
 -- Broadcast current addon version
@@ -1335,8 +1385,11 @@ function EminentDKP:ProcessRequestProposals(who)
     self:SendCommMessage('EminentDKP-Fulfill',self:GetVersion() .. '_' .. who,'GUILD')
     
     -- Then go ahead and sync the events for them
-    for i,eid in ipairs(self.syncRequests[who].events) do
-      self:SyncEvent(eid)
+    for i,range in ipairs(self.syncRequests[who].ranges) do
+      local start, finish = strsplit("-",range)
+      for eid = start, finish do
+        self:SyncEvent(eid)
+      end
     end
   end
   self.syncRequests[who] = nil
@@ -1379,23 +1432,21 @@ end
 -- Process an incoming request for missing events
 function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   if sender == self.myName then return end
-  local version, events = strsplit('_',message)
+  local version, ranges = strsplit('_',message)
   if not CheckVersionCompatability(version) then return end
-  local needed_events = { strsplit(',',events) }
+  local needed_ranges = { strsplit(',',ranges) }
   
   if self:AmOfficer() then
     -- If an officer, create a proposal to fulfill this request
     local numbers = { math.random(1000), math.random(1000), math.random(1000) }
-    self.syncRequests[sender] = { events = needed_events, timer = nil }
+    self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
     self.syncProposals[sender] = { }
     
     self:SendCommMessage('EminentDKP-Proposal',self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
   else
-    -- If not an officer, remember which events were requested
-    for i,eid in ipairs(needed_events) do
-      if tContains(self.requestedEvents,eid) ~= 1 then
-        table.insert(self.requestedEvents,1,eid)
-      end
+    -- If not an officer, remember which ranges were requested
+    for i,range in ipairs(needed_ranges) do
+      self:LogRequestedEventRange(range)
     end
   end
 end
@@ -1420,7 +1471,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
         -- Event data is out of date
         -- Randomize a time in the next 1-5 seconds that requests events
         -- This staggers event requests to cut down on addon channel traffic and spamming
-        self:ScheduleTimer("RequestMissingEvents", math.random(5), true)
+        self.syncTimer = self:ScheduleTimer("RequestMissingEvents", math.random(5), true)
       end
     end
   end
