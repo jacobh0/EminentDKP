@@ -670,13 +670,21 @@ end
 
 -- Only update the sets that have changed in the last sync
 function EminentDKP:UpdateSyncedDays()
+  local seen = {}
   for date,events in pairs(synced_dates) do
+    local set
     if sets[date] then
-      MergeTables(sets[date].events,events,true)
-      sets[date].changed = true
+      set = sets[date]
     elseif sets.today.date == date then
-      MergeTables(sets.today.events,events,true)
-      sets.today.changed = true
+      set = sets.today
+    end
+    if set then
+      MergeTables(set.events,events,true)
+      wipe(set.players)
+      for i, eid in ipairs(set.events) do
+        MarkPlayersSeen(seen, set, self:GetEvent(eid))
+      end
+      set.changed = true
     end
   end
   sets.alltime.changed = true
