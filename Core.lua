@@ -2203,7 +2203,7 @@ end
 
 -- Place a bid on an active auction
 function EminentDKP:Bid(addon,from,amount)
-  if not self:EnsureToMasterlooter(addon,"transfer",from) then return end
+  if not self:EnsureToMasterlooter(addon,"bid",from) then return end
   if auction_active then
     if eligible_looters[from] then
       local bid = math.floor(tonumber(amount) or 0)
