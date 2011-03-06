@@ -84,9 +84,13 @@ local function IsRaidInCombat()
 	end
 end
 
-local function MergeTables(source,other)
+local function MergeTables(source,other,front)
   for i,val in ipairs(other) do
-    table.insert(source,val)
+    if front then
+      table.insert(source,1,val)
+    else
+      table.insert(source,val)
+    end
   end
 end
 
@@ -543,31 +547,27 @@ end
 
 -- Builds a unique list of players for a set
 local function MarkPlayersSeen(seen, set, event)
-  local sources = { event.source, event.target, event.beneficiary }
+  local playerids = { }
   
-  for i, field in ipairs(sources) do
-    local playerids = {}
-    if i < 3 then
-      local pid = tostring(tonumber(field) or 0)
-      if pid ~= "0" then
-        table.insert(playerids,pid)
-      end
-    else
-      if field ~= "" then
-        playerids = { strsplit(",",field) }
-      end
-    end
-    if not seen[set.name] then
-      seen[set.name] = {}
-    end
-    for j, pid in ipairs(playerids) do
-      -- Seen this player in this set?
-      if not seen[set.name][pid] then
-        local player = EminentDKP:GetPlayerByID(pid)
-        if player.active then
-          table.insert(set.players, {id=pid,modedata={}})
-          seen[set.name][pid] = true
-        end
+  local source_id = tostring(tonumber(event.source) or 0)
+  local target_id = tostring(tonumber(event.target) or 0)
+  if source_id ~= "0" then table.insert(playerids,source_id) end
+  if target_id ~= "0" then table.insert(playerids,target_id) end
+  if event.beneficiary ~= "" then
+    MergeTables(playerids,{ strsplit(",",event.beneficiary) })
+  end
+  
+  if not seen[set.name] then
+    seen[set.name] = {}
+  end
+  
+  for i, pid in ipairs(playerids) do
+    -- Seen this player in this set?
+    if not seen[set.name][pid] then
+      local player = EminentDKP:GetPlayerByID(pid)
+      if player and player.active then
+        table.insert(set.players, {id=pid,modedata={}})
+        seen[set.name][pid] = true
       end
     end
   end
@@ -672,10 +672,10 @@ end
 function EminentDKP:UpdateSyncedDays()
   for date,events in pairs(synced_dates) do
     if sets[date] then
-      MergeTables(sets[date].events,events)
+      MergeTables(sets[date].events,events,true)
       sets[date].changed = true
     elseif sets.today.date == date then
-      MergeTables(sets.today.events,events)
+      MergeTables(sets.today.events,events,true)
       sets.today.changed = true
     end
   end
@@ -1688,7 +1688,7 @@ function EminentDKP:GetAvailableBounty()
 end
 
 function EminentDKP:GetAvailableBountyPercent()
-  return self:StdNumber((self:GetAvailableBounty()/self:GetTotalBounty())*100)
+  return (self:GetAvailableBounty()/self:GetTotalBounty())*100
 end
 
 -- Construct list of players currently in the raid
