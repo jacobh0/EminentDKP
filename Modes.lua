@@ -341,7 +341,8 @@ function bountyMode:PopulateData(win, set)
 		d.id = eid
 		d.label = event.source
 		d.value = event.value
-		d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP)
+		d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
+		                              date("%x",event.datetime), self.metadata.columns.Date)
 	
 		if d.value > max then
 			max = d.value
@@ -369,7 +370,7 @@ function bountyMode:GetSetSummary(set)
 end
 
 function bountyMode:OnEnable()
-  self.metadata	       = {showspots = false, ordersort = true, click1 = awardeeMode, columns = { DKP = true }}
+  self.metadata	       = {showspots = false, ordersort = true, click1 = awardeeMode, columns = { DKP = true, Date = true }}
   awardeeMode.metadata = {showspots = true, ordersort = true, sortfunc = label_sort, columns = { DKP = true }}
   
 	EminentDKP:AddMode(self)

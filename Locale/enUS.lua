@@ -45,6 +45,7 @@ L["Source"] = "Source"
 L["Count"] = "Count"
 L["Winner"] = "Winner"
 L["Time"] = "Time"
+L["Date"] = "Date"
 
 -- Options
 
