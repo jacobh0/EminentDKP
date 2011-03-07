@@ -1033,6 +1033,11 @@ function EminentDKP:DatabaseUpdate()
         if eventdata.eventType == 'bounty' and (not eventdata.source or eventdata.source == "") then
           self.db.factionrealm.pools[name].events[eid].source = "Default"
         end
+        if eventdata.eventType == 'addplayer' then
+          local ei = { strsplit(",",eventdata.extraInfo) }
+          ei[1] = select(2,UnitClass(eventdata.value)) or string.upper(string.gsub(ei[1],"%s*",""))
+          self.db.factionrealm.pools[name].events[eid].extraInfo = implode(",",ei)
+        end
       end
       if self.db.factionrealm.pools[name].lastScan ~= 0 then
         self.db.factionrealm.pools[name].lastScan = convertToTimestamp(self.db.factionrealm.pools[name].lastScan)
