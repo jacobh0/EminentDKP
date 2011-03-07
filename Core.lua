@@ -2315,7 +2315,7 @@ end
 function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
     sendchat(L["Auction cancelled. All bids have been voided."], "raid", "preset")
-    self:SendNotification("auctioncancel",{ guid = self.bidItem.srcGUID, item = self.bidItem.itemString })
+    self:SendNotification("auctioncancel",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     auction_active = false
     self:CancelTimer(self.bidTimer)
     table.insert(recent_loots[self.bidItem.srcGUID].slots,self.bidItem.slotNum)
