@@ -2,6 +2,12 @@ local L = LibStub("AceLocale-3.0"):GetLocale("EminentDKP", false)
 
 local EminentDKP = EminentDKP
 
+local function Debug(message)
+  if true then
+    EminentDKP:Print(message)
+  end
+end
+
 local classFilter = {
   [L["Death Knight"]] = { "DEATHKNIGHT" },
   [L["Druid"]] = { "DRUID" },
@@ -222,7 +228,7 @@ local classModePrototype = {
     for i, p in pairs(set.players) do
       -- Iterate through the player's relevant events and calculate data!
       local player = EminentDKP:GetPlayerByID(p.id)
-      if player.active and tContains(classFilter[self:GetName()],player.class) then
+      if tContains(classFilter[self:GetName()],player.class) then
         if p.modedata.earnedDKP == 0 then
           for j, eid in ipairs(set.events) do
             local event = EminentDKP:GetEvent(eid)
