@@ -207,7 +207,6 @@ local classModePrototype = {
     -- Reset the totals
     set.modedata[self:GetName()].currentDKP = 0
     set.modedata[self:GetName()].earnedDKP = 0
-    
     if set.sortnum == 1 then
   	  -- This is the "all-time" set, so use the actual pool
   	  for pid, player in pairs(EminentDKP:GetPlayerPool()) do

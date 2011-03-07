@@ -679,7 +679,7 @@ function EminentDKP:UpdateSyncedDays()
       set = sets.today
     else
       -- Set doesn't exist, so make it
-      if GetDaysSince(date) <= self.db.profile.daystoshow then
+      if GetDaysSince(self:GetEvent(events[1]).datetime) <= self.db.profile.daystoshow then
         set = createSet(date)
         sets[date] = set
       end
@@ -1003,6 +1003,7 @@ function EminentDKP:OnInitialize()
   self.syncProposals = {}
   self.requestedRanges = {}
   self.requestCooldown = false
+  self.broadcastCooldown = false
   
   self:CreateAuctionFrame()
   self:DatabaseUpdate()
@@ -1381,7 +1382,9 @@ end
 
 function EminentDKP:ScheduleEventsRequest(time)
   self:CancelEventsRequest()
-  self.requestTimer = self:ScheduleTimer("RequestMissingEvents", (time ~= nil and time or 3))
+  if not self.requestCooldown then
+    self.requestTimer = self:ScheduleTimer("RequestMissingEvents", (time ~= nil and time or 3))
+  end
 end
 
 function EminentDKP:CancelEventsRequest()
@@ -1391,18 +1394,34 @@ function EminentDKP:CancelEventsRequest()
   end
 end
 
+function EminentDKP:ClearRequestCooldown()
+  self.requestCooldown = false
+end
+
 -- Request the missing events
 function EminentDKP:RequestMissingEvents()
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
+    self.requestCooldown = true
     self:SendCommMessage('EminentDKP-Request',self:GetVersion() .. '_' ..implode(',',mlist),'GUILD')
+    -- 10 second cooldown on doing an event requests, gives time for stuff to start syncing
+    self:ScheduleTimer("ClearRequestCooldown", 10)
   end
   wipe(self.requestedRanges)
 end
 
+function EminentDKP:ClearBroadcastCooldown()
+  self.broadcastCooldown = false
+end
+
 -- Broadcast current addon version
 function EminentDKP:BroadcastVersion()
-  self:SendCommMessage('EminentDKP-Version',self:GetVersion(),'GUILD')
+  if not self.broadcastCooldown then
+    self.broadcastCooldown = true
+    self:SendCommMessage('EminentDKP-Version',self:GetVersion(),'GUILD')
+    -- 15 second cooldown on broadcasting version, reduces spam
+    self:ScheduleTimer("ClearBroadcastCooldown", 15)
+  end
 end
 
 -- Determine if we are the proposal winner, and if so do the syncing
@@ -1649,7 +1668,6 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     else
       -- We lack what we need to continue onward...
       self:ScheduleEventsRequest()
-      self:UpdateSyncedDays()
     end
   else
     -- We're up to date!
