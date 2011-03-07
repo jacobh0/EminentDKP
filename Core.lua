@@ -2255,8 +2255,8 @@ function EminentDKP:RAID_ROSTER_UPDATE()
     end
 	end
   
-  -- This only needs to be run by the masterlooter
-  if not self:AmMasterLooter() then return end
+  -- This only needs to be run by the masterlooter (and not in PVP)
+  if not self:AmMasterLooter() or is_in_pvp() then return end
   
   -- Make sure players exist in the pool
   for d = 1, GetNumRaidMembers() do
