@@ -1457,9 +1457,9 @@ function EminentDKP:ProcessRequestProposals(who)
     
     -- Then go ahead and sync the events for them
     for i,range in ipairs(self.syncRequests[who].ranges) do
-      local start, finish = strsplit("-",range)
+      local start, finish = GetRange(range)
       for eid = start, finish do
-        self:SyncEvent(eid)
+        self:SyncEvent(tostring(eid))
       end
     end
   end
@@ -2256,6 +2256,7 @@ function EminentDKP:RAID_ROSTER_UPDATE()
 	end
   
   -- This only needs to be run by the masterlooter (and not in PVP)
+  -- todo: we really need someway to disable/enable the addon
   if not self:AmMasterLooter() or is_in_pvp() then return end
   
   -- Make sure players exist in the pool
@@ -2387,7 +2388,11 @@ function EminentDKP:Transfer(addon,from,amount,to)
               self:CreateTransferSyncEvent(from,to,dkp)
               
               self:SendNotification("transfer",{ amount = dkp, sender=from, receiver=to })
-              sendchat(L["Succesfully transferred %.02f DKP to %s."]:format(dkp,to), from, 'whisper')
+              if addon then
+                self:WhisperPlayer(addon,"transfer",L["Succesfully transferred %.02f DKP to %s."]:format(dkp,to), from, true)
+              else
+                sendchat(L["Succesfully transferred %.02f DKP to %s."]:format(dkp,to), from, 'whisper')
+              end
               sendchat(L["%s just transferred %.02f DKP to you."]:format(from,dkp), to, 'whisper')
               sendchat(L["%s has transferred %.02f DKP to %s."]:format(from,dkp,to), "raid", "preset")
             else
