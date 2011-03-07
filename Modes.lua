@@ -2,12 +2,6 @@ local L = LibStub("AceLocale-3.0"):GetLocale("EminentDKP", false)
 
 local EminentDKP = EminentDKP
 
-local function Debug(message)
-  if true then
-    EminentDKP:Print(message)
-  end
-end
-
 local classFilter = {
   [L["Death Knight"]] = { "DEATHKNIGHT" },
   [L["Druid"]] = { "DRUID" },
