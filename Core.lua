@@ -677,6 +677,12 @@ function EminentDKP:UpdateSyncedDays()
       set = sets[date]
     elseif sets.today.date == date then
       set = sets.today
+    else
+      -- Set doesn't exist, so make it
+      if GetDaysSince(date) <= self.db.profile.daystoshow then
+        set = createSet(date)
+        sets[date] = set
+      end
     end
     if set then
       MergeTables(set.events,events,true)
@@ -1243,77 +1249,37 @@ function EminentDKP:NeedSync()
   return (self:GetEventCountDifference() > 0)
 end
 
--- Get range of events we need that aren't in the cache
--- But also omit any recently requested ranges
-function EminentDKP:GetMissingEventList()
-  local start = self:GetEventCount() + 1
-  local finish = self:GetNewestEventCount()
-  local range_list = {}
-  -- Assuming there are no overlapping ranges, and they are ordered
-  for i, range in ipairs(self.requestedRanges) do
-    local s, f = strsplit("-",range)
-    if i == 1 then
-      if start < s then
-        table.insert(range_list,start.."-"..(s-1))
-      end
-    elseif i == #(self.requestedRanges)
-      local n_s, n_f = strsplit("-",self.requestedRanges[i-1])
-      table.insert(range_list,(n_f+1).."-"..(s-1))
-      if finish > f then
-        table.insert(range_list,(f+1).."-"..finish)
-      end
-    else
-      local n_s, n_f = strsplit("-",self.requestedRanges[i-1])
-      table.insert(range_list,(n_f+1).."-"..(s-1))
-    end
-  end
-  return range_list
+local function GetRange(string)
+  local range = { strsplit("-",string) }
+  return tonumber(range[1]), tonumber(range[2])
 end
 
-function EminentDKP:ClearRequestedRanges()
-  wipe(self.requestedRanges)
-end
-
-function EminentDKP:ClearRequestCooldown()
-  self.requestCooldown = false
-end
-
--- Request the missing events
-function EminentDKP:RequestMissingEvents(cooldown)
-  if cooldown then
-    if self.requestCooldown then return end
-    self.requestCooldown = true
-    self:ScheduleTimer("ClearRequestCooldown", 10)
-  end
-  local mlist = self:GetMissingEventList()
-  if #(mlist) > 0 then
-    self:SendCommMessage('EminentDKP-Request',self:GetVersion() .. '_' ..implode(',',mlist),'GUILD')
-    self:ClearRequestedRanges()
-  end
-end
-
+-- Record a requested event range
 function EminentDKP:LogRequestedEventRange(newrange)
+  local new_start, new_finish = GetRange(newrange)
+  -- We don't care about ranges below our current eventCounter
+  if new_finish <= self:GetEventCount() then return end
+  
   local found = false
   for i, range in ipairs(self.requestedRanges) do
-    local sf_new = { strsplit("-",newrange) }
-    local sf = { strsplit("-",range) }
-    if sf_new[2] > sf[2] and sf_new[1] < sf[1] then
+    local cur_start, cur_finish = GetRange(range)
+    if new_finish > cur_finish and new_start < cur_start then
       -- New range is bigger than the current range
       self.requestedRanges[i] = newrange
       found = true
       break
-    elseif sf_new[2] <= sf[2] and sf_new[1] >= sf[1] then
+    elseif new_finish <= cur_finish and new_start >= cur_start then
       -- New range is within current range, do nothing
       found = true
       break
-    elseif sf_new[1] <= sf[2] then
+    elseif new_start <= cur_finish then
       -- New range clips the end of the current, so extend current
-      self.requestedRanges[i] = sf[1].."-"..sf_new[2]
+      self.requestedRanges[i] = cur_start.."-"..new_finish
       found = true
       break
-    elseif sf_new[2] >= sf[1] then
+    elseif new_finish >= cur_start then
       -- New range clips the front of the current, so extend current
-      self.requestedRanges[i] = sf_new[1].."-"..sf[2]
+      self.requestedRanges[i] = new_start.."-"..cur_finish
       found = true
       break
     end
@@ -1321,12 +1287,117 @@ function EminentDKP:LogRequestedEventRange(newrange)
   if not found then
     table.insert(self.requestedRanges,newrange)
   end
+end
+
+-- Get range of events we need that aren't in the cache
+-- But also omit any recently requested ranges
+function EminentDKP:GetMissingEventList()
+  local start = self:GetEventCount() + 1
+  local finish = self:GetNewestEventCount()
+  
+  -- Build the ranges available in the events cache
+  local event_cache_ranges = {}
+  local last_cache_start
+  local last_eid
+  for eid = start, finish do
+    if events_cache[tostring(eid)] then
+      if not last_cache_start then
+        last_cache_start = eid
+      end
+    elseif last_cache_start then
+      table.insert(event_cache_ranges,last_cache_start.."-"..last_eid)
+      last_cache_start = nil
+    end
+    last_eid = eid
+  end
+  
+  -- Consolidate all the ranges
+  local all_ranges = {}
+  MergeTables(all_ranges,event_cache_ranges)
+  MergeTables(all_ranges,self.requestedRanges)
+  
   -- Sort by range start
-  table.sort(self.requestedRanges,function(a,b)
-    local a_s, a_f = strsplit("-",a)
-    local b_s, b_f = strsplit("-",b)
-    return a_s < b_s
-  end)
+  if #(all_ranges) > 1 then
+    table.sort(all_ranges,function(a,b)
+      local a_s = GetRange(a)
+      local b_s = GetRange(b)
+      return a_s < b_s
+    end)
+  end
+  
+  -- Combine any overlapping ranges
+  local merged = true
+  while merged ~= false and #(all_ranges) > 1 do
+    for i = 1, #(all_ranges) do
+      local cur_start, cur_finish = GetRange(all_ranges[i])
+      local next_start, next_finish
+      if all_ranges[i+1] then
+        next_start, next_finish = GetRange(all_ranges[i+1])
+        if cur_finish >= next_start then
+          all_ranges[i] = cur_start.."-"..next_finish
+          merged = true
+          break
+        end
+      else
+        merged = false
+      end
+    end
+  end
+  
+  -- Build the ranges of events we need
+  -- Assuming there are no overlapping ranges, and they are ordered
+  local missing_ranges = {}
+  if #(all_ranges) > 1 then
+    for i, range in ipairs(all_ranges) do
+      local cur_start, cur_finish = GetRange(all_ranges[i])
+      if i == 1 then
+        if cur_start > start then
+          table.insert(missing_ranges,start.."-"..(cur_start-1))
+        end
+      else
+        local last_start, last_finish = GetRange(all_ranges[i-1])
+        table.insert(missing_ranges,(last_finish+1).."-"..(cur_start-1))
+        if i == #(all_ranges) then
+          if cur_finish < finish then
+            table.insert(missing_ranges,(cur_finish+1).."-"..finish)
+          end
+        end
+      end
+    end
+  elseif #(all_ranges) == 1 then
+    local r_s, r_f = GetRange(all_ranges[1])
+    if r_s > start then
+      table.insert(missing_ranges,start.."-"..(r_s-1))
+    end
+    if r_f < finish then
+      table.insert(missing_ranges,(r_f+1).."-"..finish)
+    end
+  else
+    table.insert(missing_ranges,start.."-"..finish)
+  end
+  
+  return missing_ranges
+end
+
+function EminentDKP:ScheduleEventsRequest(time)
+  self:CancelEventsRequest()
+  self.requestTimer = self:ScheduleTimer("RequestMissingEvents", (time ~= nil and time or 3))
+end
+
+function EminentDKP:CancelEventsRequest()
+  if self.requestTimer then
+    self:CancelTimer(self.requestTimer,true)
+    self.requestTimer = nil
+  end
+end
+
+-- Request the missing events
+function EminentDKP:RequestMissingEvents()
+  local mlist = self:GetMissingEventList()
+  if #(mlist) > 0 then
+    self:SendCommMessage('EminentDKP-Request',self:GetVersion() .. '_' ..implode(',',mlist),'GUILD')
+  end
+  wipe(self.requestedRanges)
 end
 
 -- Broadcast current addon version
@@ -1469,9 +1540,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
     if compare.event < 0 or compare.bug < 0 then
       if compare.event < 0 then
         -- Event data is out of date
-        -- Randomize a time in the next 1-5 seconds that requests events
-        -- This staggers event requests to cut down on addon channel traffic and spamming
-        self.syncTimer = self:ScheduleTimer("RequestMissingEvents", math.random(5), true)
+        self:ScheduleEventsRequest(math.random(3,6))
       end
     end
   end
@@ -1525,14 +1594,14 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   local currentEventID = self:GetEventCount()
   if tonumber(eventID) == (currentEventID + 1) then
     -- Effectively delay any event requests since we're processing another event
-    if self.syncTimer then
-      self:CancelTimer(self.syncTimer,true)
-      self.syncTimer = nil
-    end
+    self:CancelEventsRequest()
     self:ReplicateSyncEvent(eventID,event)
   elseif tonumber(eventID) > currentEventID then
     -- This is an event in the future, so cache it
     events_cache[eventID] = event
+    -- Keep scheduling an events request, as eventually
+    -- we'll stop caching events and need to fill in the holes
+    self:ScheduleEventsRequest()
   end
 end
 
@@ -1573,16 +1642,17 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     synced_dates[event_date] = { eventID }
   end
   
-  if events_cache[next_eventID] then
-    -- We have the next event we need to proceed with updating...
-    self:ReplicateSyncEvent(next_eventID,events_cache[next_eventID])
-  elseif self:GetEventCountDifference() > 0 then
-    -- We lack what we need to continue onward...
-    -- Give 3 seconds before we request missing events
-    -- This gives time to receive more events that are already being synced
-    self.syncTimer = self:ScheduleTimer("RequestMissingEvents", 3, false)
-    self:UpdateSyncedDays()
+  if self:GetEventCountDifference() > 0 then
+    if events_cache[next_eventID] then
+      -- We have the next event we need to proceed with updating...
+      self:ReplicateSyncEvent(next_eventID,events_cache[next_eventID])
+    else
+      -- We lack what we need to continue onward...
+      self:ScheduleEventsRequest()
+      self:UpdateSyncedDays()
+    end
   else
+    -- We're up to date!
     self:UpdateSyncedDays()
   end
 end
