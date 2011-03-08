@@ -242,6 +242,7 @@ local function ApplyItemFrameSettings(frame)
 	frame.status:SetStatusBarTexture(media:Fetch("statusbar", p.itemtexture))
 	
 	frame.status.spark:SetHeight(frame.status:GetHeight() + 10)
+	frame.status.spark:SetPoint("CENTER", frame.status, "RIGHT", 0, 0)
 	
 	frame.bid:SetWidth(frame:GetHeight() - 2)
 	frame.bid:SetHeight(frame:GetHeight() - 2)
@@ -296,7 +297,6 @@ local function CreateNewItemFrame()
 	itemframe.status = status
 	
 	local spark = itemframe:CreateTexture(nil, "OVERLAY")
-	spark:SetPoint("CENTER", status, "RIGHT", 0, 0)
 	spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
 	spark:SetBlendMode("ADD")
 	spark:SetWidth(14)
@@ -314,6 +314,7 @@ local function CreateNewItemFrame()
 	bid:SetScript("OnClick", function(f)
 	  last_bid_frame = f:GetParent()
 	  f.bidamt:ClearFocus()
+	  EminentDKP:ScheduleBidTimeout()
 	  EminentDKP:SendCommand("bid",f.bidamt:GetText())
 	end)
 	bid:SetMotionScriptsWhileDisabled(true)
@@ -370,13 +371,28 @@ local function GetItemFrame()
 	return frame
 end
 
+function EminentDKP:CancelBidTimeout()
+  if self.bidTimeout then
+    self:CancelTimer(self.bidTimeout,true)
+    self.bidTimeout = nil
+  end
+end
+
+-- Incase we never get a response about a bid, just assume it was rejected
+function EminentDKP:ScheduleBidTimeout()
+  self:CancelBidTimeout()
+  self.bidTimeout = self:ScheduleTimer("RejectLastItemBid",3)
+end
+
 -- Turn the bid amount box red (signify rejection of bid)
 function EminentDKP:RejectLastItemBid()
+  self:CancelBidTimeout()
   last_bid_frame.bid.bidamt:SetBackdropBorderColor(235,0,0,1)
 end
 
 -- Turn the bid amount box green (signify the acceptance of bid)
 function EminentDKP:AcceptLastItemBid()
+  self:CancelBidTimeout()
   last_bid_frame.bid.bidamt:SetBackdropBorderColor(0,235,0,1)
 end
 
@@ -390,6 +406,7 @@ end
 
 -- Display all the available loot for a given GUID
 function EminentDKP:ShowAuctionItems(guid)
+  if not self.auctionItems[guid] then return end
   -- If we are already showing the loot for a GUID: stop
   if auction_guid == guid then
     return
@@ -484,6 +501,10 @@ end
 
 -- Cleanup and recycle all the frames for re-use later (saves memory)
 function EminentDKP:RecycleAuctionItems()
+  if self.auctionRecycleTimer then
+    self:CancelTimer(self.auctionRecycleTimer,true)
+    self.auctionRecycleTimer = nil
+  end
   for i, frame in ipairs(item_frames) do
     frame.item = nil
     frame.slot = nil
@@ -522,6 +543,22 @@ end
 					}
 	StaticPopup_Show("ResetSkadaDialog")
 ]]
+local function TNum(number)
+  return tonumber(string.format("%.02f",number))
+end
+
+local function ConfirmAction(name,msg,accept)
+  StaticPopupDialogs[name] = {
+    text = msg, 
+    button1 = ACCEPT, 
+    button2 = CANCEL,
+    timeout = 15, 
+    whileDead = 0, 
+    hideOnEscape = 1, 
+    OnAccept = accept,
+  }
+  StaticPopup_Show(name)
+end
 
 -- Show the tab responsible for transfers
 local function CreateTransferTab(container)
@@ -537,14 +574,16 @@ local function CreateTransferTab(container)
   
   local amount = AceGUI:Create("Slider")
   amount:SetLabel("Amount")
-  amount:SetSliderValues(1,EminentDKP:GetMyCurrentDKP(),1)
+  amount:SetSliderValues(1,TNum(EminentDKP:GetMyCurrentDKP()),1)
   amount:SetValue(1)
   
   local send = AceGUI:Create("Button")
   send:SetText("Send")
   send:SetWidth(200)
   send:SetCallback("OnClick",function(what)
-    EminentDKP:SendCommand('transfer',amount:GetValue(),recip:GetValue())
+    ConfirmAction("EminentDKPTransfer",
+                  L["Are you sure you want to transfer %s %.02f DKP?"]:format(recip:GetValue(),amount:GetValue()),
+                  function() EminentDKP:SendCommand('transfer',amount:GetValue(),recip:GetValue()) end)
   end)
   send:SetDisabled(true)
   

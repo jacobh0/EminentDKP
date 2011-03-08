@@ -123,7 +123,7 @@ function EminentDKP:AddColumnOptions(mode)
         set= function() 
           mode.metadata.columns[colname] = not mode.metadata.columns[colname]
           db[c] = mode.metadata.columns[colname]
-          EminentDKP:UpdateDisplay(true)
+          EminentDKP:UpdateAllDisplays()
         end,
 			}
 			cols.args[c] = col

@@ -262,7 +262,10 @@ local classModePrototype = {
     			d.value = (hasmodedata and player.modedata.currentDKP or pdata.currentDKP)
     			d.class = pdata.class
     			-- Never show percent unless it is the alltime set, the percents are meaningless on individual days
-    			local showpercent = (set.sortnum ~= 1 and false or self.metadata.columns.Percent)
+    			local showpercent = false
+    			if set.sortnum == 1 then
+    			  showpercent = self.metadata.columns.Percent
+  			  end
     			d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
     			                              EminentDKP:StdNumber((d.value / set.modedata[self:GetName()].currentDKP) * 100).."%", showpercent)
     			if d.value > max then

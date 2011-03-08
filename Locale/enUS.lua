@@ -176,6 +176,8 @@ L["Control-Click for"] = "Control-Click for"
 
 L["Auction Frame"] = "Auction Frame"
 
+-- Action Panel Confirmations
+L["Are you sure you want to transfer %s %.02f DKP?"] = "Are you sure you want to transfer %s %.02f DKP?"
 
 -- General messages
 
@@ -194,7 +196,6 @@ L["ERROR: %s does not exist in the DKP pool."] = "ERROR: %s does not exist in th
 L["ERROR: %s is not a fresh player."] = "ERROR: %s is not a fresh player."
 L["ERROR: Invalid bounty amount given."] = "ERROR: Invalid bounty amount given."
 L["ERROR: An auction must not be active."] = "ERROR: An auction must not be active."
-L["ERROR: Must be in a raid with a masterlooter."] = "ERROR: Must be in a raid with a masterlooter."
 
 L["Successfully renamed %s to %s."] = "Successfully renamed %s to %s."
 L["Successfully reset vanity DKP for %s."] = "Successfully reset vanity DKP for %s."
@@ -214,7 +215,7 @@ L["You cannot transfer DKP during an auction."] = "You cannot transfer DKP durin
 L["You cannot transfer DKP to yourself."] = "You cannot transfer DKP to yourself."
 L["You do not exist in the DKP pool."] = "You do not exist in the DKP pool."
 L["%s does not exist in the DKP pool."] = "%s does not exist in the DKP pool."
-L["DKP amount must be a number greater than 0."] = "DKP amount must be a number greater than 0."
+L["DKP amount must be atleast 1."] = "DKP amount must be atleast 1."
 L["The DKP amount must not exceed your current DKP."] = "The DKP amount must not exceed your current DKP."
 
 L["Auction has closed. Determining winner..."] = "Auction has closed. Determining winner..."

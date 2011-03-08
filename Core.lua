@@ -994,11 +994,9 @@ function EminentDKP:OnInitialize()
   
   self.myName = UnitName("player")
   
-  -- Get the current loot info as a basis
-  self:PARTY_LOOT_METHOD_CHANGED()
   self.auctionItems = {}
   
-  -- Remember events we have recently sycned
+  -- Remember sync stuff
   self.syncRequests = {}
   self.syncProposals = {}
   self.requestedRanges = {}
@@ -1012,6 +1010,7 @@ function EminentDKP:OnInitialize()
   -- Since SharedMedia doesn't finish loading until after this executes, we need to re-apply
   -- the settings again to ensure everything is how it should be, an unfortunate work-around...
   self:ScheduleTimer("ApplySettingsAll", 2)
+  self:ScheduleTimer("PARTY_LOOT_METHOD_CHANGED", 2) --  Names don't load properly yet either
   
   DEFAULT_CHAT_FRAME:AddMessage("|rYou are using |cFFEBAA32EminentDKP |cFFAAEB32v"..VERSION.."|r")
   DEFAULT_CHAT_FRAME:AddMessage("|rVisit |cFFD2691Ehttp://eminent.enjin.com|r for feedback and support.")
@@ -2380,7 +2379,7 @@ function EminentDKP:Bid(addon,from,amount)
   if auction_active then
     if eligible_looters[from] then
       local bid = math.floor(tonumber(amount) or 0)
-      if bid > 0 then
+      if bid >= 1 then
         if self:PlayerHasDKP(from,bid) then
           self.bidItem.bids[from] = bid
           self:WhisperPlayer(addon,"bid",L["Your bid of %d has been accepted."]:format(bid), from, true)
@@ -2388,7 +2387,7 @@ function EminentDKP:Bid(addon,from,amount)
           self:WhisperPlayer(addon,"bid",L["The DKP amount must not exceed your current DKP."], from)
         end
       else
-        self:WhisperPlayer(addon,"bid",L["DKP amount must be a number greater than 0."], from)
+        self:WhisperPlayer(addon,"bid",L["DKP amount must be atleast 1."], from)
       end
     else
       self:WhisperPlayer(addon,"bid",L["You are not eligible to receive loot."], from)
@@ -2406,7 +2405,7 @@ function EminentDKP:Transfer(addon,from,amount,to)
       if self:PlayerExistsInPool(from) then
         if self:PlayerExistsInPool(to) then
           local dkp = tonumber(amount) or 0
-          if dkp > 0 then
+          if dkp >= 1 then
             if self:PlayerHasDKP(from,dkp) then
               self:CreateTransferSyncEvent(from,to,dkp)
               
@@ -2422,7 +2421,7 @@ function EminentDKP:Transfer(addon,from,amount,to)
               self:WhisperPlayer(addon,"transfer",L["The DKP amount must not exceed your current DKP."], from)
             end
           else
-            self:WhisperPlayer(addon,"transfer",L["DKP amount must be a number greater than 0."], from)
+            self:WhisperPlayer(addon,"transfer",L["DKP amount must be atleast 1."], from)
           end
         else
           self:WhisperPlayer(addon,"transfer",L["%s does not exist in the DKP pool."]:format(to), from)
@@ -2851,17 +2850,13 @@ function EminentDKP:ActuateNotification(notifyType,data)
     self:ShowAuctionItems(data.guid)
     self:ShowAuctionDisenchant(data.slot)
   elseif notifyType == "lootdone" then
-    self:RecycleAuctionItems()
+    self.auctionRecycleTimer = self:ScheduleTimer("RecycleAuctionItems",6)
   elseif notifyType == "scan" then
     self:GetActivePool().lastScan = data.time
   end
 end
 
 function EminentDKP:SendCommand(...)
-  if not self.masterLooterName or not self:IsAnOfficer(self.masterLooterName) then
-    self:DisplayActionResult(L["ERROR: Must be in a raid with a masterlooter."])
-    return
-  end
   local cmd, arg1, arg2 = ...
   local tbl = {}
   table.insert(tbl,cmd)
