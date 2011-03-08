@@ -720,7 +720,6 @@ function EminentDKP:ApplySettingsAll()
   for i, win in ipairs(windows) do
 		self:ApplySettings(win)
 	end
-	self:ApplyAuctionFrameSettings()
 end
 
 function EminentDKP:ApplySettings(win)
@@ -985,6 +984,8 @@ function EminentDKP:OnInitialize()
 	self.db.RegisterCallback(self, "OnProfileCopied", "ReloadWindows")
 	self.db.RegisterCallback(self, "OnProfileReset", "ReloadWindows")
   
+  self:DatabaseUpdate()
+  
   -- Modes
   for name, mode in EminentDKP:IterateModules() do
     if mode.OnEnable then
@@ -1004,16 +1005,20 @@ function EminentDKP:OnInitialize()
   self.broadcastCooldown = false
   
   self:CreateAuctionFrame()
-  self:DatabaseUpdate()
   self:ReloadWindows()
   
   -- Since SharedMedia doesn't finish loading until after this executes, we need to re-apply
   -- the settings again to ensure everything is how it should be, an unfortunate work-around...
-  self:ScheduleTimer("ApplySettingsAll", 2)
-  self:ScheduleTimer("PARTY_LOOT_METHOD_CHANGED", 2) --  Names don't load properly yet either
+  self:ScheduleTimer("GlobalApplySettings", 2)
   
   DEFAULT_CHAT_FRAME:AddMessage("|rYou are using |cFFEBAA32EminentDKP |cFFAAEB32v"..VERSION.."|r")
   DEFAULT_CHAT_FRAME:AddMessage("|rVisit |cFFD2691Ehttp://eminent.enjin.com|r for feedback and support.")
+end
+
+function EminentDKP:GlobalApplySettings()
+  self:ApplySettingsAll()
+  self:ApplyAuctionFrameSettings()
+  self:PARTY_LOOT_METHOD_CHANGED()
 end
 
 -- DATABASE UPDATES
@@ -2260,22 +2265,14 @@ end
 -- Tracking for hide when solo option
 function EminentDKP:PARTY_MEMBERS_CHANGED()
   if self.db.profile.hidesolo then
-    if is_solo() then
-		  self:ToggleMeters(false)
-	  else
-	    self:ToggleMeters(true)
-    end
+    self:ToggleMeters(not is_solo())
 	end
 end
 
 -- Keep track of people in the raid
 function EminentDKP:RAID_ROSTER_UPDATE()
   if self.db.profile.hidesolo then
-    if is_solo() then
-		  self:ToggleMeters(false)
-	  else
-	    self:ToggleMeters(true)
-    end
+    self:ToggleMeters(not is_solo())
 	end
   
   -- This only needs to be run by the masterlooter (and not in PVP)
