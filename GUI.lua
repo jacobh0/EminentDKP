@@ -31,6 +31,14 @@ local backdrop_default = {
 	insets = {left = 2, right = 2, top = 2, bottom = 2}
 }
 
+local bidamt_backdrop_default = {
+	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	edgeSize = 6,
+	tile = true,
+	insets = {left = 4, right = 4, top = 4, bottom = 4}
+}
+
 -- Handle the auction frame being moved
 local function move(self)
 	if not self:GetParent().locked then
@@ -329,7 +337,7 @@ local function CreateNewItemFrame()
 	bidamt:SetHeight(20)
 	bidamt:SetTextInsets(3, 3, 3, 3)
 	bidamt:SetMaxLetters(6)
-	bidamt:SetBackdrop(backdrop_default)
+	bidamt:SetBackdrop(bidamt_backdrop_default)
 	bidamt:SetBackdropColor(0.1, 0.1, 0.1, 1)
 	bidamt:SetBackdropBorderColor(0,0,0,1)
 	bidamt:SetAutoFocus(false)
@@ -590,7 +598,7 @@ local function CreateTransferTab(container)
   send:SetDisabled(true)
   
   recip:SetCallback("OnValueChanged",function(i,j,val)
-    if val ~= "" then
+    if val ~= "" and EminentDKP:InQualifiedRaid() then
       send:SetDisabled(false)
     else
       send:SetDisabled(true)

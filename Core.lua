@@ -2865,6 +2865,10 @@ function EminentDKP:ActuateNotification(notifyType,data)
   end
 end
 
+function EminentDKP:InQualifiedRaid()
+  return (UnitInRaid("player") and self.lootMethod == 'master' and self:IsAnOfficer(self.masterLooterName))
+end
+
 function EminentDKP:SendCommand(...)
   local cmd, arg1, arg2 = ...
   local tbl = {}
