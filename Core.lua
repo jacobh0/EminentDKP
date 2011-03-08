@@ -2572,7 +2572,7 @@ function EminentDKP:AuctionBidTimer()
       else
         sendchat(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter), nil, 'self')
       end
-      self:SendNotification("auctiondisenchant",{ slot = self.bidItem.slotNum })
+      self:SendNotification("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     else
       local bids = 0
       local secondHighestBid = 0
@@ -2818,6 +2818,10 @@ function EminentDKP:ActuateNotification(notifyType,data)
     if not self.auctionItems[guid] then
       data.guid = nil
       self.auctionItems[guid] = data
+      -- Get the items in the cache
+      for i,item in ipairs(data.items) do
+        GetItemInfo(item.info)
+      end
     end
   elseif notifyType == "bounty" then
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
