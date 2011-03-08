@@ -1073,6 +1073,7 @@ function EminentDKP:OnEnable()
 	-- Custom event notifications
 	self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
 	self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
+	self:RawHookScript(RaidWarningFrame, "OnEvent", "HideRaidWarning")
 	self:RawHook("LevelUpDisplay_AnimStep", "LevelUpDisplayFinished", true)
 	
 	if type(CUSTOM_CLASS_COLORS) == "table" then
@@ -2749,6 +2750,14 @@ function EminentDKP:CHAT_MSG_RAID_WARNING_CONTROLLER(eventController, message, f
   if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
     eventController:BlockFromChatFrame()
   end
+end
+
+function EminentDKP:HideRaidWarning(frame, event, message)
+  -- Ensure all correspondence from the addon is hidden (option)
+  if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
+    return
+  end
+  self.hooks[frame].OnEvent(frame, event, message)
 end
 
 function EminentDKP:CHAT_MSG_WHISPER_INFORM_CONTROLLER(eventController, message, from, ...)

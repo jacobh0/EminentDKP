@@ -464,6 +464,7 @@ function EminentDKP:CancelAuction(slot)
   HideBidApparatus(frame)
   frame.winner:SetText(L["Auction cancelled"])
   frame.winner:Show()
+  PlaySound("AuctionWindowClose")
 end
 
 -- Start the timer and show bid box/button for an item
@@ -478,6 +479,7 @@ function EminentDKP:StartAuction(slot,start)
   frame.status:Show()
   frame.status.spark:Show()
   frame.winner:Hide()
+  PlaySound("AuctionWindowOpen")
 end
 
 function EminentDKP:ShowAuctionDisenchant(slot)
@@ -582,7 +584,7 @@ local function CreateTransferTab(container)
   send:SetWidth(200)
   send:SetCallback("OnClick",function(what)
     ConfirmAction("EminentDKPTransfer",
-                  L["Are you sure you want to transfer %s %.02f DKP?"]:format(recip:GetValue(),amount:GetValue()),
+                  L["Are you sure you want to transfer %.02f DKP to %s?"]:format(recip:GetValue(),amount:GetValue()),
                   function() EminentDKP:SendCommand('transfer',amount:GetValue(),recip:GetValue()) end)
   end)
   send:SetDisabled(true)

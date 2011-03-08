@@ -177,7 +177,7 @@ L["Control-Click for"] = "Control-Click for"
 L["Auction Frame"] = "Auction Frame"
 
 -- Action Panel Confirmations
-L["Are you sure you want to transfer %s %.02f DKP?"] = "Are you sure you want to transfer %s %.02f DKP?"
+L["Are you sure you want to transfer %.02f DKP to %s?"] = "Are you sure you want to transfer %.02f DKP to %s?"
 
 -- General messages
 
