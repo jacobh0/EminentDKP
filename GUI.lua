@@ -146,10 +146,6 @@ function EminentDKP:ApplyAuctionFrameSettings()
 		auction_frame.bgframe:Hide()
 		
 		self:AdjustAuctionFrameBackgroundHeight()
-		
-		if auction_frame:IsShown() then
-		  auction_frame.bgframe:Show()
-	  end
 	elseif auction_frame.bgframe then
 		auction_frame.bgframe:Hide()
 	end
@@ -239,6 +235,10 @@ function EminentDKP:AdjustAuctionFrameBackgroundHeight()
     local settings = self.db.profile.auctionframe
     local height = (#(item_frames) * (settings.itemheight + settings.itemspacing)) + settings.background.borderthickness + settings.itemspacing
     auction_frame.bgframe:SetHeight(height)
+    
+    if self.db.profile.auctionframe.enablebackground and auction_frame:IsShown() then
+      auction_frame.bgframe:Show()
+    end
   end
 end
 
@@ -438,9 +438,6 @@ function EminentDKP:ShowAuctionItems(guid)
   auction_frame:Show()
   if self.db.profile.auctionframe.enabletitle then
 	  auction_frame.title:Show()
-  end
-  if self.db.profile.auctionframe.enablebackground and auction_frame.bgframe then
-    auction_frame.bgframe:Show()
   end
   auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(self.auctionItems[guid].name))
   for i, item in ipairs(self.auctionItems[guid].items) do

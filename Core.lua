@@ -2834,7 +2834,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
     local guid = data.guid
     data.guid = nil
     self.auctionItems[guid] = data
-    -- Get the items in the cache
+    -- Ensures the items showup properly when reported in the auction frame
     for i,item in ipairs(data.items) do
       GetItemInfo(item.info)
     end
@@ -2847,14 +2847,17 @@ function EminentDKP:ActuateNotification(notifyType,data)
       self:NotifyOnScreen("TRANSFER_MADE",data.amount,data.sender,data.receiver)
     end
   elseif notifyType == "auction" then
+    -- Start an auction
     if not self:AmMasterLooter() then auction_active = true end
     self:ShowAuctionItems(data.guid)
     self:StartAuction(data.slot,tonumber(data.start))
   elseif notifyType == "auctioncancel" then
+    -- Cancel an auction
     if not self:AmMasterLooter() then auction_active = false end
     self:ShowAuctionItems(data.guid)
     self:CancelAuction(data.slot)
   elseif notifyType == "auctionwon" then
+    -- Label the winner of an auction
     if not self:AmMasterLooter() then auction_active = false end
     self:ShowAuctionItems(data.guid)
     self:ShowAuctionWinner(data.slot,data.receiver,data.amount,data.tie)
@@ -2862,10 +2865,12 @@ function EminentDKP:ActuateNotification(notifyType,data)
       self:NotifyOnScreen("AUCTION_WON",data.item,data.amount)
     end
   elseif notifyType == "auctiondisenchant" then
+    -- Label an auction disenchanted
     if not self:AmMasterLooter() then auction_active = false end
     self:ShowAuctionItems(data.guid)
     self:ShowAuctionDisenchant(data.slot)
   elseif notifyType == "lootdone" then
+    -- Hide the auction frame
     self.auctionRecycleTimer = self:ScheduleTimer("RecycleAuctionItems",6,true)
   elseif notifyType == "scan" then
     self:GetActivePool().lastScan = data.time
@@ -2873,7 +2878,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
 end
 
 function EminentDKP:InQualifiedRaid()
-  return (UnitInRaid("player") and self.lootMethod == 'master' and self:IsAnOfficer(self:GetMasterLooterName()))
+  return (self:GetMasterLooterName() and self:IsAnOfficer(self:GetMasterLooterName()))
 end
 
 function EminentDKP:SendCommand(...)
