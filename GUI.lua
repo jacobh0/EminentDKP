@@ -34,9 +34,9 @@ local backdrop_default = {
 local bidamt_backdrop_default = {
 	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	edgeSize = 6,
+	edgeSize = 12,
 	tile = true,
-	insets = {left = 4, right = 4, top = 4, bottom = 4}
+	insets = {left = 3, right = 3, top = 3, bottom = 3}
 }
 
 -- Handle the auction frame being moved
@@ -66,6 +66,7 @@ function EminentDKP:CreateAuctionFrame()
   auction_frame:SetPoint("TOPLEFT", UIParent, "CENTER")
   auction_frame:SetMovable(true)
   auction_frame:SetClampedToScreen(true)
+  auction_frame:Hide()
 
   auction_frame.title = CreateFrame("Button", nil, auction_frame)
   auction_frame.title:SetScript("OnMouseDown", move)
@@ -110,22 +111,16 @@ function EminentDKP:ApplyAuctionFrameSettings()
 	auction_frame.title:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
 	auction_frame.title:SetWidth(p.itemwidth)
   auction_frame.title:SetHeight(p.itemheight * .75)
-	
-	if self:AuctionActive() and p.enabletitle then
-	  auction_frame.title:Show()
-  else
-    auction_frame.title:Hide()
-  end
   
   -- Window
 	if p.enablebackground then
 		if auction_frame.bgframe == nil then
-			auction_frame.bgframe = CreateFrame("Frame", p.name.."BG", g)
+			auction_frame.bgframe = CreateFrame("Frame", "EminentDKPAuctionFrameBG", auction_frame)
 			auction_frame.bgframe:SetFrameStrata("BACKGROUND")
-			auction_frame.bgframe:EnableMouse()
-			auction_frame.bgframe:EnableMouseWheel()
+			--auction_frame.bgframe:EnableMouse()
+			--auction_frame.bgframe:EnableMouseWheel()
 			--auction_frame.bgframe:SetScript("OnMouseDown", function(frame, btn) if btn == "RightButton" then window:RightClick() end end)
-			auction_frame.bgframe:SetScript("OnMouseWheel", function() end)
+			--auction_frame.bgframe:SetScript("OnMouseWheel", function() end)
 		end
 
 		local inset = p.background.margin
@@ -143,16 +138,27 @@ function EminentDKP:ApplyAuctionFrameSettings()
 		local color = p.background.color
 		auction_frame.bgframe:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
 		auction_frame.bgframe:SetWidth(auction_frame:GetWidth() + (p.background.borderthickness * 2))
-		auction_frame.bgframe:SetHeight(p.background.height)
 
 		auction_frame.bgframe:ClearAllPoints()
 		auction_frame.bgframe:SetPoint("LEFT", auction_frame.title, "LEFT", -p.background.borderthickness, 0)
 		auction_frame.bgframe:SetPoint("RIGHT", auction_frame.title, "RIGHT", p.background.borderthickness, 0)
-		auction_frame.bgframe:SetPoint("TOP", auction_frame.title, "BOTTOM", 0, 5)
-		auction_frame.bgframe:Show()
+		auction_frame.bgframe:SetPoint("TOP", auction_frame.title, "BOTTOM", 0, 0)
+		auction_frame.bgframe:Hide()
+		
+		self:AdjustAuctionFrameBackgroundHeight()
+		
+		if auction_frame:IsShown() then
+		  auction_frame.bgframe:Show()
+	  end
 	elseif auction_frame.bgframe then
 		auction_frame.bgframe:Hide()
 	end
+	
+	if auction_frame:IsShown() and p.enabletitle then
+	  auction_frame.title:Show()
+  else
+    auction_frame.title:Hide()
+  end
 	
 	auction_frame.locked = p.locked
   
@@ -213,8 +219,7 @@ end
 
 -- This updates the timer bar on an item auction
 local function TimerUpdate(frame)
-  local now = time()
-  local left = frame:GetParent().time - now
+  local left = frame:GetParent().time - GetTime()
   if left > 0 then
   	frame.spark:SetPoint("CENTER", frame, "LEFT", (left / 30) * frame:GetWidth(), 0)
   	frame:SetValue(left)
@@ -228,6 +233,14 @@ end
 
 local auction_guid = ""
 local last_bid_frame
+
+function EminentDKP:AdjustAuctionFrameBackgroundHeight()
+  if auction_frame.bgframe then
+    local settings = self.db.profile.auctionframe
+    local height = (#(item_frames) * (settings.itemheight + settings.itemspacing)) + settings.background.borderthickness + settings.itemspacing
+    auction_frame.bgframe:SetHeight(height)
+  end
+end
 
 -- Apply the profile settings to an item frame
 local function ApplyItemFrameSettings(frame)
@@ -245,12 +258,11 @@ local function ApplyItemFrameSettings(frame)
 	frame.buttonborder2:SetWidth(frame.button:GetWidth() + 2)
 	frame.buttonborder2:SetHeight(frame.button:GetHeight() + 2)
 	
-	frame.status:SetWidth(frame:GetWidth() - 2 - frame.button:GetWidth())
+	frame.status:SetWidth(frame:GetWidth() - 2 - frame.buttonborder2:GetWidth())
 	frame.status:SetHeight(frame:GetHeight() - 2)
 	frame.status:SetStatusBarTexture(media:Fetch("statusbar", p.itemtexture))
 	
 	frame.status.spark:SetHeight(frame.status:GetHeight() + 10)
-	frame.status.spark:SetPoint("CENTER", frame.status, "RIGHT", 0, 0)
 	
 	frame.bid:SetWidth(frame:GetHeight() - 2)
 	frame.bid:SetHeight(frame:GetHeight() - 2)
@@ -297,28 +309,26 @@ local function CreateNewItemFrame()
 	itemframe.buttonborder2 = buttonborder2
 	
 	local status = CreateFrame("StatusBar", nil, itemframe)
-	status:SetPoint("RIGHT", itemframe, "RIGHT", -1, 0)
+	status:SetPoint("LEFT", buttonborder2, "RIGHT", 0, 0)
 	status:SetScript("OnUpdate", TimerUpdate)
 	status:SetFrameLevel(status:GetFrameLevel()-1)
 	status:SetStatusBarColor(.8, .8, .8, .9)
 	status:Hide()
 	itemframe.status = status
 	
-	local spark = itemframe:CreateTexture(nil, "OVERLAY")
+	local spark = status:CreateTexture(nil, "OVERLAY")
 	spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
+	spark:SetPoint("CENTER", status, "RIGHT", 0, 0)
 	spark:SetBlendMode("ADD")
 	spark:SetWidth(14)
 	spark:Hide()
 	status.spark = spark
 	
 	local bid = CreateFrame("Button", nil, itemframe)
-	bid:SetPoint("RIGHT", itemframe, "RIGHT", -1, -2)
+	bid:SetPoint("RIGHT", itemframe, "RIGHT", -2, -2)
 	bid:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Up")
 	bid:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Down")
 	bid:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Highlight")
-	bid.tiptext = "Bid Now"
-	--f:SetScript("OnEnter", SetTip)
-	--f:SetScript("OnLeave", HideTip)
 	bid:SetScript("OnClick", function(f)
 	  last_bid_frame = f:GetParent()
 	  f.bidamt:ClearFocus()
@@ -332,14 +342,14 @@ local function CreateNewItemFrame()
 	itemframe.bid = bid
 	
 	local bidamt = CreateFrame("EditBox", nil, itemframe)
-	bidamt:SetPoint("RIGHT", bid, "LEFT", -2, 2)
-	bidamt:SetWidth(45)
+	bidamt:SetPoint("RIGHT", bid, "LEFT", -1, 2)
+	bidamt:SetWidth(55)
 	bidamt:SetHeight(20)
-	bidamt:SetTextInsets(3, 3, 3, 3)
+	bidamt:SetTextInsets(5, 5, 5, 3)
 	bidamt:SetMaxLetters(6)
 	bidamt:SetBackdrop(bidamt_backdrop_default)
-	bidamt:SetBackdropColor(0.1, 0.1, 0.1, 1)
-	bidamt:SetBackdropBorderColor(0.3,0.3,0.3,1)
+	bidamt:SetBackdropColor(0.1,0.1,0.1,1)
+	bidamt:SetBackdropBorderColor(0.5,0.5,0.5,1)
 	bidamt:SetAutoFocus(false)
 	bidamt:SetFontObject(ChatFontNormal)
 	bidamt:SetScript("OnTextChanged", VerifyBid)
@@ -408,21 +418,29 @@ end
 function EminentDKP:ReApplyItemFrameSettings()
   for i, frame in ipairs(item_frames) do
     ApplyItemFrameSettings(frame)
-    frame:SetPoint("TOPLEFT", i > 1 and item_frames[i] or auction_frame.title, "BOTTOMLEFT", 0, -(self.db.profile.auctionframe.itemspacing))
+    frame:SetPoint("TOPLEFT", i > 1 and item_frames[i-1] or auction_frame.title, "BOTTOMLEFT", 0, -(self.db.profile.auctionframe.itemspacing))
   end
 end
 
 -- Display all the available loot for a given GUID
 function EminentDKP:ShowAuctionItems(guid)
   if not self.auctionItems[guid] then return end
-  -- If we are already showing the loot for a GUID: stop
   if auction_guid == guid then
-    return
-  elseif auction_guid ~= "" then
-    self:RecycleAuctionItems()
+    -- If the # of items has decreased, re-draw the lootlist
+    if #(self.auctionItems[guid].items) < #(item_frames) then
+      self:RecycleAuctionItems(false)
+    else
+      return
+    end
+  else
+    self:RecycleAuctionItems(false)
   end
+  auction_frame:Show()
   if self.db.profile.auctionframe.enabletitle then
 	  auction_frame.title:Show()
+  end
+  if self.db.profile.auctionframe.enablebackground and auction_frame.bgframe then
+    auction_frame.bgframe:Show()
   end
   auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(self.auctionItems[guid].name))
   for i, item in ipairs(self.auctionItems[guid].items) do
@@ -446,6 +464,7 @@ function EminentDKP:ShowAuctionItems(guid)
     f:Show()
   end
   auction_guid = guid
+  self:AdjustAuctionFrameBackgroundHeight()
 end
 
 local function GetItemFrameBySlot(slot)
@@ -479,7 +498,7 @@ end
 function EminentDKP:StartAuction(slot,start)
   local frame = GetItemFrameBySlot(slot)
   frame.bid:Show()
-  frame.bid.bidamt:SetBackdropBorderColor(0.3,0.3,0.3,1)
+  frame.bid.bidamt:SetBackdropBorderColor(0.5,0.5,0.5,1)
   frame.bid.bidamt:Show()
   frame.time = start + 30
   frame.status:SetMinMaxValues(0, 30)
@@ -510,7 +529,7 @@ function EminentDKP:ShowAuctionWinner(slot,name,amount,tie)
 end
 
 -- Cleanup and recycle all the frames for re-use later (saves memory)
-function EminentDKP:RecycleAuctionItems()
+function EminentDKP:RecycleAuctionItems(clear_list)
   if self.auctionRecycleTimer then
     self:CancelTimer(self.auctionRecycleTimer,true)
     self.auctionRecycleTimer = nil
@@ -528,8 +547,12 @@ function EminentDKP:RecycleAuctionItems()
   end
   wipe(item_frames)
   auction_frame.title:Hide()
+  if auction_frame.bgframe then
+    auction_frame.bgframe:Hide()
+  end
+  auction_frame:Hide()
   -- Clear out the loot list for this GUID, we no longer need it
-  if self.auctionItems[auction_guid] then
+  if clear_list and self.auctionItems[auction_guid] then
     self.auctionItems[auction_guid] = nil
   end
   auction_guid = ""
@@ -592,7 +615,7 @@ local function CreateTransferTab(container)
   send:SetWidth(200)
   send:SetCallback("OnClick",function(what)
     ConfirmAction("EminentDKPTransfer",
-                  L["Are you sure you want to transfer %.02f DKP to %s?"]:format(recip:GetValue(),amount:GetValue()),
+                  L["Are you sure you want to transfer %.02f DKP to %s?"]:format(amount:GetValue(),recip:GetValue()),
                   function() EminentDKP:SendCommand('transfer',amount:GetValue(),recip:GetValue()) end)
   end)
   send:SetDisabled(true)

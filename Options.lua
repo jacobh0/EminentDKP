@@ -81,8 +81,8 @@ EminentDKP.defaults = {
     	itemfont = "Accidental Presidency",
     	itemtexture = "Healbot",
     	itemspacing = 4,
-      title = {menubutton = true, font="Accidental Presidency", fontsize=14,margin=0, texture="Armory", bordertexture="None", borderthickness=2, color = {r=0,g=0,b=0,a=0.6}},
-    	background = {margin=0, height=150, texture="None", bordertexture="None", borderthickness=0, color = {r=0,g=0,b=0.5,a=0.5}},
+      title = {font="Accidental Presidency", fontsize=14,margin=0, texture="Armory", bordertexture="None", borderthickness=2, color = {r=0,g=0,b=0,a=0.6}},
+    	background = {margin=0, texture="None", bordertexture="None", borderthickness=0, color = {r=0,g=0,b=0.5,a=0.5}},
     	enabletitle = true, 
     	enablebackground = false,
     	locked = false,
@@ -473,20 +473,6 @@ EminentDKP.options = {
               end,
               order=4,
             },
-            height = {
-              type="range",
-              name=L["Window height"],
-              desc=L["The height of the window. If this is 0 the height is dynamically changed according to how many bars exist."],
-              min=0,
-              max=600,
-              step=1,
-              get=function() return EminentDKP.db.profile.auctionframe.background.height end,
-              set=function(win, height)
-                EminentDKP.db.profile.auctionframe.background.height = height
-                EminentDKP:ApplyAuctionFrameSettings()
-              end,
-              order=5,
-            },
             color = {
               type="color",
               name=L["Background color"],
@@ -500,7 +486,7 @@ EminentDKP.options = {
                 EminentDKP.db.profile.auctionframe.background.color = {["r"] = r, ["g"] = g, ["b"] = b, ["a"] = a}
                 EminentDKP:ApplyAuctionFrameSettings()
               end,
-              order=6,
+              order=5,
             },
           },
         },

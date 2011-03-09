@@ -1583,12 +1583,14 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
         name=self.auctionItems[self.bidItem.srcGUID].name,
         items=self.auctionItems[self.bidItem.srcGUID].items
       },sender)
-      -- Start the auction for them
-      self:SendNotification("auction",{ 
-        guid=self.bidItem.srcGUID, 
-        slot=self.bidItem.slotNum, 
-        start=self.bidItem.start
-      },sender)
+      if auction_active then
+        -- Start the auction for them
+        self:SendNotification("auction",{ 
+          guid=self.bidItem.srcGUID, 
+          slot=self.bidItem.slotNum, 
+          start=self.bidItem.start
+        },sender)
+      end
     end
   end
 end
@@ -1809,7 +1811,8 @@ end
 function EminentDKP:GetOtherPlayersNames()
   local list = {}
   for name,pid in pairs(self:GetActivePool().playerIDs) do
-    if name ~= self.myName then
+    local pdata = self:GetPlayerByID(pid)
+    if pdata.active and name ~= self.myName then
       list[name] = name
     end
   end
@@ -2308,6 +2311,16 @@ function EminentDKP:AmMasterLooter()
   return (self.amMasterLooter and self:AmOfficer())
 end
 
+function EminentDKP:GetMasterLooterName()
+  if self.lootMethod == 'master' and UnitInRaid("player") then
+    if not UnitInRaid(self.masterLooterName) then
+      self:PARTY_LOOT_METHOD_CHANGED()
+    end
+    return self.masterLooterName
+  end
+  return nil
+end
+
 -- Loot window closing means cancel auction
 function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
@@ -2527,7 +2540,7 @@ function EminentDKP:AdminStartAuction()
   			  bids={}, 
   			  slotNum=slot,
   			  srcGUID=guid,
-  			  start=time(),
+  			  start=GetTime(),
   			}
   			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
   			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
@@ -2783,7 +2796,7 @@ function EminentDKP:SendNotification(...)
 end
 
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
-  if not self:IsAnOfficer(sender) then return end
+  --if not self:IsAnOfficer(sender) then return end
   -- Decode the compressed data
   local one = libCE:Decode(message)
 
@@ -2819,14 +2832,11 @@ function EminentDKP:ActuateNotification(notifyType,data)
     end
   elseif notifyType == "lootlist" then
     local guid = data.guid
-    -- We only set the loot list once
-    if not self.auctionItems[guid] then
-      data.guid = nil
-      self.auctionItems[guid] = data
-      -- Get the items in the cache
-      for i,item in ipairs(data.items) do
-        GetItemInfo(item.info)
-      end
+    data.guid = nil
+    self.auctionItems[guid] = data
+    -- Get the items in the cache
+    for i,item in ipairs(data.items) do
+      GetItemInfo(item.info)
     end
   elseif notifyType == "bounty" then
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
@@ -2856,14 +2866,14 @@ function EminentDKP:ActuateNotification(notifyType,data)
     self:ShowAuctionItems(data.guid)
     self:ShowAuctionDisenchant(data.slot)
   elseif notifyType == "lootdone" then
-    self.auctionRecycleTimer = self:ScheduleTimer("RecycleAuctionItems",6)
+    self.auctionRecycleTimer = self:ScheduleTimer("RecycleAuctionItems",6,true)
   elseif notifyType == "scan" then
     self:GetActivePool().lastScan = data.time
   end
 end
 
 function EminentDKP:InQualifiedRaid()
-  return (UnitInRaid("player") and self.lootMethod == 'master' and self:IsAnOfficer(self.masterLooterName))
+  return (UnitInRaid("player") and self.lootMethod == 'master' and self:IsAnOfficer(self:GetMasterLooterName()))
 end
 
 function EminentDKP:SendCommand(...)
@@ -2872,7 +2882,7 @@ function EminentDKP:SendCommand(...)
   table.insert(tbl,cmd)
   table.insert(tbl,arg1)
   table.insert(tbl,arg2)
-  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self.masterLooterName)
+  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self:GetMasterLooterName())
 end
 
 function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
