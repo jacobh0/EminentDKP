@@ -92,6 +92,7 @@ function EminentDKP:ApplyAuctionFrameSettings()
   auction_frame:SetWidth(p.itemwidth)
   auction_frame:SetHeight(p.itemheight * .75)
   
+  -- Auction frame title
   local fo = CreateFont("TitleFontEminentDKPAuctionFrame")
 	fo:SetFont(media:Fetch('font', p.title.font), p.title.fontsize)
 	auction_frame.title:SetNormalFontObject(fo)
@@ -112,15 +113,11 @@ function EminentDKP:ApplyAuctionFrameSettings()
 	auction_frame.title:SetWidth(p.itemwidth)
   auction_frame.title:SetHeight(p.itemheight * .75)
   
-  -- Window
+  -- Auction frame background
 	if p.enablebackground then
 		if auction_frame.bgframe == nil then
 			auction_frame.bgframe = CreateFrame("Frame", "EminentDKPAuctionFrameBG", auction_frame)
 			auction_frame.bgframe:SetFrameStrata("BACKGROUND")
-			--auction_frame.bgframe:EnableMouse()
-			--auction_frame.bgframe:EnableMouseWheel()
-			--auction_frame.bgframe:SetScript("OnMouseDown", function(frame, btn) if btn == "RightButton" then window:RightClick() end end)
-			--auction_frame.bgframe:SetScript("OnMouseWheel", function() end)
 		end
 
 		local inset = p.background.margin
