@@ -2796,7 +2796,7 @@ function EminentDKP:SendNotification(...)
 end
 
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
-  --if not self:IsAnOfficer(sender) then return end
+  if not self:IsAnOfficer(sender) then return end
   -- Decode the compressed data
   local one = libCE:Decode(message)
 
@@ -2877,6 +2877,7 @@ function EminentDKP:InQualifiedRaid()
 end
 
 function EminentDKP:SendCommand(...)
+  if not self:GetMasterLooterName() then return end
   local cmd, arg1, arg2 = ...
   local tbl = {}
   table.insert(tbl,cmd)
