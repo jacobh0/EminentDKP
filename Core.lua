@@ -30,33 +30,33 @@ TODO:
 
 HighResTimer = {
   Get = function(self)
-    return self.TimeDelta and self.TimeStart + GetTime() - self.TimeDelta or time();
+    return self.TimeDelta and self.TimeStart + GetTime() - self.TimeDelta or time()
   end,
 
   OnUpdate = function(self)
     if (self.TimeDelta ~= nil) then
-      return;
+      return
     end
     
-    local t = time();
-    local gt = GetTime();
+    local t = time()
+    local gt = GetTime()
     if (self.LastTime == nil) then
-      self.LastTime = t;
-      return;
+      self.LastTime = t
+      return
     end
-    // Soon as our second changes, record GetTime delta
+    -- Soon as our second changes, record GetTime delta
     if (t > self.LastTime) then
-      self.TimeStart = t;
-      self.TimeDelta = gt;
+      self.TimeStart = t
+      self.TimeDelta = gt
     end
   end,
 
   Initialize = function(self)
-  	self.Frame = CreateFrame("Frame");
-  	self.Frame:SetScript("OnUpdate", function() self:OnUpdate(); end);
+  	self.Frame = CreateFrame("Frame")
+  	self.Frame:SetScript("OnUpdate", function() self:OnUpdate() end)
   end
 }
-HighResTimer:Initialize();
+HighResTimer:Initialize()
 
 function EminentDKP:GetTime()
   return HighResTimer:Get()
