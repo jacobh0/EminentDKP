@@ -2819,11 +2819,6 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
   end
   
   self:ActuateNotification(notifyType,data)
-  
-  while #(cached_notifications) > 0 do
-    local n = tremove(cached_notifications)
-    self:ActuateNotification(n.t,n.d)
-  end
 end
 
 function EminentDKP:ActuateNotification(notifyType,data)
@@ -2852,6 +2847,10 @@ function EminentDKP:ActuateNotification(notifyType,data)
     -- Ensures the items showup properly when reported in the auction frame
     for i,item in ipairs(data.items) do
       GetItemInfo(item.info)
+    end
+    while #(cached_notifications) > 0 do
+      local n = tremove(cached_notifications)
+      self:ActuateNotification(n.t,n.d)
     end
   elseif notifyType == "bounty" then
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
