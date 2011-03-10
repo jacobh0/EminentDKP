@@ -2370,7 +2370,7 @@ function EminentDKP:LOOT_OPENED()
 		    self:SendNotification("lootlist",{ guid=guid, name=unitName, items=itemlist })
 			end
 			-- Ensure that we only print once by keeping track of the GUID
-			recent_loots[guid] = { name=unitName, slots=slotlist }
+			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
     end
   end
 end
@@ -2795,6 +2795,8 @@ function EminentDKP:SendNotification(...)
   end
 end
 
+local cached_notifications = {}
+
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
   if not self:IsAnOfficer(sender) then return end
   -- Decode the compressed data
@@ -2817,9 +2819,22 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
   end
   
   self:ActuateNotification(notifyType,data)
+  
+  while #(cached_notifications) > 0 do
+    local n = tremove(cached_notifications)
+    self:ActuateNotification(n.t,n.d)
+  end
 end
 
 function EminentDKP:ActuateNotification(notifyType,data)
+  if notifyType ~= "lootlist" and data.guid then
+    if not self.auctionItems[data.guid] then
+      table.insert(cached_notifications,1,{t=notifyType,d=data})
+      self:SendCommand("lootlist",data.guid)
+      return
+    end
+  end
+  
   if notifyType == "accept" or notifyType == "reject" then
     if data.from == "transfer" then
       self:DisplayActionResult(data.message)
@@ -2892,12 +2907,22 @@ function EminentDKP:SendCommand(...)
 end
 
 function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
+  if not self:AmMasterLooter() then return end
   local command, arg1, arg2 = strsplit(",", message, 3)
   
   if command == 'bid' then
     self:Bid(true,sender,arg1)
   elseif command == 'transfer' then
     self:Transfer(true,sender,arg1,arg2)
+  elseif command == 'lootlist' then
+    -- Send them the loot
+    if recent_loots[arg1] then
+      self:SendNotification("lootlist",{ 
+        guid=arg1, 
+        name=recent_loots[arg1].name,
+        items=recent_loots[arg1].items
+      },sender)
+    end
   end
 end
 
