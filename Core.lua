@@ -2832,7 +2832,7 @@ end
 local cached_notifications = {}
 
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
-  --if not self:IsAnOfficer(sender) then return end
+  if not self:IsAnOfficer(sender) then return end
   -- Decode the compressed data
   local one = libCE:Decode(message)
 
@@ -2853,6 +2853,13 @@ function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
   end
   
   self:ActuateNotification(notifyType,data)
+end
+
+function EminentDKP:RunCachedNotifications()
+  while #(cached_notifications) > 0 do
+    local n = tremove(cached_notifications)
+    self:ActuateNotification(n.t,n.d)
+  end
 end
 
 function EminentDKP:ActuateNotification(notifyType,data)
@@ -2882,10 +2889,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
     for i,item in ipairs(data.items) do
       GetItemInfo(item.info)
     end
-    while #(cached_notifications) > 0 do
-      local n = tremove(cached_notifications)
-      self:ActuateNotification(n.t,n.d)
-    end
+    self:ScheduleTimer("RunCachedNotifications",1)
   elseif notifyType == "bounty" then
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
   elseif notifyType == "transfer" then
