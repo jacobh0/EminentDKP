@@ -2540,7 +2540,7 @@ function EminentDKP:AdminStartAuction()
   			  bids={}, 
   			  slotNum=slot,
   			  srcGUID=guid,
-  			  start=GetTime(),
+  			  start=time(),
   			}
   			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
   			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
@@ -2798,7 +2798,7 @@ end
 local cached_notifications = {}
 
 function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
-  if not self:IsAnOfficer(sender) then return end
+  --if not self:IsAnOfficer(sender) then return end
   -- Decode the compressed data
   local one = libCE:Decode(message)
 

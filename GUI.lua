@@ -212,7 +212,7 @@ end
 
 -- This updates the timer bar on an item auction
 local function TimerUpdate(frame)
-  local left = frame:GetParent().time - GetTime()
+  local left = time() - frame:GetParent().time
   if left > 0 then
   	frame.spark:SetPoint("CENTER", frame, "LEFT", (left / 30) * frame:GetWidth(), 0)
   	frame:SetValue(left)
@@ -421,7 +421,6 @@ end
 
 -- Display all the available loot for a given GUID
 function EminentDKP:ShowAuctionItems(guid)
-  if not self.auctionItems[guid] then return end
   if auction_guid == guid then
     -- If the # of items has decreased, re-draw the lootlist
     if #(self.auctionItems[guid].items) < #(item_frames) then
