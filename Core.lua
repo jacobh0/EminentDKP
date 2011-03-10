@@ -28,6 +28,40 @@ TODO:
 
 ]]
 
+HighResTimer = {
+  Get = function(self)
+    return self.TimeDelta and self.TimeStart + GetTime() - self.TimeDelta or time();
+  end,
+
+  OnUpdate = function(self)
+    if (self.TimeDelta ~= nil) then
+      return;
+    end
+    
+    local t = time();
+    local gt = GetTime();
+    if (self.LastTime == nil) then
+      self.LastTime = t;
+      return;
+    end
+    // Soon as our second changes, record GetTime delta
+    if (t > self.LastTime) then
+      self.TimeStart = t;
+      self.TimeDelta = gt;
+    end
+  end,
+
+  Initialize = function(self)
+  	self.Frame = CreateFrame("Frame");
+  	self.Frame:SetScript("OnUpdate", function() self:OnUpdate(); end);
+  end
+}
+HighResTimer:Initialize();
+
+function EminentDKP:GetTime()
+  return HighResTimer:Get()
+end
+
 -- All the meter windows
 local windows = {}
 
@@ -1588,7 +1622,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
         self:SendNotification("auction",{ 
           guid=self.bidItem.srcGUID, 
           slot=self.bidItem.slotNum, 
-          elapsed=(GetTime() - self.bidItem.start)
+          start=self.bidItem.start
         },sender)
       end
     end
@@ -2540,9 +2574,9 @@ function EminentDKP:AdminStartAuction()
   			  bids={}, 
   			  slotNum=slot,
   			  srcGUID=guid,
-  			  start=GetTime(),
+  			  start=self:GetTime(),
   			}
-  			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, elapsed = 0 })
+  			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
   			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
 		
   			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
@@ -2864,7 +2898,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
     -- Start an auction
     if not self:AmMasterLooter() then auction_active = true end
     self:ShowAuctionItems(data.guid)
-    self:StartAuction(data.slot,data.elapsed)
+    self:StartAuction(data.slot,data.start)
   elseif notifyType == "auctioncancel" then
     -- Cancel an auction
     if not self:AmMasterLooter() then auction_active = false end
