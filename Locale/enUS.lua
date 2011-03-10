@@ -224,7 +224,6 @@ L["%s was not eligible to receive loot to disenchant."] = "%s was not eligible t
 L["A tie was broken with a random roll."] = "A tie was broken with a random roll."
 
 L["%s has won %s for %d DKP!"] = "%s has won %s for %d DKP!"
-L["Each player has received %d DKP."] = "Each player has received %d DKP."
 L["No more loot found."] = "No more loot found."
 
 L["A bounty of %.02f has been awarded to %d players."] = "A bounty of %.02f has been awarded to %d players."

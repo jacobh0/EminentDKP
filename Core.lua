@@ -2282,7 +2282,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
       if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
         local name = self:GetPlayerNameByID(pid)
         if self:IsPlayerFresh(name) then
-          -- purge
+          -- The player has been inactive for a while, purge them if they're fresh
           self:CreatePurgeSyncEvent(name)
         elseif data.active then
           -- If deemed inactive then reset their DKP and vanity DKP
@@ -2540,10 +2540,7 @@ end
 function EminentDKP:AdminStartAuction()
   if not self:EnsureMasterlooter() then return end
   if GetNumLootItems() > 0 then
-    local guid = 'container'
-    if UnitExists("target") then
-      guid = UnitGUID("target")
-    end
+    local guid = UnitExists("target") and UnitGUID("target") or 'container'
     if #(recent_loots[guid].slots) > 0 then
       if not auction_active then
         -- Update eligibility list
@@ -2654,7 +2651,7 @@ function EminentDKP:AuctionBidTimer()
       
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
       sendchat(L["%s has won %s for %d DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid), "raid", "preset")
-      sendchat(L["Each player has received %d DKP."]:format(dividend), "raid", "preset")
+      sendchat(L["Each player has received %.02f DKP."]:format(dividend), "raid", "preset")
       self:SendNotification("auctionwon",{
         guid = self.bidItem.srcGUID, 
         amount = secondHighestBid, 
@@ -2863,6 +2860,7 @@ function EminentDKP:RunCachedNotifications()
 end
 
 function EminentDKP:ActuateNotification(notifyType,data)
+  -- We don't have a lootlist, so request it before we run this
   if notifyType ~= "lootlist" and data.guid then
     if not self.auctionItems[data.guid] then
       table.insert(cached_notifications,1,{t=notifyType,d=data})
