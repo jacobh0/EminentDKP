@@ -1588,7 +1588,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
         self:SendNotification("auction",{ 
           guid=self.bidItem.srcGUID, 
           slot=self.bidItem.slotNum, 
-          start=self.bidItem.start
+          elapsed=(GetTime() - self.bidItem.start)
         },sender)
       end
     end
@@ -2540,9 +2540,9 @@ function EminentDKP:AdminStartAuction()
   			  bids={}, 
   			  slotNum=slot,
   			  srcGUID=guid,
-  			  start=time(),
+  			  start=GetTime(),
   			}
-  			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
+  			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, elapsed = 0 })
   			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
 		
   			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
@@ -2864,7 +2864,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
     -- Start an auction
     if not self:AmMasterLooter() then auction_active = true end
     self:ShowAuctionItems(data.guid)
-    self:StartAuction(data.slot,tonumber(data.start))
+    self:StartAuction(data.slot,data.elapsed)
   elseif notifyType == "auctioncancel" then
     -- Cancel an auction
     if not self:AmMasterLooter() then auction_active = false end

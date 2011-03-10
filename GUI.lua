@@ -212,7 +212,7 @@ end
 
 -- This updates the timer bar on an item auction
 local function TimerUpdate(frame)
-  local left = time() - frame:GetParent().time
+  local left = GetTime() - frame:GetParent().elapsed
   if left > 0 then
   	frame.spark:SetPoint("CENTER", frame, "LEFT", (left / 30) * frame:GetWidth(), 0)
   	frame:SetValue(left)
@@ -488,12 +488,12 @@ function EminentDKP:CancelAuction(slot)
 end
 
 -- Start the timer and show bid box/button for an item
-function EminentDKP:StartAuction(slot,start)
+function EminentDKP:StartAuction(slot,elapsed)
   local frame = GetItemFrameBySlot(slot)
   frame.bid:Show()
   frame.bid.bidamt:SetBackdropBorderColor(0.5,0.5,0.5,1)
   frame.bid.bidamt:Show()
-  frame.time = start + 30
+  frame.elapsed = GetTime() - elapsed
   frame.status:SetMinMaxValues(0, 30)
   frame.status:SetValue(30)
   frame.status:Show()
@@ -530,7 +530,7 @@ function EminentDKP:RecycleAuctionItems(clear_list)
   for i, frame in ipairs(item_frames) do
     frame.item = nil
     frame.slot = nil
-    frame.time = nil
+    frame.elapsed = nil
     frame.bid.bidamt:SetText("")
     frame.winner:SetText("")
     HideBidApparatus(frame)
