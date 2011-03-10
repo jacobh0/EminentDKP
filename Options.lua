@@ -29,6 +29,7 @@ EminentDKP.windowdefaults = {
 	
 	hidden = false,
 	enabletitle = true, 
+	enablestatus = true,
 	enablebackground = false,
 	
 	set = nil,

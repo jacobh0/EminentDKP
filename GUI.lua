@@ -939,6 +939,18 @@ function meter:ApplySettings(window)
 	else
 		g:HideAnchor()
 	end
+  
+	-- Status bar
+	g.status:ShowLabel()
+	g.status:SetColorAt(0, color.r, color.g, color.b, color.a or 1)
+	--g.status:SetLabel("Test")
+	g.status:SetValue(50)
+	
+	if p.enablestatus then
+	  g:ShowStatus()
+  else
+    g:HideStatus()
+  end
 	
 	-- Spark.
 	if g:HasAnyBar() then
