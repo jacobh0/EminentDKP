@@ -173,7 +173,6 @@ local function CompareVersions(current,other)
 end
 
 local function UpdateNewestVersion(newer)
-  -- todo: trigger a notification if we need update
   local newer_version = strtrim(newer)
   local compare = CompareVersions(EminentDKP:GetNewestVersion(),newer_version)
   
@@ -190,6 +189,7 @@ local function UpdateNewestVersion(newer)
       end
     end
   end
+  EminentDKP:UpdateStatusBar()
 end
 
 local function CheckVersionCompatability(otherversion)
@@ -795,55 +795,6 @@ function EminentDKP:UpdateAllDisplays()
   end
 end
 
-local function lerp(a, b, delta)
-  return (a + (b - a) * delta)
-end
-
-local color_red = { .7, .13, .13 }
-local color_green = { .13, .7, .13 }
-
-local function ColorLerp(color1, color2, delta)
-  return lerp(color1[1], color2[1], delta), 
-         lerp(color1[2], color2[2], delta), 
-         lerp(color1[3], color2[3], delta)
-end
-
-function EminentDKP:UpdateStatusBar()
-  local color, label, maxvalue, value
-  if not syncing then
-    if self:NeedSync() then
-      -- Show out of date status
-      maxvalue = self:GetNewestEventCount()
-      value = self:GetEventCount()
-      local percent = value / maxvalue
-      color = color_red
-      label = ("Out of Date (%d%%)"):format(percent)
-    else
-      -- Show the bounty status
-      local percent = self:GetAvailableBountyPercent()
-      color = { ColorLerp(color_green,color_red,(percent / 100)) }
-      label = ("Bounty: %.02f (%d%%)"):format(self:GetAvailableBounty(),percent)
-      maxvalue = 100
-      value = percent
-    end
-  else
-    -- Show the sync status
-    maxvalue = self:GetNewestEventCount()
-    value = self:GetEventCount()
-    local percent = value / maxvalue
-    color = { ColorLerp(color_red,color_green,percent) }
-    label = ("Syncing... %d/%d (%d%%)"):format(value,maxvalue,(percent * 100))
-  end
-  -- Update the status bar in all windows
-  for i, win in ipairs(windows) do
-    win.bargroup.status:UnsetAllColors()
-    win.bargroup.status:SetColorAt(0, color[1], color[2], color[3], 1)
-    win.bargroup.status:SetLabel(label)
-    win.bargroup.status:SetValue(value)
-    win.bargroup.status:SetMaxValue(maxvalue)
-  end
-end
-
 -- Update a given window's display
 function EminentDKP:UpdateDisplay(win)
 	if win.selectedmode then
@@ -1330,6 +1281,10 @@ function EminentDKP:GetNewestVersion()
   return (newest_version ~= '' and newest_version or self:GetVersion())
 end
 
+function EminentDKP:NeedUpgrade()
+  return needs_update
+end
+
 ---------- START SYNC FUNCTIONS ----------
 
 function EminentDKP:GetNewestEventCount()
@@ -1654,7 +1609,6 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
     if compare.event < 0 or compare.bug < 0 then
       if compare.event < 0 then
         -- Event data is out of date
-        self:UpdateStatusBar()
         self:ScheduleEventsRequest(math.random(3,6))
       end
     end
@@ -1936,7 +1890,7 @@ function EminentDKP:GetPlayerPool()
   return self:GetActivePool().players
 end
 
-function EminentDKP:GetTotalBounty()
+function EminentDKP:GetBountySize()
   return self:GetActivePool().bounty.size
 end
 
@@ -1945,7 +1899,7 @@ function EminentDKP:GetAvailableBounty()
 end
 
 function EminentDKP:GetAvailableBountyPercent()
-  return (self:GetAvailableBounty()/self:GetTotalBounty())*100
+  return (self:GetAvailableBounty()/self:GetBountySize())*100
 end
 
 -- Construct list of players currently in the raid
@@ -2371,7 +2325,7 @@ function EminentDKP:RAID_ROSTER_UPDATE()
   
   -- This only needs to be run by the masterlooter (and not in PVP)
   -- todo: we really need someway to disable/enable the addon
-  if not self:AmMasterLooter() or is_in_pvp() then return end
+  if self:NeedSync() or not self:AmMasterLooter() or is_in_pvp() then return end
   
   -- Make sure players exist in the pool
   for d = 1, GetNumRaidMembers() do

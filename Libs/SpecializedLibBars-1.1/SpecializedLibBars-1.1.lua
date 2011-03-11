@@ -3,8 +3,8 @@
 -- Modified for EminentDKP
 -- Note to self: don't forget to notify original author of changes
 -- in the unlikely event they end up being usable outside of Skada.
-local MAJOR = "SpecializedLibBars-1.0"
-local MINOR = 90000 + tonumber(("$Revision: 2 $"):match("%d+"))
+local MAJOR = "SpecializedLibBars-1.1"
+local MINOR = 90000 + tonumber(("$Revision: 1 $"):match("%d+"))
 
 local lib, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end -- No Upgrade needed.
@@ -342,15 +342,6 @@ do
 	local function configClick(self, button)
 		self:GetParent().callbacks:Fire("ConfigClicked", self:GetParent(), button)
 	end
-	local function statusEnter(self, button)
-		self:GetParent().callbacks:Fire("StatusEnter", self:GetParent(), button)
-	end
-	local function statusLeave(self, button)
-		self:GetParent().callbacks:Fire("StatusLeave", self:GetParent(), button)
-	end
-	local function statusClick(self, button)
-		self:GetParent().callbacks:Fire("StatusClick", self:GetParent(), button)
-	end
 	
 	local DEFAULT_TEXTURE = [[Interface\TARGETINGFRAME\UI-StatusBar]]
 	function lib:NewBarGroup(name, orientation, length, thickness, frameName)
@@ -386,11 +377,7 @@ do
 		--]]
 		
 		-- Create a status bar
-    list.status = list:NewUntrackedBarFromPrototype(barPrototype, "Status", "test", 1, 100, nil, false)
-		list.status:SetScript("OnEnter", statusEnter)
-		list.status:SetScript("OnLeave", statusLeave)
-		--list.status:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-		--list.status:SetScript("OnClick", statusClick)
+    list.status = list:NewUntrackedBarFromPrototype(barPrototype, "Status", "", 0, 100, nil, false)
 		
 		local myfont = CreateFont("MyTitleFont")
 		myfont:CopyFontObject(ChatFontSmall)

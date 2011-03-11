@@ -809,6 +809,55 @@ end
   Display functions for the meter listing
 ---------------------------------------------------------------------]]
 
+local function lerp(a, b, delta)
+  return (a + (b - a) * delta)
+end
+
+local color_red = { .9, .10, .10 }
+local color_green = { .10, .9, .10 }
+
+local function ColorLerp(color1, color2, delta)
+  return lerp(color1[1], color2[1], delta), 
+         lerp(color1[2], color2[2], delta), 
+         lerp(color1[3], color2[3], delta)
+end
+
+function EminentDKP:UpdateStatusBar()
+  local color, label, maxvalue, value
+  if not syncing then
+    if self:NeedSync() then
+      -- Show out of date status
+      maxvalue = self:GetNewestEventCount()
+      value = self:GetEventCount()
+      local percent = value / maxvalue
+      color = color_red
+      label = (L["Out of Date"].." (%d%%)"):format(percent)
+    else
+      -- Show the bounty status
+      local percent = self:GetAvailableBountyPercent()
+      color = { ColorLerp(color_green,color_red,(percent / 100)) }
+      label = (L["Bounty:"].." %s (%d%%)"):format(self:FormatNumber(self:GetAvailableBounty()),percent)
+      maxvalue = 100
+      value = percent
+    end
+  else
+    -- Show the sync status
+    maxvalue = self:GetNewestEventCount()
+    value = self:GetEventCount()
+    local percent = value / maxvalue
+    color = { ColorLerp(color_red,color_green,percent) }
+    label = (L["Syncing..."].." %d/%d (%d%%)"):format(value,maxvalue,(percent * 100))
+  end
+  -- Update the status bar in all windows
+  for i, win in ipairs(self:GetWindows()) do
+    win.bargroup.status:UnsetAllColors()
+    win.bargroup.status:SetColorAt(0, color[1], color[2], color[3], 1)
+    win.bargroup.status:SetLabel(label)
+    win.bargroup.status:SetValue(value)
+    win.bargroup.status:SetMaxValue(maxvalue)
+  end
+end
+
 -- Called when a EminentDKP window starts using this display provider.
 function meter:Create(window)
   -- Re-use bargroup if it exists.
@@ -862,6 +911,92 @@ function meter:Wipe(window)
 	
 	-- Clean up.
 	window.bargroup:SortBars()
+end
+
+local ttactive = false
+
+local function BarEnter(win, id, label)
+	local t = GameTooltip
+	if EminentDKP.db.profile.tooltips and (win.metadata.click1 or win.metadata.click2 or win.metadata.click3 or win.metadata.tooltip) then
+		ttactive = true
+		EminentDKP:SetTooltipPosition(t, win.bargroup)
+	  t:ClearLines()
+	    
+	    -- Current mode's own tooltips.
+		if win.metadata.tooltip then
+			win.metadata.tooltip(win, id, label, t)
+			
+			-- Spacer
+			if win.metadata.click1 or win.metadata.click2 or win.metadata.click3 then
+				t:AddLine(" ")
+			end
+		end
+		
+		-- Generic informative tooltips.
+		if EminentDKP.db.profile.informativetooltips then
+			if win.metadata.click1 then
+				EminentDKP:AddSubviewToTooltip(t, win, win.metadata.click1, id, label)
+			end
+			if win.metadata.click2 then
+				EminentDKP:AddSubviewToTooltip(t, win, win.metadata.click2, id, label)
+			end
+			if win.metadata.click3 then
+				EminentDKP:AddSubviewToTooltip(t, win, win.metadata.click3, id, label)
+			end
+		end
+	  
+		-- Click directions.
+		if win.metadata.click1 then
+			t:AddLine(L["Click for"].." "..win.metadata.click1:GetName()..".", 0.2, 1, 0.2)
+		end
+		if win.metadata.click2 then
+			t:AddLine(L["Shift-Click for"].." "..win.metadata.click2:GetName()..".", 0.2, 1, 0.2)
+		end
+		if win.metadata.click3 then
+			t:AddLine(L["Control-Click for"].." "..win.metadata.click3:GetName()..".", 0.2, 1, 0.2)
+		end
+		t:Show()
+	end
+end
+
+local function BarLeave(win, id, label)
+	if ttactive then
+		GameTooltip:Hide()
+		ttactive = false
+	end
+end
+
+function StatusEnter(win, button)
+  local t = GameTooltip
+	if EminentDKP.db.profile.tooltips then
+		ttactive = true
+		EminentDKP:SetTooltipPosition(t, win.bargroup)
+	  t:ClearLines()
+	  
+	  t:AddLine(L["Bounty Pool"], 1,1,1)
+	  t:AddDoubleLine(L["Available:"], EminentDKP:FormatNumber(EminentDKP:GetAvailableBounty()), 1,1,1)
+	  t:AddDoubleLine(L["Size:"], EminentDKP:FormatNumber(EminentDKP:GetBountySize()), 1,1,1)
+	  t:AddLine(" ")
+	  t:AddLine(L["Version Info"], 1,1,1)
+	  if EminentDKP:NeedUpgrade() then
+	    t:AddDoubleLine(L["Current:"], EminentDKP:GetVersion(), unpack(color_red))
+  	  t:AddDoubleLine(L["Newest:"], EminentDKP:GetNewestVersion(), unpack(color_green))
+  	  t:AddLine(" ")
+	    t:AddLine(L["Please upgrade to the newest version."], unpack(color_red))
+    else
+	    t:AddDoubleLine(L["Current:"], EminentDKP:GetVersion(), 1,1,1,unpack(color_green))
+  	  t:AddDoubleLine(L["Newest:"], EminentDKP:GetNewestVersion(), 1,1,1,unpack(color_green))
+    end
+	  
+	  t:Show()
+  end
+end
+
+function StatusLeave(win, button)
+  BarLeave(win,nil,nil)
+end
+
+function StatusClick(win, button)
 end
 
 function meter:ConfigClicked(cbk, group, button)
@@ -942,7 +1077,10 @@ function meter:ApplySettings(window)
   
 	-- Status bar
 	g.status:ShowLabel()
-	--g.status:SetJustifyH("MIDDLE")
+	g.status:SetScript("OnEnter", function(bar) StatusEnter(window, bar) end)
+	g.status:SetScript("OnLeave", function(bar) StatusLeave(window, bar) end)
+	g.status:SetScript("OnMouseDown", function(bar) StatusClick(window,bar) end)
+	g.status.label:SetJustifyH("MIDDLE")
 	
 	if p.enablestatus then
 	  g:ShowStatus()
@@ -1066,59 +1204,6 @@ local function BarClick(win, id, label, button)
 		showmode(win, id, label, click3)
 	elseif click1 then
 		showmode(win, id, label, click1)
-	end
-end
-
-local ttactive = false
-
-local function BarEnter(win, id, label)
-	local t = GameTooltip
-	if EminentDKP.db.profile.tooltips and (win.metadata.click1 or win.metadata.click2 or win.metadata.click3 or win.metadata.tooltip) then
-		ttactive = true
-		EminentDKP:SetTooltipPosition(t, win.bargroup)
-	  t:ClearLines()
-	    
-	    -- Current mode's own tooltips.
-		if win.metadata.tooltip then
-			win.metadata.tooltip(win, id, label, t)
-			
-			-- Spacer
-			if win.metadata.click1 or win.metadata.click2 or win.metadata.click3 then
-				t:AddLine(" ")
-			end
-		end
-		
-		-- Generic informative tooltips.
-		if EminentDKP.db.profile.informativetooltips then
-			if win.metadata.click1 then
-				EminentDKP:AddSubviewToTooltip(t, win, win.metadata.click1, id, label)
-			end
-			if win.metadata.click2 then
-				EminentDKP:AddSubviewToTooltip(t, win, win.metadata.click2, id, label)
-			end
-			if win.metadata.click3 then
-				EminentDKP:AddSubviewToTooltip(t, win, win.metadata.click3, id, label)
-			end
-		end
-	  
-		-- Click directions.
-		if win.metadata.click1 then
-			t:AddLine(L["Click for"].." "..win.metadata.click1:GetName()..".", 0.2, 1, 0.2)
-		end
-		if win.metadata.click2 then
-			t:AddLine(L["Shift-Click for"].." "..win.metadata.click2:GetName()..".", 0.2, 1, 0.2)
-		end
-		if win.metadata.click3 then
-			t:AddLine(L["Control-Click for"].." "..win.metadata.click3:GetName()..".", 0.2, 1, 0.2)
-		end
-		t:Show()
-	end
-end
-
-local function BarLeave(win, id, label)
-	if ttactive then
-		GameTooltip:Hide()
-		ttactive = false
 	end
 end
 

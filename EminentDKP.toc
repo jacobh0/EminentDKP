@@ -10,7 +10,7 @@
 
 embeds.xml
 
-Libs\SpecializedLibBars-1.0\SpecializedLibBars-1.0.lua
+Libs\SpecializedLibBars-1.1\SpecializedLibBars-1.1.lua
 
 Locale\enUS.lua
 
