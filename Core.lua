@@ -189,7 +189,6 @@ local function UpdateNewestVersion(newer)
       end
     end
   end
-  EminentDKP:UpdateStatusBar()
 end
 
 local function CheckVersionCompatability(otherversion)
@@ -1598,6 +1597,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   local compare = CompareVersions(self:GetVersion(),version)
   
   UpdateNewestVersion(version)
+  self:UpdateStatusBar()
   if compare.major > 0 or compare.minor > 0 then
     -- Broadcast our newer version
     self:BroadcastVersion()

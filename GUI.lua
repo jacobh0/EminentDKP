@@ -3,7 +3,7 @@ local AceGUI = LibStub("AceGUI-3.0")
 
 local EminentDKP = EminentDKP
 
-local meter = EminentDKP:NewModule("MeterDisplay", "SpecializedLibBars-1.0")
+local meter = EminentDKP:NewModule("MeterDisplay", "SpecializedLibBars-1.1")
 local libwindow = LibStub("LibWindow-1.1")
 local media = LibStub("LibSharedMedia-3.0")
 
@@ -968,7 +968,7 @@ end
 
 function StatusEnter(win, button)
   local t = GameTooltip
-	if EminentDKP.db.profile.tooltips then
+	if EminentDKP.db.profile.tooltips and not EminentDKP:NeedSync() then
 		ttactive = true
 		EminentDKP:SetTooltipPosition(t, win.bargroup)
 	  t:ClearLines()
@@ -1153,6 +1153,7 @@ function meter:ApplySettings(window)
 		-- Calculate max number of bars to show if our height is not dynamic.
 		if p.background.height > 0 then
 			local maxbars = math.floor(p.background.height / math.max(1, p.barheight + p.barspacing))
+			if g:IsStatusVisible() then maxbars = maxbars - 1 end
 			g:SetMaxBars(maxbars)
 		else
 			-- Adjust background height according to current bars.
@@ -1352,6 +1353,7 @@ function meter:AdjustBackgroundHeight(window)
 	local numbars = 0
 	if window.bargroup:GetBars() ~= nil then
 		for name, bar in pairs(window.bargroup:GetBars()) do if bar:IsShown() then numbars = numbars + 1 end end
+		if window.bargroup:IsStatusVisible() then numbars = numbars + 1 end
 		local height = numbars * (window.settings.barheight + window.settings.barspacing) + window.settings.background.borderthickness
 		if window.bargroup.bgframe:GetHeight() ~= height then
 			window.bargroup.bgframe:SetHeight(height)
