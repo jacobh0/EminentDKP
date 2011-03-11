@@ -1451,6 +1451,7 @@ end
 
 -- Request the missing events
 function EminentDKP:RequestMissingEvents()
+  syncing = false
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
     self.requestCooldown = true
@@ -1725,7 +1726,6 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
       self:ReplicateSyncEvent(next_eventID,events_cache[next_eventID])
     else
       -- We lack what we need to continue onward...
-      syncing = false
       self:ScheduleEventsRequest()
     end
   else
