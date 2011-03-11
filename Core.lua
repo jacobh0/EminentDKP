@@ -21,10 +21,9 @@ end
 
 TODO:
 
+0. Add enable/disable option for officers
 1. Organize meter display code and move to GUI.lua
-2. Revamp version system
-3. Bounty bar? (have to modify SpecializedLibBars)
-4. Vanity rolls? (custom view mode)
+2. Vanity rolls? (custom view mode)
 
 ]]
 
@@ -1081,6 +1080,9 @@ function EminentDKP:DatabaseUpdate()
       if self.db.factionrealm.pools[name].lastScan ~= 0 then
         self.db.factionrealm.pools[name].lastScan = convertToTimestamp(self.db.factionrealm.pools[name].lastScan)
       end
+      if self.db.profile.raid then
+        self.db.profile.raid = nil
+      end
       pool.revision = 1
     end
   end
@@ -1723,6 +1725,7 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
       self:ReplicateSyncEvent(next_eventID,events_cache[next_eventID])
     else
       -- We lack what we need to continue onward...
+      syncing = false
       self:ScheduleEventsRequest()
     end
   else
