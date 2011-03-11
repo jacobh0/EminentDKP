@@ -979,8 +979,8 @@ function StatusEnter(win, button)
 	  t:AddLine(" ")
 	  t:AddLine(L["Version Info"], 1,1,1)
 	  if EminentDKP:NeedUpgrade() then
-	    t:AddDoubleLine(L["Current:"], EminentDKP:GetVersion(), unpack(color_red))
-  	  t:AddDoubleLine(L["Newest:"], EminentDKP:GetNewestVersion(), unpack(color_green))
+	    t:AddDoubleLine(L["Current:"], EminentDKP:GetVersion(), 1,1,1,unpack(color_red))
+  	  t:AddDoubleLine(L["Newest:"], EminentDKP:GetNewestVersion(), 1,1,1,unpack(color_green))
   	  t:AddLine(" ")
 	    t:AddLine(L["Please upgrade to the newest version."], unpack(color_red))
     else
