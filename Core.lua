@@ -2221,7 +2221,7 @@ end
 
 -- Keep track of any creature deaths
 function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
-  if not self:AmOfficer() and not UnitInRaid("player") then return end
+  if not self:AmOfficer() or not UnitInRaid("player") then return end
   if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
     table.insert(recent_deaths,1,dstName)
     if #(recent_deaths) > 10 then
@@ -2232,8 +2232,9 @@ end
 
 -- Keep track of any earned achievements
 function EminentDKP:ACHIEVEMENT_EARNED(event, achievementID)
-  if not self:AmOfficer() and not UnitInRaid("player") then return end
-  table.insert(recent_achievements,1,select(2,GetAchievementInfo(tonumber(achievementID))))
+  if not self:AmOfficer() or not UnitInRaid("player") then return end
+  local achiev_id, achiev_name = GetAchievementInfo(tonumber(achievementID))
+  table.insert(recent_achievements,1,achiev_name)
   if #(recent_achievements) > 10 then
     tremove(recent_achievements)
   end
@@ -2967,6 +2968,8 @@ function EminentDKP:ProcessSlashCmd(input)
   
   if command == 'auction' then
     self:AdminStartAuction()
+  elseif command == 'options' then
+    InterfaceOptionsFrame_OpenToCategory("EminentDKP")
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
