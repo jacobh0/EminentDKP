@@ -81,6 +81,7 @@ local eligible_looters = {}
 
 local events_cache = {}
 local synced_dates = {}
+local syncing = false
 
 local lastContainerName = nil
 
@@ -754,6 +755,7 @@ function EminentDKP:ApplySettingsAll()
   for i, win in ipairs(windows) do
 		self:ApplySettings(win)
 	end
+	self:UpdateStatusBar()
 end
 
 function EminentDKP:ApplySettings(win)
@@ -790,6 +792,55 @@ end
 function EminentDKP:UpdateAllDisplays()
   for i, win in ipairs(windows) do
     self:UpdateDisplay(win)
+  end
+end
+
+local function lerp(a, b, delta)
+  return (a + (b - a) * delta)
+end
+
+local color_red = { .7, .13, .13 }
+local color_green = { .13, .7, .13 }
+
+local function ColorLerp(color1, color2, delta)
+  return lerp(color1[1], color2[1], delta), 
+         lerp(color1[2], color2[2], delta), 
+         lerp(color1[3], color2[3], delta)
+end
+
+function EminentDKP:UpdateStatusBar()
+  local color, label, maxvalue, value
+  if not syncing then
+    if self:NeedSync() then
+      -- Show out of date status
+      maxvalue = self:GetNewestEventCount()
+      value = self:GetEventCount()
+      local percent = value / maxvalue
+      color = color_red
+      label = ("Out of Date (%d%%)"):format(percent)
+    else
+      -- Show the bounty status
+      local percent = self:GetAvailableBountyPercent()
+      color = { ColorLerp(color_green,color_red,(percent / 100)) }
+      label = ("Bounty: %.02f (%d%%)"):format(self:GetAvailableBounty(),percent)
+      maxvalue = 100
+      value = percent
+    end
+  else
+    -- Show the sync status
+    maxvalue = self:GetNewestEventCount()
+    value = self:GetEventCount()
+    local percent = value / maxvalue
+    color = { ColorLerp(color_red,color_green,percent) }
+    label = ("Syncing... %d/%d (%d%%)"):format(value,maxvalue,(percent * 100))
+  end
+  -- Update the status bar in all windows
+  for i, win in ipairs(windows) do
+    win.bargroup.status:UnsetAllColors()
+    win.bargroup.status:SetColorAt(0, color[1], color[2], color[3], 1)
+    win.bargroup.status:SetLabel(label)
+    win.bargroup.status:SetValue(value)
+    win.bargroup.status:SetMaxValue(maxvalue)
   end
 end
 
@@ -1603,6 +1654,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
     if compare.event < 0 or compare.bug < 0 then
       if compare.event < 0 then
         -- Event data is out of date
+        self:UpdateStatusBar()
         self:ScheduleEventsRequest(math.random(3,6))
       end
     end
@@ -1657,16 +1709,20 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   
   -- We will only act on the next chronological event and cache future events
   local currentEventID = self:GetEventCount()
-  if tonumber(eventID) == (currentEventID + 1) then
-    -- Effectively delay any event requests since we're processing another event
-    self:CancelEventsRequest()
-    self:ReplicateSyncEvent(eventID,event)
-  elseif tonumber(eventID) > currentEventID then
-    -- This is an event in the future, so cache it
-    events_cache[eventID] = event
-    -- Keep scheduling an events request, as eventually
-    -- we'll stop caching events and need to fill in the holes
-    self:ScheduleEventsRequest()
+  if tonumber(eventID) > currentEventID then
+    syncing = true
+    if tonumber(eventID) == (currentEventID + 1) then
+      -- Effectively delay any event requests since we're processing another event
+      self:CancelEventsRequest()
+      self:ReplicateSyncEvent(eventID,event)
+    else
+      -- This is an event in the future, so cache it
+      events_cache[eventID] = event
+      -- Keep scheduling an events request, as eventually
+      -- we'll stop caching events and need to fill in the holes
+      self:ScheduleEventsRequest()
+    end
+    self:UpdateStatusBar()
   end
 end
 
@@ -1718,6 +1774,7 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   else
     -- We're up to date!
     self:UpdateSyncedDays()
+    syncing = false
   end
 end
 
@@ -2020,7 +2077,7 @@ function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
     if vanitydkp < dkp then
       self:CreatePlayerVanityDeduction(pid,cid,(dkp-vanitydkp))
     end
-    self:DecreaseAvailableBounty(vanitydkp)
+    self:DecreaseAvailableBounty(dkp)
   elseif vanitydkp == 0 and dkp > 0 then
     self:CreatePlayerEarning(pid,cid,dkp,false)
     self:DecreaseAvailableBounty(dkp)
