@@ -1,8 +1,9 @@
 -- LibBars-1.0 by Antiarc, all glory to him.
 -- Specialized ( = uglified) for Skada
+-- Modified for EminentDKP
 -- Note to self: don't forget to notify original author of changes
 -- in the unlikely event they end up being usable outside of Skada.
-local MAJOR = "SpecializedLibBars-1.0"
+local MAJOR = "SpecializedLibBars-1.1"
 local MINOR = 90000 + tonumber(("$Revision: 1 $"):match("%d+"))
 
 local lib, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
@@ -252,6 +253,18 @@ end
 
 --[[ Individual bars ]]--
 
+function lib:NewUntrackedBarFromPrototype(prototype, name, ...)
+	assert(self ~= lib, "You may only call :NewBar as an embedded function")
+	assert(type(prototype) == "table" and type(prototype.metatable) == "table", "Invalid bar prototype")
+	local bar = CreateFrame("Frame")
+	bar = setmetatable(bar, prototype.metatable)
+	bar.name = name
+	bar:Create(...)
+	bar:SetFont(self.font, self.fontSize, self.fontFlags)
+  
+	return bar, true
+end
+
 function lib:NewBarFromPrototype(prototype, name, ...)
 	assert(self ~= lib, "You may only call :NewBar as an embedded function")
 	assert(type(prototype) == "table" and type(prototype.metatable) == "table", "Invalid bar prototype")
@@ -363,9 +376,12 @@ do
 		})
 		--]]
 		
+		-- Create a status bar
+    list.status = list:NewUntrackedBarFromPrototype(barPrototype, "Status", "", 0, 100, nil, false)
+		
 		local myfont = CreateFont("MyTitleFont")
 		myfont:CopyFontObject(ChatFontSmall)
-
+    
 		list.button = CreateFrame("Button", nil, list)
 		list.button:SetBackdrop(frame_defaults)
 		list.button:SetNormalFontObject(myfont)
@@ -444,6 +460,23 @@ function barListPrototype:NewBarFromPrototype(prototype, ...)
 	return bar, isNew
 end
 
+function barListPrototype:NewUntrackedBarFromPrototype(prototype, ...)
+	local bar, isNew = lib.NewUntrackedBarFromPrototype(self, prototype, ...)
+	bar:SetTexture(self.texture)
+	bar:SetFill(self.fill)
+	-- if isNew then bar:SetValue(0) end
+	
+	if self.showIcon then bar:ShowIcon() else bar:HideIcon(bar) end
+	if self.showLabel then bar:ShowLabel() else bar:HideLabel(bar) end
+	if self.showTimerLabel then bar:ShowTimerLabel() else bar:HideTimerLabel(bar) end
+	--self:SortBars()
+	bar.ownerGroup = self
+	bar.RegisterCallback(self, "FadeFinished")
+	bar.RegisterCallback(self, "TimerFinished")
+	bar:SetParent(self)
+	return bar, isNew
+end
+
 function barListPrototype:SetWidth(width)
 	if self:IsVertical() then
 		self:SetThickness(width)
@@ -512,6 +545,9 @@ function barListPrototype:SetTexture(tex)
 			v:SetTexture(tex)
 		end
 	end
+	if self.status then
+	  self.status:SetTexture(tex)
+  end
 end
 
 function barListPrototype:SetFont(f, s, m)
@@ -521,6 +557,9 @@ function barListPrototype:SetFont(f, s, m)
 			v:SetFont(f, s, m)
 		end
 	end
+	if self.status then
+	  self.status:SetFont(f, s, m)
+  end
 end
 
 function barListPrototype:SetFill(fill)
@@ -530,6 +569,9 @@ function barListPrototype:SetFill(fill)
 			v:SetFill(fill)
 		end
 	end
+	if self.status then
+	  self.status:SetFill(fill)
+  end
 end
 
 function barListPrototype:IsFilling()
@@ -647,6 +689,9 @@ function barListPrototype:UpdateColors()
 --             end
 		end
 	end
+	if self.status then
+	  self.status:UpdateColor()
+  end
 end
 
 function barListPrototype:SetColorAt(at, r, g, b, a)
@@ -693,6 +738,29 @@ function barListPrototype:FadeFinished(evt, bar, name)
 	group:SortBars()
 end
 
+function barListPrototype:ShowStatus()
+	self.status:Show()
+	self:SortBars()
+end
+
+function barListPrototype:HideStatus()
+	self.status:Hide()
+	self:SortBars()
+end
+
+function barListPrototype:IsStatusVisible()
+	return self.status:IsVisible()
+end
+
+function barListPrototype:ToggleStatus()
+	if self.status:IsVisible() then
+		self.status:Hide()
+	else
+		self.status:Show()
+	end
+	self:SortBars()
+end
+
 function barListPrototype:ShowAnchor()
 	self.button:Show()
 	self:SortBars()
@@ -736,21 +804,26 @@ end
 function barListPrototype:ReverseGrowth(reverse)
 	self.growup = reverse
 	self.button:ClearAllPoints()
+	self.status:ClearAllPoints()
 	if self.orientation % 2 == 0 then
 		if reverse then
 			self.button:SetPoint("TOPRIGHT", self, "TOPRIGHT")
 			self.button:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT")
+			self.status:SetPoint("TOPRIGHT", self.button, "BOTTOMRIGHT")
 		else
 			self.button:SetPoint("TOPLEFT", self, "TOPLEFT")
 			self.button:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT")
+			self.status:SetPoint("TOPLEFT", self.button, "BOTTOMLEFT")
 		end
 	else
 		if reverse then
 			self.button:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT")
 			self.button:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT")
+			self.status:SetPoint("BOTTOMLEFT", self.button, "TOPLEFT")
 		else
 			self.button:SetPoint("TOPLEFT", self, "TOPLEFT")
 			self.button:SetPoint("TOPRIGHT", self, "TOPRIGHT")
+			self.status:SetPoint("TOPLEFT", self.button, "BOTTOMLEFT")
 		end
 	end
 	self:SortBars()
@@ -788,6 +861,9 @@ function barListPrototype:SetLength(length)
 			v:SetLength(length)
 		end
 	end
+	if self.status then
+	  self.status:SetLength(length)
+  end
 	self:UpdateOrientationLayout()
 end
 
@@ -802,6 +878,9 @@ function barListPrototype:SetThickness(thickness)
 			v:SetThickness(thickness)
 		end
 	end
+	if self.status then
+	  self.status:SetThickness(thickness)
+  end
 	self:UpdateOrientationLayout()
 end
 
@@ -816,6 +895,9 @@ function barListPrototype:SetOrientation(orientation)
 			v:SetOrientation(orientation)
 		end
 	end
+	if self.status then
+	  self.status:SetOrientation(orientation)
+  end
 	self:UpdateOrientationLayout()
 end
 
@@ -859,6 +941,9 @@ function barListPrototype:SetUseSpark(use)
 			v:SetUseSpark(use)
 		end
 	end
+	if self.status then
+	  self.status:SetUseSpark(use)
+  end
 end
 
 -- group:SetSortFunction(group.NOOP) to disable sorting
@@ -900,7 +985,12 @@ do
 			return apct > bpct
 		end
 	end	function barListPrototype:SortBars()
-		local lastBar = self.button:IsVisible() and self.button or self
+	  local lastBar = self
+	  if self.status:IsVisible() then
+	    lastBar = self.status
+    elseif self.button:IsVisible() then
+      lastBar = self.button
+    end
 		local ct = 0
 		if not bars[self] then return end
 		for k, v in pairs(bars[self]) do
@@ -955,7 +1045,7 @@ do
 		for i = 1, #values do
 			local origTo = to
 			local v = values[i]
-			if lastBar == self or lastBar == self.button then
+			if lastBar == self or lastBar == self.button or lastBar == self.status then
 				if lastBar == self then
 					to = from
 				end

@@ -271,3 +271,16 @@ L["Unrecognized command. Whisper %s for a list of valid commands."] = "Unrecogni
 
 L["Performing database scan..."] = "Performing database scan..."
 L["There is more than 50% of the bounty available. You should distribute some."] = "There is more than 50% of the bounty available. You should distribute some."
+
+-- Statusbar
+L["Syncing..."] = "Syncing..."
+L["Out of Date"] = "Out of Date"
+
+L["Bounty Pool"] = "Bounty Pool"
+L["Bounty:"] = "Bounty:"
+L["Available:"] = "Available:"
+L["Size:"] = "Size:"
+L["Current:"] = "Current:"
+L["Newest:"] = "Newest:"
+L["Version Info"] = "Version Info"
+L["Please upgrade to the newest version."] = "Please upgrade to the newest version."

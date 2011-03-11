@@ -21,10 +21,9 @@ end
 
 TODO:
 
+0. Add enable/disable option for officers
 1. Organize meter display code and move to GUI.lua
-2. Revamp version system
-3. Bounty bar? (have to modify SpecializedLibBars)
-4. Vanity rolls? (custom view mode)
+2. Vanity rolls? (custom view mode)
 
 ]]
 
@@ -81,6 +80,7 @@ local eligible_looters = {}
 
 local events_cache = {}
 local synced_dates = {}
+local syncing = false
 
 local lastContainerName = nil
 
@@ -172,7 +172,6 @@ local function CompareVersions(current,other)
 end
 
 local function UpdateNewestVersion(newer)
-  -- todo: trigger a notification if we need update
   local newer_version = strtrim(newer)
   local compare = CompareVersions(EminentDKP:GetNewestVersion(),newer_version)
   
@@ -754,6 +753,7 @@ function EminentDKP:ApplySettingsAll()
   for i, win in ipairs(windows) do
 		self:ApplySettings(win)
 	end
+	self:UpdateStatusBar()
 end
 
 function EminentDKP:ApplySettings(win)
@@ -1080,6 +1080,9 @@ function EminentDKP:DatabaseUpdate()
       if self.db.factionrealm.pools[name].lastScan ~= 0 then
         self.db.factionrealm.pools[name].lastScan = convertToTimestamp(self.db.factionrealm.pools[name].lastScan)
       end
+      if self.db.profile.raid then
+        self.db.profile.raid = nil
+      end
       pool.revision = 1
     end
   end
@@ -1279,6 +1282,10 @@ function EminentDKP:GetNewestVersion()
   return (newest_version ~= '' and newest_version or self:GetVersion())
 end
 
+function EminentDKP:NeedUpgrade()
+  return needs_update
+end
+
 ---------- START SYNC FUNCTIONS ----------
 
 function EminentDKP:GetNewestEventCount()
@@ -1444,6 +1451,7 @@ end
 
 -- Request the missing events
 function EminentDKP:RequestMissingEvents()
+  syncing = false
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
     self.requestCooldown = true
@@ -1592,6 +1600,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   local compare = CompareVersions(self:GetVersion(),version)
   
   UpdateNewestVersion(version)
+  self:UpdateStatusBar()
   if compare.major > 0 or compare.minor > 0 then
     -- Broadcast our newer version
     self:BroadcastVersion()
@@ -1657,16 +1666,20 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   
   -- We will only act on the next chronological event and cache future events
   local currentEventID = self:GetEventCount()
-  if tonumber(eventID) == (currentEventID + 1) then
-    -- Effectively delay any event requests since we're processing another event
-    self:CancelEventsRequest()
-    self:ReplicateSyncEvent(eventID,event)
-  elseif tonumber(eventID) > currentEventID then
-    -- This is an event in the future, so cache it
-    events_cache[eventID] = event
-    -- Keep scheduling an events request, as eventually
-    -- we'll stop caching events and need to fill in the holes
-    self:ScheduleEventsRequest()
+  if tonumber(eventID) > currentEventID then
+    syncing = true
+    if tonumber(eventID) == (currentEventID + 1) then
+      -- Effectively delay any event requests since we're processing another event
+      self:CancelEventsRequest()
+      self:ReplicateSyncEvent(eventID,event)
+    else
+      -- This is an event in the future, so cache it
+      events_cache[eventID] = event
+      -- Keep scheduling an events request, as eventually
+      -- we'll stop caching events and need to fill in the holes
+      self:ScheduleEventsRequest()
+    end
+    self:UpdateStatusBar()
   end
 end
 
@@ -1718,6 +1731,7 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   else
     -- We're up to date!
     self:UpdateSyncedDays()
+    syncing = false
   end
 end
 
@@ -1879,7 +1893,7 @@ function EminentDKP:GetPlayerPool()
   return self:GetActivePool().players
 end
 
-function EminentDKP:GetTotalBounty()
+function EminentDKP:GetBountySize()
   return self:GetActivePool().bounty.size
 end
 
@@ -1888,7 +1902,7 @@ function EminentDKP:GetAvailableBounty()
 end
 
 function EminentDKP:GetAvailableBountyPercent()
-  return (self:GetAvailableBounty()/self:GetTotalBounty())*100
+  return (self:GetAvailableBounty()/self:GetBountySize())*100
 end
 
 -- Construct list of players currently in the raid
@@ -2020,7 +2034,7 @@ function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
     if vanitydkp < dkp then
       self:CreatePlayerVanityDeduction(pid,cid,(dkp-vanitydkp))
     end
-    self:DecreaseAvailableBounty(vanitydkp)
+    self:DecreaseAvailableBounty(dkp)
   elseif vanitydkp == 0 and dkp > 0 then
     self:CreatePlayerEarning(pid,cid,dkp,false)
     self:DecreaseAvailableBounty(dkp)
@@ -2315,7 +2329,7 @@ function EminentDKP:RAID_ROSTER_UPDATE()
   
   -- This only needs to be run by the masterlooter (and not in PVP)
   -- todo: we really need someway to disable/enable the addon
-  if not self:AmMasterLooter() or is_in_pvp() then return end
+  if self:NeedSync() or not self:AmMasterLooter() or is_in_pvp() then return end
   
   -- Make sure players exist in the pool
   for d = 1, GetNumRaidMembers() do
