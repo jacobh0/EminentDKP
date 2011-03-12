@@ -66,6 +66,7 @@ EminentDKP.defaults = {
     itemrarity = 3,
     expiretime = 30,
     hidesolo = false,
+    hideparty = false,
     hidepvp = true,
     hidecombat = true,
     maxplayerevents = 30,
@@ -148,7 +149,7 @@ EminentDKP.options = {
     windows = {
       type= "group",
       name= L["Windows"],
-      order= 0,
+      order= 5,
       args = {
         create = {
           type= "input",
@@ -507,6 +508,17 @@ EminentDKP.options = {
             EminentDKP.db.profile.hidesolo = not EminentDKP.db.profile.hidesolo
             EminentDKP:ApplySettingsAll()
           end,
+          order= 3,
+				},
+				hideparty = {
+          type= "toggle",
+          name= L["Hide in Party"],
+          desc= L["Hides EminentDKP's window when in a party."],
+          get= function() return EminentDKP.db.profile.hideparty end,
+          set= function()
+            EminentDKP.db.profile.hideparty = not EminentDKP.db.profile.hideparty
+            EminentDKP:ApplySettingsAll()
+          end,
           order= 4,
 				},
 				hidepvp = {
@@ -688,8 +700,8 @@ EminentDKP.options = {
 		},
     columns = {
       type= "group",
-      name= L["Columns"],
-      order= 4,
+      name= L["Window Columns"],
+      order= 6,
       args= {},
     },
 	}

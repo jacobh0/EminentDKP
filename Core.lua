@@ -216,6 +216,11 @@ local function is_solo()
 	return GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0
 end
 
+-- Are we in a party?
+local function is_in_party()
+  return GetNumRaidMembers() == 0 and GetNumPartyMembers() > 0
+end
+
 local function find_mode(name)
 	for i, mode in ipairs(modes) do
 		if mode:GetName() == name then
@@ -277,19 +282,30 @@ function Window:AddOptions()
           self:SetDisplay(display)
           EminentDKP:ApplySettings(win[2])
         end,
-        order= 21,
+        order= 2,
       },
       locked = {
         type= "toggle",
         name= L["Lock window"],
         desc= L["Locks the bar window in place."],
-        order= 18,
         get= function() return settings.barslocked end,
         set= function(win)
           settings.barslocked = not settings.barslocked
         	EminentDKP:ApplySettings(win[2])
         end,
-      }
+        order= 3,
+      },
+      enablestatus = {
+        type="toggle",
+        name=L["Enable Status Bar"],
+        desc=L["Enables the the status bar under the title."],
+        get=function() return settings.enablestatus end,
+        set=function(win) 
+          settings.enablestatus = not settings.enablestatus
+          EminentDKP:ApplySettings(win[2])
+        end,
+        order= 4,
+      },
     }
 	}
 	self.display:AddDisplayOptions(self, options.args)
@@ -2319,11 +2335,14 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
   end
 end
 
--- Tracking for hide when solo option
+-- Tracking for hide when solo option and hide in party option
 function EminentDKP:PARTY_MEMBERS_CHANGED()
   if self.db.profile.hidesolo then
     self:ToggleMeters(not is_solo())
 	end
+  if self.db.profile.hideparty then
+    self:ToggleMeters(not is_in_party())
+  end
 end
 
 -- Keep track of people in the raid
@@ -2593,8 +2612,8 @@ function EminentDKP:AdminStartAuction()
   			  srcGUID=guid,
   			  start=self:GetTime(),
   			}
-  			self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
   			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
+  			self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
 		
   			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
   			sendchat(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink), "raid", "preset")

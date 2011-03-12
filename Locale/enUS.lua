@@ -67,6 +67,8 @@ L["Deletes the chosen window."] = "Deletes the chosen window."
 L["General Options"] = "General Options"
 L["Hide when solo"] = "Hide when solo"
 L["Hides EminentDKP's window when not in a party or raid."] = "Hides EminentDKP's window when not in a party or raid."
+L["Hide in Party"] = "Hide in Party"
+L["Hides EminentDKP's window when in a party."] = "Hides EminentDKP's window when in a party."
 L["Hide in PvP"] = "Hide in PvP"
 L["Hides EminentDKP's window when in Battlegrounds/Arenas."] = "Hides EminentDKP's window when in Battlegrounds/Arenas."
 L["Hide in combat"] = "Hide in combat"
@@ -108,7 +110,7 @@ L["Default"] = "Default"
 L["Top right"] = "Top right"
 L["Top left"] = "Top left"
 
-L["Columns"] = "Columns"
+L["Window Columns"] = "Window Columns"
 
 L["Title bar"] = "Title bar"
 L["Enables the title bar."] = "Enables the title bar."
@@ -126,6 +128,8 @@ L["Show spark effect"] = "Show spark effect"
 L["Bars"] = "Bars"
 L["Reverse bar growth"] = "Reverse bar growth"
 L["Bars will grow up instead of down."] = "Bars will grow up instead of down."
+L["Enable Status Bar"] = "Enable Status Bar"
+L["Enables the the status bar under the title."] = "Enables the the status bar under the title."
 
 L["The font used by the title bar."] = true
 L["Bar font"] = true
