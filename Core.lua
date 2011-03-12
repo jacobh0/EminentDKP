@@ -2378,10 +2378,10 @@ end
 -- Loot window closing means cancel auction
 function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
-    sendchat(L["Auction cancelled. All bids have been voided."], "raid", "preset")
-    self:InformPlayer("auctioncancel",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     auction_active = false
     self:CancelTimer(self.bidTimer)
+    sendchat(L["Auction cancelled. All bids have been voided."], "raid", "preset")
+    self:InformPlayer("auctioncancel",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     table.insert(recent_loots[self.bidItem.srcGUID].slots,self.bidItem.slotNum)
     self.bidItem = nil
   end
@@ -2422,9 +2422,10 @@ function EminentDKP:LOOT_OPENED()
 		    
 		    -- Share loot list with raid
 		    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
+		    
+		    -- Ensure that we only print once by keeping track of the GUID
+  			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
 			end
-			-- Ensure that we only print once by keeping track of the GUID
-			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
     end
   end
 end
@@ -2563,9 +2564,6 @@ function EminentDKP:AdminStartAuction()
     local guid = UnitExists("target") and UnitGUID("target") or 'container'
     if #(recent_loots[guid].slots) > 0 then
       if not auction_active then
-        -- Update eligibility list
-        self:UpdateLootEligibility()
-		
     		-- Fast forward to next eligible slot
     		local slot
     		local itemLink
@@ -2582,10 +2580,12 @@ function EminentDKP:AdminStartAuction()
   		  
     		-- Gather some info about this item
     		local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
+    		
+    		-- Update eligibility list
+        self:UpdateLootEligibility()
 		    
   			auction_active = true
-  			self.bidItem = { 
-  			  name=lootName, 
+  			self.bidItem = {
   			  itemString=string.match(itemLink, "item[%-?%d:]+"), 
   			  elapsed=0, 
   			  bids={}, 
@@ -2615,9 +2615,9 @@ function EminentDKP:AuctionBidTimer()
   
   -- If 30 seconds has elapsed, then close it
   if self.bidItem.elapsed == 30 then
-    sendchat(L["Auction has closed. Determining winner..."], "raid", "preset")
     auction_active = false
     self:CancelTimer(self.bidTimer)
+    sendchat(L["Auction has closed. Determining winner..."], "raid", "preset")
     
     local looter = self.myName
 		local guid = self.bidItem.srcGUID
@@ -2635,14 +2635,12 @@ function EminentDKP:AuctionBidTimer()
       end
       self:InformPlayer("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     else
-      local bids = 0
       local secondHighestBid = 0
       local winningBid = 0
       local winners = {}
       
       -- Run through the bids and determine the winner(s)
       for name,bid in pairs(self.bidItem.bids) do
-        bids = bids + 1
         if bid > winningBid then
           secondHighestBid = winningBid
           winners = {}
@@ -2687,6 +2685,7 @@ function EminentDKP:AuctionBidTimer()
     
     -- Re-run the auction routine...
     if #(recent_loots[guid].slots) > 0 then
+      self.bidItem = nil
       self:AdminStartAuction()
     else
       sendchat(L["No more loot found."], "raid", "preset")
@@ -2694,8 +2693,7 @@ function EminentDKP:AuctionBidTimer()
       self.bidItem = nil
     end
   else
-    local timeLeft = (30 - self.bidItem.elapsed)
-    sendchat(timeLeft .. '...', "raid", "preset")
+    sendchat(("%d..."):format(30-self.bidItem.elapsed), "raid", "preset")
   end
 end
 
