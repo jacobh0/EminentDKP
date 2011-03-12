@@ -6,10 +6,10 @@ EminentDKP.windowdefaults = {
 	
 	barmax=10,
 	barspacing=0,
-	bartexture="BantoBar",
+	bartexture="Smooth",
 	barfont="Accidental Presidency",
 	barfontsize=14,
-	barheight=15,
+	barheight=16,
 	barwidth=240,
 	barorientation=1,
 	barcolor = {r = 0.3, g = 0.3, b = 0.8, a=1},

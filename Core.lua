@@ -27,6 +27,7 @@ TODO:
 
 ]]
 
+-- High resolution timer, adds milliseconds to the regular timestamp from time()
 HighResTimer = {
   Get = function(self)
     return self.TimeDelta and self.TimeStart + GetTime() - self.TimeDelta or time()
@@ -1040,6 +1041,9 @@ function EminentDKP:OnInitialize()
   
   self:CreateAuctionFrame()
   self:ReloadWindows()
+  
+  -- Broadcast version
+  self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
   
   -- Since SharedMedia doesn't finish loading until after this executes, we need to re-apply
   -- the settings again to ensure everything is how it should be, an unfortunate work-around...
@@ -2264,16 +2268,11 @@ function EminentDKP:ACHIEVEMENT_EARNED(event, achievementID)
   end
 end
 
--- Broadcast version
+-- Keep track of being in PVP
 function EminentDKP:PLAYER_ENTERING_WORLD()
-  self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
   -- Hide the meters if we're PVPing and we want it hidden
   if self.db.profile.hidepvp then
-    if is_in_pvp() then
-      self:ToggleMeters(false)
-    else
-      self:ToggleMeters(true)
-    end
+    self:ToggleMeters(not is_in_pvp())
   end
 end
 
