@@ -1140,7 +1140,7 @@ function EminentDKP:OnEnable()
   self:ScheduleRepeatingTimer("BroadcastVersion", 300)
 end
 
--- Hook the animation step function so we can change the font size of the flavor text
+-- Hook the animation step function to change the font size of the flavor text
 function EminentDKP:LevelUpDisplayFinished(frame)
   if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" or frame.type == "TRANSFER_MADE" then
     frame.spellFrame.flavorText:SetFontObject("GameFontNormalLarge")
@@ -1148,6 +1148,7 @@ function EminentDKP:LevelUpDisplayFinished(frame)
   self.hooks["LevelUpDisplay_AnimStep"](frame)
 end
 
+-- Hook the levelUpDisplay OnHide to execute any cached notifications
 function EminentDKP:LevelUpDisplayHide(frame)
   self:ExecuteNextNotification()
   self.hooks[frame].OnHide(frame)
@@ -1215,6 +1216,7 @@ end
 local animating = false
 local queued_notifications = {}
 
+-- Execute cached on-screen notifications
 function EminentDKP:ExecuteNextNotification()
   if #(queued_notifications) > 0 then
     local n = tremove(queued_notifications)
@@ -1227,6 +1229,7 @@ function EminentDKP:ExecuteNextNotification()
   end
 end
 
+-- Play a notification (or cache it)
 function EminentDKP:NotifyOnScreen(...)
   local eventType, received, source, extra = ...
   local data = { src = source, desc = received, extra = extra }
@@ -1242,6 +1245,7 @@ function EminentDKP:NotifyOnScreen(...)
   end
 end
 
+-- Permission check for a command *sent* to a masterlooter
 function EminentDKP:EnsureToMasterlooter(addon,method,from)
   if not self.amMasterLooter then
     self:WhisperPlayer(addon,method,L["That command must be sent to the master looter."],from)
@@ -1633,21 +1637,13 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   
   -- If they load during an auction, and are eligible, notify them appropriately
   if welcome and welcome == "Hello" then
-    if self:AmMasterLooter() and self.bidItem and eligible_looters[sender] then
-      -- Send them the loot
-      self:InformPlayer("lootlist",{ 
+    if self:AmMasterLooter() and auction_active and eligible_looters[sender] then
+      -- Start the auction for them
+      self:InformPlayer("auction",{ 
         guid=self.bidItem.srcGUID, 
-        name=self.auctionItems[self.bidItem.srcGUID].name,
-        items=self.auctionItems[self.bidItem.srcGUID].items
+        slot=self.bidItem.slotNum, 
+        start=self.bidItem.start
       },sender)
-      if auction_active then
-        -- Start the auction for them
-        self:InformPlayer("auction",{ 
-          guid=self.bidItem.srcGUID, 
-          slot=self.bidItem.slotNum, 
-          start=self.bidItem.start
-        },sender)
-      end
     end
   end
 end
@@ -2912,7 +2908,8 @@ function EminentDKP:ActuateNotification(notifyType,data)
     for i,item in ipairs(data.items) do
       GetItemInfo(item.info)
     end
-    self:ScheduleTimer("RunCachedNotifications",1)
+    -- Have to wait 1.5s to ensure the items are in the itemcache
+    self:ScheduleTimer("RunCachedNotifications",1.5)
   elseif notifyType == "bounty" then
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
   elseif notifyType == "transfer" then
