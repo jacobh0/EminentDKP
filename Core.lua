@@ -1104,14 +1104,24 @@ function EminentDKP:OnEnable()
 	self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
 	self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
 	self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
-	-- Sync methods
-	self:RegisterComm("EminentDKP-Proposal", "ProcessSyncProposal")
-	self:RegisterComm("EminentDKP-Fulfill", "ProcessSyncFulfill")
-	self:RegisterComm("EminentDKP-Request", "ProcessSyncRequest")
-	self:RegisterComm("EminentDKP-Version", "ProcessSyncVersion")
-	self:RegisterComm("EminentDKP-Cmd", "ProcessCommand")
-	self:RegisterComm("EminentDKP-Notify", "ProcessNotification")
-	self:RegisterComm("EminentDKP", "ProcessSyncEvent")
+	-- 4.1 insurance (until AceComm is updated)
+	if RegisterAddonMessagePrefix ~= nil then
+	  RegisterAddonMessagePrefix("EminentDKP-SPP")
+	  RegisterAddonMessagePrefix("EminentDKP-SFF")
+	  RegisterAddonMessagePrefix("EminentDKP-SRQ")
+	  RegisterAddonMessagePrefix("EminentDKP-SV")
+	  RegisterAddonMessagePrefix("EminentDKP-SE")
+	  RegisterAddonMessagePrefix("EminentDKP-CMD")
+	  RegisterAddonMessagePrefix("EminentDKP-INF")
+  end
+	-- Addon messages
+	self:RegisterComm("EminentDKP-SPP", "ProcessSyncProposal")
+	self:RegisterComm("EminentDKP-SFF", "ProcessSyncFulfill")
+	self:RegisterComm("EminentDKP-SRQ", "ProcessSyncRequest")
+	self:RegisterComm("EminentDKP-SV", "ProcessSyncVersion")
+	self:RegisterComm("EminentDKP-SE", "ProcessSyncEvent")
+	self:RegisterComm("EminentDKP-CMD", "ProcessCommand")
+	self:RegisterComm("EminentDKP-INF", "ProcessInformation")
 	-- Custom event notifications
 	self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
 	self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
@@ -1455,7 +1465,7 @@ function EminentDKP:RequestMissingEvents()
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
     self.requestCooldown = true
-    self:SendCommMessage('EminentDKP-Request',self:GetVersion() .. '_' ..implode(',',mlist),'GUILD')
+    self:SendCommMessage("EminentDKP-SRQ",self:GetVersion() .. '_' ..implode(',',mlist),'GUILD')
     -- 10 second cooldown on doing an event requests, gives time for stuff to start syncing
     self:ScheduleTimer("ClearRequestCooldown", 10)
   end
@@ -1470,7 +1480,7 @@ end
 function EminentDKP:BroadcastVersion()
   if not self.broadcastCooldown then
     self.broadcastCooldown = true
-    self:SendCommMessage('EminentDKP-Version',self:GetVersion(),'GUILD')
+    self:SendCommMessage("EminentDKP-SV",self:GetVersion(),'GUILD')
     -- 15 second cooldown on broadcasting version, reduces spam
     self:ScheduleTimer("ClearBroadcastCooldown", 15)
   end
@@ -1524,7 +1534,7 @@ function EminentDKP:ProcessRequestProposals(who)
   
   if winners[1] == self.myName then
     -- We have won the proposal, announce that we are fulfilling their request
-    self:SendCommMessage('EminentDKP-Fulfill',self:GetVersion() .. '_' .. who,'GUILD')
+    self:SendCommMessage("EminentDKP-SFF",self:GetVersion() .. '_' .. who,'GUILD')
     
     -- Then go ahead and sync the events for them
     for i,range in ipairs(self.syncRequests[who].ranges) do
@@ -1584,7 +1594,7 @@ function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
     self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
     self.syncProposals[sender] = { }
     
-    self:SendCommMessage('EminentDKP-Proposal',self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
+    self:SendCommMessage("EminentDKP-SPP",self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
   else
     -- If not an officer, remember which ranges were requested
     for i,range in ipairs(needed_ranges) do
@@ -1621,14 +1631,14 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   if welcome and welcome == "Hello" then
     if self:AmMasterLooter() and self.bidItem and eligible_looters[sender] then
       -- Send them the loot
-      self:SendNotification("lootlist",{ 
+      self:InformPlayer("lootlist",{ 
         guid=self.bidItem.srcGUID, 
         name=self.auctionItems[self.bidItem.srcGUID].name,
         items=self.auctionItems[self.bidItem.srcGUID].items
       },sender)
       if auction_active then
         -- Start the auction for them
-        self:SendNotification("auction",{ 
+        self:InformPlayer("auction",{ 
           guid=self.bidItem.srcGUID, 
           slot=self.bidItem.slotNum, 
           start=self.bidItem.start
@@ -1987,7 +1997,7 @@ function EminentDKP:SyncEvent(eventID)
   local two = libC:CompressHuffman(one)
   local final = libCE:Encode(two)
   
-  self:SendCommMessage('EminentDKP',final,'GUILD',nil,'BULK')
+  self:SendCommMessage("EminentDKP-SE",final,'GUILD',nil,'BULK')
 end
 
 function EminentDKP:CreateAddPlayerSyncEvent(name,className)
@@ -2256,7 +2266,7 @@ end
 
 -- Broadcast version
 function EminentDKP:PLAYER_ENTERING_WORLD()
-  self:SendCommMessage('EminentDKP-Version',self:GetVersion()..":Hello",'GUILD')
+  self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
   -- Hide the meters if we're PVPing and we want it hidden
   if self.db.profile.hidepvp then
     if is_in_pvp() then
@@ -2310,7 +2320,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
     end
     sendchat(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
     self:GetActivePool().lastScan = time()
-    self:SendNotification("scan",{ time=self:GetLastScan() })
+    self:InformPlayer("scan",{ time=self:GetLastScan() })
   end
 end
 
@@ -2374,7 +2384,7 @@ end
 function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
     sendchat(L["Auction cancelled. All bids have been voided."], "raid", "preset")
-    self:SendNotification("auctioncancel",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
+    self:InformPlayer("auctioncancel",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     auction_active = false
     self:CancelTimer(self.bidTimer)
     table.insert(recent_loots[self.bidItem.srcGUID].slots,self.bidItem.slotNum)
@@ -2416,7 +2426,7 @@ function EminentDKP:LOOT_OPENED()
 		    end
 		    
 		    -- Share loot list with raid
-		    self:SendNotification("lootlist",{ guid=guid, name=unitName, items=itemlist })
+		    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
 			end
 			-- Ensure that we only print once by keeping track of the GUID
 			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
@@ -2427,7 +2437,7 @@ end
 function EminentDKP:WhisperPlayer(addon, method, msg, who, accept)
   if addon then
     local nt = (accept and "accept" or "reject")
-    self:SendNotification(nt,{ from=method, message=msg },who)
+    self:InformPlayer(nt,{ from=method, message=msg },who)
   else
     sendchat(msg, who, 'whisper')
   end
@@ -2469,7 +2479,7 @@ function EminentDKP:Transfer(addon,from,amount,to)
             if self:PlayerHasDKP(from,dkp) then
               self:CreateTransferSyncEvent(from,to,dkp)
               
-              self:SendNotification("transfer",{ amount = dkp, sender=from, receiver=to })
+              self:InformPlayer("transfer",{ amount = dkp, sender=from, receiver=to })
               if addon then
                 self:WhisperPlayer(addon,"transfer",L["Succesfully transferred %.02f DKP to %s."]:format(dkp,to), from, true)
               else
@@ -2588,7 +2598,7 @@ function EminentDKP:AdminStartAuction()
   			  srcGUID=guid,
   			  start=self:GetTime(),
   			}
-  			self:SendNotification("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
+  			self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
   			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
 		
   			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
@@ -2628,7 +2638,7 @@ function EminentDKP:AuctionBidTimer()
       else
         sendchat(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter), nil, 'self')
       end
-      self:SendNotification("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
+      self:InformPlayer("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     else
       local bids = 0
       local secondHighestBid = 0
@@ -2667,7 +2677,7 @@ function EminentDKP:AuctionBidTimer()
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
       sendchat(L["%s has won %s for %d DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid), "raid", "preset")
       sendchat(L["Each player has received %.02f DKP."]:format(dividend), "raid", "preset")
-      self:SendNotification("auctionwon",{
+      self:InformPlayer("auctionwon",{
         guid = self.bidItem.srcGUID, 
         amount = secondHighestBid, 
         receiver = looter, 
@@ -2685,7 +2695,7 @@ function EminentDKP:AuctionBidTimer()
       self:AdminStartAuction()
     else
       sendchat(L["No more loot found."], "raid", "preset")
-      self:SendNotification("lootdone",{ guid = self.bidItem.srcGUID })
+      self:InformPlayer("lootdone",{ guid = self.bidItem.srcGUID })
       self.bidItem = nil
     end
   else
@@ -2719,7 +2729,7 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
       self:CreateBountySyncEvent(players,amount,reason)
       
       -- Announce bounty to the other addons
-	    self:SendNotification("bounty",{ amount = dividend })
+	    self:InformPlayer("bounty",{ amount = dividend })
       
       sendchat(L["A bounty of %.02f has been awarded to %d players."]:format(amount,#(players)), "raid", "preset")
       sendchat(L["Each player has received %.02f DKP."]:format(dividend), "raid", "preset")
@@ -2830,20 +2840,21 @@ function EminentDKP:CHAT_MSG_WHISPER_CONTROLLER(eventController, message, from, 
   end
 end
 
-function EminentDKP:SendNotification(...)
+function EminentDKP:InformPlayer(...)
+  if not self:IsAnOfficer(sender) then return end
   local notifyType, rawdata, target = ...
   local data = notifyType .. "_" .. libS:Serialize(rawdata)
   local tosync = libCE:Encode(libC:CompressHuffman(data))
   if not target then
-    self:SendCommMessage('EminentDKP-Notify',tosync,'RAID')
+    self:SendCommMessage('EminentDKP-INF',tosync,'RAID')
   else
-    self:SendCommMessage('EminentDKP-Notify',tosync,'WHISPER',target)
+    self:SendCommMessage('EminentDKP-INF',tosync,'WHISPER',target)
   end
 end
 
 local cached_notifications = {}
 
-function EminentDKP:ProcessNotification(prefix, message, distribution, sender)
+function EminentDKP:ProcessInformation(prefix, message, distribution, sender)
   if not self:IsAnOfficer(sender) then return end
   -- Decode the compressed data
   local one = libCE:Decode(message)
@@ -2953,7 +2964,7 @@ function EminentDKP:SendCommand(...)
   table.insert(tbl,cmd)
   table.insert(tbl,arg1)
   table.insert(tbl,arg2)
-  self:SendCommMessage('EminentDKP-Cmd',implode(",",tbl),'WHISPER',self:GetMasterLooterName())
+  self:SendCommMessage("EminentDKP-CMD",implode(",",tbl),'WHISPER',self:GetMasterLooterName())
 end
 
 function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
@@ -2967,7 +2978,7 @@ function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
   elseif command == 'lootlist' then
     -- Send them the loot
     if recent_loots[arg1] then
-      self:SendNotification("lootlist",{ 
+      self:InformPlayer("lootlist",{ 
         guid=arg1, 
         name=recent_loots[arg1].name,
         items=recent_loots[arg1].items

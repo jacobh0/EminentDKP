@@ -968,7 +968,7 @@ end
 
 function StatusEnter(win, button)
   local t = GameTooltip
-	if EminentDKP.db.profile.tooltips and not EminentDKP:NeedSync() then
+	if EminentDKP.db.profile.tooltips then
 		ttactive = true
 		EminentDKP:SetTooltipPosition(t, win.bargroup)
 	  t:ClearLines()
