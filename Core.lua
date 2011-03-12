@@ -2337,12 +2337,13 @@ end
 
 -- Tracking for hide when solo option and hide in party option
 function EminentDKP:PARTY_MEMBERS_CHANGED()
-  if self.db.profile.hidesolo then
+  if is_in_party() then
+    if self.db.profile.hideparty then
+      self:ToggleMeters(not is_in_party())
+    end
+  elseif self.db.profile.hidesolo then
     self:ToggleMeters(not is_solo())
 	end
-  if self.db.profile.hideparty then
-    self:ToggleMeters(not is_in_party())
-  end
 end
 
 -- Keep track of people in the raid
