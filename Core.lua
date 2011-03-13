@@ -1337,6 +1337,10 @@ function EminentDKP:GetEventCountDifference()
   return self:GetNewestEventCount() - self:GetEventCount()
 end
 
+function EminentDKP:IsSyncing()
+  return syncing
+end
+
 function EminentDKP:NeedSync()
   return (self:GetEventCountDifference() > 0)
 end

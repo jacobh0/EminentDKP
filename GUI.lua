@@ -824,14 +824,14 @@ end
 
 function EminentDKP:UpdateStatusBar()
   local color, label, maxvalue, value
-  if not syncing then
+  if not self:IsSyncing() then
     if self:NeedSync() then
       -- Show out of date status
       maxvalue = self:GetNewestEventCount()
       value = self:GetEventCount()
       local percent = value / maxvalue
       color = color_red
-      label = (L["Out of Date"].." (%d%%)"):format(percent)
+      label = (L["Out of Date"].." (%d%%)"):format(percent * 100)
     else
       -- Show the bounty status
       local percent = self:GetAvailableBountyPercent()
