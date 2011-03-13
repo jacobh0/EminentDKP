@@ -85,8 +85,8 @@ local syncing = false
 
 local lastContainerName = nil
 
--- Whether or not automated tracking is allowed to run
-local tracking = false
+-- Whether or not officer functionality is allowed to run
+local enabled = true
 
 local function convertToTimestamp(datetime)
   local t, d = strsplit(' ',datetime)
@@ -112,7 +112,7 @@ local function GetDaysSince(timestamp)
   return GetDaysBetween(time(),timestamp)
 end
 
-local function IsRaidInCombat()
+local function IsGroupInCombat()
 	if GetNumRaidMembers() > 0 then
 		-- We are in a raid.
 		for i = 1, GetNumRaidMembers(), 1 do
@@ -1117,6 +1117,7 @@ function EminentDKP:OnEnable()
 	self:RegisterEvent("PLAYER_ENTERING_WORLD") -- version broadcast
 	self:RegisterChatEvent("CHAT_MSG_WHISPER") -- whisper commands received
 	self:RegisterChatEvent("CHAT_MSG_WHISPER_INFORM") -- whispers sent
+	self:RegisterChatEvent("CHAT_MSG_PARTY") -- party messages
 	self:RegisterChatEvent("CHAT_MSG_RAID") -- raid messages
 	self:RegisterChatEvent("CHAT_MSG_RAID_WARNING") -- raid warnings
 	self:RegisterEvent("ACHIEVEMENT_EARNED") -- achievement tracking
@@ -1277,8 +1278,8 @@ function EminentDKP:EnsureToMasterlooter(addon,method,from)
     self:WhisperPlayer(addon,method,L["The master looter must be an officer."],from)
     return false
   end
-  if not UnitInRaid(from) then
-    self:WhisperPlayer(addon,method,L["You are not in the current raid group."],from)
+  if not UnitExists(from) then
+    self:WhisperPlayer(addon,method,L["You are not in the current group."],from)
     return false
   end
   return true
@@ -1292,6 +1293,10 @@ function EminentDKP:EnsureOfficership()
   end
   if self:NeedSync() then
     self:DisplayActionResult(L["Your database must be up to date first."])
+    return false
+  end
+  if not self:IsEnabled() then
+    self:DisplayActionResult(L["EminentDKP is currently disabled."])
     return false
   end
   return true
@@ -1685,7 +1690,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Decompress the decoded data
   local two, message = libC:Decompress(one)
   if not two then
-  	sendchat("Error occured while decoding a sync event:" .. message,nil,'self')
+  	self:Print("Error occured while decoding a sync event:" .. message)
   	return
   end
   
@@ -1696,7 +1701,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Deserialize the decompressed data
   local success, event = libS:Deserialize(data)
   if not success then
-    sendchat("Error occured while deserializing a sync event.",nil,'self')
+    self:Print("Error occured while deserializing a sync event.")
   	return
   end
   
@@ -1789,6 +1794,10 @@ function EminentDKP:FormatNumber(number)
 			return self:StdNumber(number)
 		end
 	end
+end
+
+function EminentDKP:MessageGroup(what)
+  sendchat(what,(is_in_party() and "party" or "raid"),"preset")
 end
 
 function EminentDKP:AuctionActive()
@@ -1949,27 +1958,33 @@ function EminentDKP:GetAvailableBountyPercent()
   return (self:GetAvailableBounty()/self:GetBountySize())*100
 end
 
--- Construct list of players currently in the raid
-function EminentDKP:GetCurrentRaidMembers()
+-- Construct list of IDs for players currently in the group
+function EminentDKP:GetCurrentGroupMembersIDs()
   local players = {}
-  for spot = 1, 40 do
-    local name = select(1,GetRaidRosterInfo(spot))
-		if name then
-		  local player, pid = self:GetPlayerByName(name)
-		  players[pid] = player
+  if is_in_party() then
+    for spot = 1, 5 do
+      local name = UnitName("party"..spot)
+  		if name then
+  		  table.insert(players,self:GetPlayerIDByName(name))
+  		end
+    end
+  else
+    for spot = 1, 40 do
+      local name = UnitName("raid"..spot)
+  		if name then
+  		  table.insert(players,self:GetPlayerIDByName(name))
+  		end
 		end
   end
   return players
 end
 
--- Construct list of IDs for players currently in the raid
-function EminentDKP:GetCurrentRaidMembersIDs()
+-- Construct list of players currently in the group
+function EminentDKP:GetCurrentGroupMembers()
   local players = {}
-  for spot = 1, 40 do
-    local name = select(1,GetRaidRosterInfo(spot))
-		if name then
-		  table.insert(players,self:GetPlayerIDByName(name))
-		end
+  for i, pid in ipairs(self:GetCurrentGroupMembersIDs())
+    local pdata = self:GetPlayerByID(pid)
+    players[pid] = pdata
   end
   return players
 end
@@ -2292,27 +2307,33 @@ end
 
 ---------- END EVENT FUNCTIONS ----------
 
--- Iterate over the raid and determine loot eligibility
+-- Iterate over the group and determine loot eligibility
 function EminentDKP:UpdateLootEligibility()
   wipe(eligible_looters)
-  for d = 1, GetNumRaidMembers() do
+  local count = (is_in_party() and GetNumPartyMembers() or GetNumRaidMembers())
+  for d = 1, count do
 		if GetMasterLootCandidate(d) then
 			eligible_looters[GetMasterLootCandidate(d)] = d
 		end
 	end
 end
 
-function EminentDKP:CanTrack()
-  return tracking
+function EminentDKP:IsEnabled()
+  return enabled and not self:NeedSync()
 end
 
 function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, guild)
-  tracking = (self.db.profile.guildgroup and guild or true)
+  -- if disable in party, and in a party, ignore
+  if self.db.profile.disableparty and is_in_party() then return end
+    -- if disable in pvp, and in pvp, ignore
+  if self.db.profile.disablepvp and is_in_pvp() then return end
+  
+  enabled = (self.db.profile.guildgroup and guild or true)
 end
 
 -- Keep track of any creature deaths
 function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
-  if not self:AmOfficer() or not UnitInRaid("player") then return end
+  if not self:AmOfficer() or not self:IsEnabled() then return end
   if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
     table.insert(recent_deaths,1,dstName)
     if #(recent_deaths) > 10 then
@@ -2323,7 +2344,7 @@ end
 
 -- Keep track of any earned achievements
 function EminentDKP:ACHIEVEMENT_EARNED(event, achievementID)
-  if not self:AmOfficer() or not UnitInRaid("player") then return end
+  if not self:AmOfficer() or not self:IsEnabled() then return end
   local achiev_id, achiev_name = GetAchievementInfo(tonumber(achievementID))
   table.insert(recent_achievements,1,achiev_name)
   if #(recent_achievements) > 10 then
@@ -2337,11 +2358,14 @@ function EminentDKP:PLAYER_ENTERING_WORLD()
   if self.db.profile.hidepvp then
     self:ToggleMeters(not is_in_pvp())
   end
+  if self.db.profile.disablepvp then
+    enabled = not is_in_pvp()
+  end
 end
 
--- Check if we're not dead and raid is not in combat, then we're out of combat
+-- Check if we're not dead and group is not in combat, then we're out of combat
 function EminentDKP:CheckCombatStatus()
-  if not UnitIsDead("player") and not IsRaidInCombat() then
+  if not UnitIsDead("player") and not IsGroupInCombat() then
     self:CancelTimer(self.combatCheckTimer,true)
     self:ToggleMeters(true)
   end
@@ -2361,10 +2385,10 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
     self:CancelTimer(self.combatCheckTimer,true)
     self:ToggleMeters(false)
   end
-  if not self:AmMasterLooter() then return end
+  if not self:AmMasterLooter() or not self:IsEnabled() then return end
   
   if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) > 0 then
-    sendchat(L["Performing database scan..."], nil, 'self')
+    self:Print(L["Performing database scan..."])
     for pid,data in pairs(self:GetActivePool().players) do
       if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
         local name = self:GetPlayerNameByID(pid)
@@ -2378,11 +2402,33 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
       end
     end
     if self:GetAvailableBountyPercent() > 50 then
-      sendchat(L["There is more than 50% of the bounty available. You should distribute some."], nil, 'self')
+      self:Print(L["There is more than 50% of the bounty available. You should distribute some."])
     end
-    sendchat(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
+    self:MessageGroup(L["Current bounty is %.02f DKP."]:format(self:GetAvailableBounty()))
     self:GetActivePool().lastScan = time()
     self:InformPlayer("scan",{ time=self:GetLastScan() })
+  end
+end
+
+-- Make sure players exist in the pool
+function EminentDKP:CheckGroupPlayers()
+  -- This only needs to be run by the masterlooter
+  if not self:AmMasterLooter() or self:IsEnabled() then return end
+  
+  if GetNumRaidMembers() > 0 then
+    for d = 1, GetNumRaidMembers() do
+  		local name = select(1,GetRaidRosterInfo(d))
+  		if name and not self:PlayerExistsInPool(name) then
+  		  self:CreateAddPlayerSyncEvent(name,select(2,UnitClass(name)))
+  		end
+  	end
+  elseif GetNumPartyMembers() > 0 then
+    for d = 1, GetNumPartyMembers() do
+  		local name = UnitName("party"..d)
+  		if name and not self:PlayerExistsInPool(name) then
+  		  self:CreateAddPlayerSyncEvent(name,select(2,UnitClass(name)))
+  		end
+  	end
   end
 end
 
@@ -2395,37 +2441,38 @@ function EminentDKP:PARTY_MEMBERS_CHANGED()
   elseif self.db.profile.hidesolo then
     self:ToggleMeters(not is_solo())
 	end
+	if self.db.profile.disableparty then
+    enabled = not is_in_party()
+  end
+  
+  self:CheckGroupPlayers()
 end
 
--- Keep track of people in the raid
+-- Tracking for hide when solo option
 function EminentDKP:RAID_ROSTER_UPDATE()
   if self.db.profile.hidesolo then
     self:ToggleMeters(not is_solo())
 	end
   
-  -- This only needs to be run by the masterlooter (and not in PVP)
-  if not self:AmMasterLooter() or is_in_pvp() or self:NeedSync() then return end
-  
-  -- Make sure players exist in the pool
-  for d = 1, GetNumRaidMembers() do
-		local name = select(1,GetRaidRosterInfo(d))
-		if not self:PlayerExistsInPool(name) then
-		  self:CreateAddPlayerSyncEvent(name,select(2,UnitClass(name)))
-		end
-	end
+  self:CheckGroupPlayers()
 end
 
 -- Keep track of the loot method
 function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self.lootMethod, self.masterLooterPartyID, self.masterLooterRaidID = GetLootMethod()
   self.amMasterLooter = (self.lootMethod == 'master' and self.masterLooterPartyID == 0)
-  self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
-  self:RAID_ROSTER_UPDATE()
+  if is_in_party() then 
+    self.masterLooterName = UnitName("party"..tostring(self.masterLooterPartyID))
+  else
+    self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
+  end
+  
+  self:CheckGroupPlayers()
 end
 
 -- Keep track of the last container we opened
 function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
-  if not self:AmMasterLooter() then return end
+  if not self:AmMasterLooter() or not self:IsEnabled() then return end
   if spell == "Opening" and unit == "player" then
     lastContainerName = target
   end
@@ -2436,8 +2483,8 @@ function EminentDKP:AmMasterLooter()
 end
 
 function EminentDKP:GetMasterLooterName()
-  if self.lootMethod == 'master' and UnitInRaid("player") then
-    if not UnitInRaid(self.masterLooterName) then
+  if self.lootMethod == 'master' then
+    if not UnitExists(self.masterLooterName) then
       self:PARTY_LOOT_METHOD_CHANGED()
     end
     return self.masterLooterName
@@ -2450,53 +2497,51 @@ function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
     auction_active = false
     self:CancelTimer(self.bidTimer)
-    sendchat(L["Auction cancelled. All bids have been voided."], "raid", "preset")
+    self:MessageGroup(L["Auction cancelled. All bids have been voided."])
     self:InformPlayer("auctioncancel",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     table.insert(recent_loots[self.bidItem.srcGUID].slots,self.bidItem.slotNum)
     self.bidItem = nil
   end
 end
 
--- Prints out the loot to the raid when looting a corpse
+-- Prints out the loot to the group when looting a corpse
 function EminentDKP:LOOT_OPENED()
   -- This only needs to be run by the masterlooter
-  if not self:AmMasterLooter() then return end
+  if not self:AmMasterLooter() or not self:IsEnabled() then return end
   
-  if UnitInRaid("player") then
-    -- Query some info about this unit...
-    local unitName = lastContainerName
-    local guid = 'container'
-    if UnitExists("target") then
-      unitName = UnitName("target")
-      guid = UnitGUID("target")
-    end
-    if not recent_loots[guid] and GetNumLootItems() > 0 then
-      local eligible_items = {}
-      local slotlist = {}
-      local itemlist = {}
-      for slot = 1, GetNumLootItems() do 
-				local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-				if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
-				  local link = GetLootSlotLink(slot)
-				  table.insert(eligible_items,link)
-				  table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), slot=slot })
-				  table.insert(slotlist,1,slot)
-				end
+  -- Query some info about this unit...
+  local unitName = lastContainerName
+  local guid = 'container'
+  if UnitExists("target") then
+    unitName = UnitName("target")
+    guid = UnitGUID("target")
+  end
+  if not recent_loots[guid] and GetNumLootItems() > 0 then
+    local eligible_items = {}
+    local slotlist = {}
+    local itemlist = {}
+    for slot = 1, GetNumLootItems() do 
+			local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
+			if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
+			  local link = GetLootSlotLink(slot)
+			  table.insert(eligible_items,link)
+			  table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), slot=slot })
+			  table.insert(slotlist,1,slot)
 			end
-			
-			if #(eligible_items) > 0 then
-  			sendchat(L["Loot from %s:"]:format(unitName),"raid", "preset")
-			  for i,loot in ipairs(eligible_items) do
-			    sendchat(loot,"raid", "preset")
-		    end
-		    
-		    -- Share loot list with raid
-		    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
-		    
-		    -- Ensure that we only print once by keeping track of the GUID
-  			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
-			end
-    end
+		end
+		
+		if #(eligible_items) > 0 then
+			self:MessageGroup(L["Loot from %s:"]:format(unitName))
+		  for i,loot in ipairs(eligible_items) do
+		    self:MessageGroup(loot)
+	    end
+	    
+	    -- Share loot list with group
+	    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
+	    
+	    -- Ensure that we only print once by keeping track of the GUID
+			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
+		end
   end
 end
 
@@ -2552,7 +2597,7 @@ function EminentDKP:Transfer(addon,from,amount,to)
                 sendchat(L["Succesfully transferred %.02f DKP to %s."]:format(dkp,to), from, 'whisper')
               end
               sendchat(L["%s just transferred %.02f DKP to you."]:format(from,dkp), to, 'whisper')
-              sendchat(L["%s has transferred %.02f DKP to %s."]:format(from,dkp,to), "raid", "preset")
+              self:MessageGroup(L["%s has transferred %.02f DKP to %s."]:format(from,dkp,to))
             else
               self:WhisperPlayer(addon,"transfer",L["The DKP amount must not exceed your current DKP."], from)
             end
@@ -2579,7 +2624,7 @@ end
 
 function EminentDKP:GetStandings(stat)
   local a = {}
-  local players = self:GetCurrentRaidMembers()
+  local players = self:GetCurrentGroupMembers()
   if next(players) == nil then
     players = self:GetPlayerPool()
   end
@@ -2665,9 +2710,11 @@ function EminentDKP:AdminStartAuction()
   			}
   			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
   			self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
-		
-  			sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
-  			sendchat(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink), "raid", "preset")
+		    
+		    if not is_in_party() then
+  			  sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
+			  end
+  			self:MessageGroup(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink))
       else
         self:DisplayActionResult(L["An auction is already active."])
       end
@@ -2687,7 +2734,7 @@ function EminentDKP:AuctionBidTimer()
   if self.bidItem.elapsed == 30 then
     auction_active = false
     self:CancelTimer(self.bidTimer)
-    sendchat(L["Auction has closed. Determining winner..."], "raid", "preset")
+    self:MessageGroup(L["Auction has closed. Determining winner..."])
     
     local looter = self.myName
 		local guid = self.bidItem.srcGUID
@@ -2697,11 +2744,11 @@ function EminentDKP:AuctionBidTimer()
     
     if next(self.bidItem.bids) == nil then
       -- No bids received, so disenchant
-      sendchat(L["No bids received. Disenchanting."], "raid", "preset")
+      self:MessageGroup(L["No bids received. Disenchanting."])
       if eligible_looters[self.db.profile.disenchanter] then
         looter = self.db.profile.disenchanter
       else
-        sendchat(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter), nil, 'self')
+        self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter))
       end
       self:InformPlayer("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
     else
@@ -2730,16 +2777,16 @@ function EminentDKP:AuctionBidTimer()
         -- We have a tie to break
         looter = winners[math.random(#(winners))]
         secondHighestBid = winningBid
-        sendchat(L["A tie was broken with a random roll."], "raid", "preset")
+        self:MessageGroup(L["A tie was broken with a random roll."])
       end
       
       -- Construct list of players to receive dkp
-      local players = self:GetCurrentRaidMembersIDs()
+      local players = self:GetCurrentGroupMembersIDs()
       local dividend = (secondHighestBid/#(players))
       
       self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
-      sendchat(L["%s has won %s for %d DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid), "raid", "preset")
-      sendchat(L["Each player has received %.02f DKP."]:format(dividend), "raid", "preset")
+      self:MessageGroup(L["%s has won %s for %d DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid))
+      self:MessageGroup(L["Each player has received %.02f DKP."]:format(dividend))
       self:InformPlayer("auctionwon",{
         guid = self.bidItem.srcGUID, 
         amount = secondHighestBid, 
@@ -2758,12 +2805,12 @@ function EminentDKP:AuctionBidTimer()
       self.bidItem = nil
       self:AdminStartAuction()
     else
-      sendchat(L["No more loot found."], "raid", "preset")
+      self:MessageGroup(L["No more loot found."])
       self:InformPlayer("lootdone",{ guid = self.bidItem.srcGUID })
       self.bidItem = nil
     end
   else
-    sendchat(("%d..."):format(30-self.bidItem.elapsed), "raid", "preset")
+    self:MessageGroup(("%d..."):format(30-self.bidItem.elapsed))
   end
 end
 
@@ -2792,9 +2839,9 @@ function EminentDKP:AdminIssueAdjustment(who,amount,deduction,reason)
 	    self:InformPlayer("adjustment",{ amount = p, receiver = who })
 	    
 	    if deduction then
-	       sendchat(L["%s has received a deduction of %.02f DKP."]:format(who,p), "raid", "preset")
+	       self:MessageGroup(L["%s has received a deduction of %.02f DKP."]:format(who,p))
       else
-        sendchat(L["%s has been awarded %.02f DKP."]:format(who,p), "raid", "preset")
+        self:MessageGroup(L["%s has been awarded %.02f DKP."]:format(who,p))
       end
     else
       self:DisplayActionResult(L["ERROR: Invalid adjustment amount given."])
@@ -2810,7 +2857,7 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
     local p = tonumber(value) or 0
     if (percent and p <= 100 and p > 0) or (not percent and p <= self:GetAvailableBounty() and p > 0) then
       -- Construct list of players to receive bounty
-      local players = self:GetCurrentRaidMembersIDs()
+      local players = self:GetCurrentGroupMembersIDs()
       
       local amount = (percent and (self:GetAvailableBounty() * (p/100)) or p)
       local dividend = (amount/#(players))
@@ -2820,9 +2867,9 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
       -- Announce bounty to the other addons
 	    self:InformPlayer("bounty",{ amount = dividend })
       
-      sendchat(L["A bounty of %.02f has been awarded to %d players."]:format(amount,#(players)), "raid", "preset")
-      sendchat(L["Each player has received %.02f DKP."]:format(dividend), "raid", "preset")
-      sendchat(L["The bounty pool is now %.02f DKP."]:format(self:GetAvailableBounty()), "raid", "preset")
+      self:MessageGroup(L["A bounty of %.02f has been awarded to %d players."]:format(amount,#(players)))
+      self:MessageGroup(L["Each player has received %.02f DKP."]:format(dividend))
+      self:MessageGroup(L["The bounty pool is now %.02f DKP."]:format(self:GetAvailableBounty()))
     else
       self:DisplayActionResult(L["ERROR: Invalid bounty amount given."])
     end
@@ -2836,7 +2883,7 @@ function EminentDKP:AdminVanityRoll()
   if not self:EnsureOfficership() then return end
   if not auction_active then
     local ranks = {}
-    for pid, data in pairs(self:GetCurrentRaidMembers()) do
+    for pid, data in pairs(self:GetCurrentGroupMembers()) do
   		local name = self:GetPlayerNameByID(pid)
 			if data.currentVanityDKP > 0 then
 			  local roll = math.random(math.floor(data.currentVanityDKP))/1000
@@ -2845,9 +2892,9 @@ function EminentDKP:AdminVanityRoll()
 	  end
 	  table.sort(ranks, function(a,b) return a.r>b.r end)
 	  
-	  sendchat(L["Vanity item rolls weighted by current vanity DKP:"], "raid", "preset")
+	  self:MessageGroup(L["Vanity item rolls weighted by current vanity DKP:"])
 	  for rank,data in ipairs(ranks) do
-	    sendchat(("%d. %s (%.02f) - %.02f"):format(rank,data.n,data.v,data.r), "raid", "preset")
+	    self:MessageGroup(("%d. %s (%.02f) - %.02f"):format(rank,data.n,data.v,data.r))
     end
   else
     self:DisplayActionResult(L["ERROR: An auction must not be active."])
@@ -2886,24 +2933,29 @@ function EminentDKP:DisplayActionResult(status)
   if self.actionpanel then
     self.actionpanel:SetStatusText(status)
   else
-    sendchat(status, nil, 'self')
+    self:Print(status)
   end
 end
 
 ------------- END ADMIN FUNCTIONS -------------
 
-function EminentDKP:CHAT_MSG_RAID_CONTROLLER(eventController, message, from, ...)
+function EminentDKP:FILTER_EMINENTDKP_MESSAGES(eventController, message)
   -- Ensure all correspondence from the addon is hidden (option)
   if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
     eventController:BlockFromChatFrame()
   end
 end
 
+function EminentDKP:CHAT_MSG_PARTY_CONTROLLER(eventController, message, from, ...)
+  self:FILTER_EMINENTDKP_MESSAGES(eventController, message)
+end
+
+function EminentDKP:CHAT_MSG_RAID_CONTROLLER(eventController, message, from, ...)
+  self:FILTER_EMINENTDKP_MESSAGES(eventController, message)
+end
+
 function EminentDKP:CHAT_MSG_RAID_WARNING_CONTROLLER(eventController, message, from, ...)
-  -- Ensure all correspondence from the addon is hidden (option)
-  if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
-    eventController:BlockFromChatFrame()
-  end
+  self:FILTER_EMINENTDKP_MESSAGES(eventController, message)
 end
 
 function EminentDKP:HideRaidWarning(frame, event, message)
@@ -2934,7 +2986,7 @@ function EminentDKP:InformPlayer(...)
   local data = notifyType .. "_" .. libS:Serialize(rawdata)
   local tosync = libCE:Encode(libC:CompressHuffman(data))
   if not target then
-    self:SendCommMessage('EminentDKP-INF',tosync,'RAID')
+    self:SendCommMessage('EminentDKP-INF',tosync,(is_in_party() and "PARTY" or "RAID"))
   else
     self:SendCommMessage('EminentDKP-INF',tosync,'WHISPER',target)
   end
@@ -2950,7 +3002,7 @@ function EminentDKP:ProcessInformation(prefix, message, distribution, sender)
   -- Decompress the decoded data
   local two, message = libC:Decompress(one)
   if not two then
-  	sendchat('Error occured while decoding a notification: '..message,nil,'self')
+  	self:Print('Error occured while decoding a notification: '..message)
   	return
   end
   
@@ -2959,7 +3011,7 @@ function EminentDKP:ProcessInformation(prefix, message, distribution, sender)
   -- Deserialize the decompressed data
   local success, data = libS:Deserialize(rawdata)
   if not success then
-    sendchat('Error occured while deserializing notification data.',nil,'self')
+    self:Print('Error occured while deserializing notification data.')
   	return
   end
   
@@ -3089,7 +3141,7 @@ function EminentDKP:ProcessSlashCmd(input)
     if self:GetNewestVersion() ~= self:GetVersion() then
       say_what = say_what .. " (latest is "..self:GetNewestVersion()..")"
     end
-    sendchat(say_what, nil, 'self')
+    self:Print(say_what)
   end
 end
 

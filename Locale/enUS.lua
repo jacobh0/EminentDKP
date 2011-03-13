@@ -197,7 +197,8 @@ L["That command can only be used by an officer."] = "That command can only be us
 L["Master looting must be enabled."] = "Master looting must be enabled."
 L["Only the master looter can use that command."] = "Only the master looter can use that command."
 L["Your database must be up to date first."] = "Your database must be up to date first."
-L["You are not in the current raid group."] = "You are not in the current raid group."
+L["You are not in the current group."] = "You are not in the current group."
+L["EminentDKP is currently disabled."] = "EminentDKP is currently disabled."
 
 L["Achievement: %s"] = "Achievement: %s"
 L["Kill: %s"] = "Kill: %s"
