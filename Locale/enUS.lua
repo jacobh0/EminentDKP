@@ -297,3 +297,34 @@ L["Current:"] = "Current:"
 L["Newest:"] = "Newest:"
 L["Version Info"] = "Version Info"
 L["Please upgrade to the newest version."] = "Please upgrade to the newest version."
+
+-- Action Panel
+L["EminentDKP Action Panel"] = "EminentDKP Action Panel"
+L["Vanity"] = "Vanity"
+L["Transfer"] = "Transfer"
+L["Bounty"] = "Bounty"
+L["Adjustment"] = "Adjustment"
+
+L["Transfer DKP"] = "Transfer DKP"
+L["Recipient"] = "Recipient"
+L["Amount"] = "Amount"
+L["Send"] = "Send"
+
+L["Reset Vanity DKP"] = "Reset Vanity DKP"
+L["Player"] = "Player"
+L["Reset"] = "Reset"
+L["Vanity DKP Roll"] = "Vanity DKP Roll"
+L["Roll"] = "Roll"
+
+L["Rename Player"] = "Rename Player"
+L["Rename"] = "Rename"
+L["New Player"] = "New Player"
+L["Old Player"] = "Old Player"
+
+L["Award Bounty"] = "Award Bounty"
+L["Reason"] = "Reason"
+L["Award"] = "Award"
+
+L["Issue Adjustment"] = "Issue Adjustment"
+L["Deduction"] = "Deduction"
+L["Issue"] = "Issue"

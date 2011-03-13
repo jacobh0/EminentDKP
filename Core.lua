@@ -1746,7 +1746,7 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     self:CreateVanityResetEvent(sname,event.datetime)
   elseif event.eventType == 'adjustment' then
     local sname = self:GetPlayerNameByID(event.source)
-    self:CreateAdjustmentEvent(sname,math.abs(event.value),(event.value < 0),event.extraInfo)
+    self:CreateAdjustmentEvent(sname,math.abs(event.value),(event.value < 0),event.extraInfo,event.datetime)
   elseif event.eventType == 'rename' then
     self:CreateRenameEvent(event.extraInfo,event.value,event.datetime)
   end
@@ -2798,7 +2798,7 @@ function EminentDKP:AdminIssueAdjustment(who,amount,deduction,reason)
         sendchat(L["%s has been awarded %.02f DKP."]:format(who,p), "raid", "preset")
       end
     else
-      self:DisplayActionResult(L["ERROR: Invalid bounty amount given."])
+      self:DisplayActionResult(L["ERROR: Invalid adjustment amount given."])
     end
   else
     self:DisplayActionResult(L["ERROR: An auction must not be active."])
