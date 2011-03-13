@@ -24,6 +24,7 @@ TODO:
 0. Add enable/disable option for officers
 1. Organize meter display code and move to GUI.lua
 2. Vanity rolls? (custom view mode)
+3. Localize action panel
 
 ]]
 
@@ -1743,6 +1744,9 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   elseif event.eventType == 'vanityreset' then
     local sname = self:GetPlayerNameByID(event.source)
     self:CreateVanityResetEvent(sname,event.datetime)
+  elseif event.eventType == 'adjustment' then
+    local sname = self:GetPlayerNameByID(event.source)
+    self:CreateAdjustmentEvent(sname,math.abs(event.value),(event.value < 0),event.extraInfo)
   elseif event.eventType == 'rename' then
     self:CreateRenameEvent(event.extraInfo,event.value,event.datetime)
   end
@@ -1885,10 +1889,15 @@ function EminentDKP:PlayerHasDKP(name,amount)
   return (player ~= nil and player.currentDKP >= amount)
 end
 
+-- Get current DKP for a player
+function EminentDKP:GetCurrentDKP(name)
+  local player = self:GetPlayerByName(name)
+  return (player ~= nil and player.currentDKP or nil)
+end
+
 -- Get the your current DKP
 function EminentDKP:GetMyCurrentDKP()
-  local player = self:GetPlayerByName(self.myName)
-  return (player ~= nil and player.currentDKP or nil)
+  return self:GetCurrentDKP(self.myName)
 end
 
 -- Get the names of everybody else in the pool
@@ -2159,6 +2168,31 @@ function EminentDKP:CreatePurgeEvent(name,dtime)
   
   self:GetActivePool().playerIDs[name] = nil
   self:GetActivePool().players[pid] = nil
+  
+  return cid
+end
+
+function EminentDKP:CreateAdjustmentSyncEvent(name,amount,deduction,reason)
+  self:SyncEvent(self:CreateAdjustmentEvent(name,amount,deduction,reason,time()))
+end
+
+function EminentDKP:CreateAdjustmentEvent(name,amount,deduction,reason,dtime)
+  local pdata, pid = self:GetPlayerByName(name)
+  
+  if deduction then amount = amount * -1 end
+  
+  -- Create the event
+  local cid = self:CreateEvent(pid,"adjustment",reason,"","",amount,dtime)
+  
+  if deduction then
+    -- If deducting: subtract DKP and add it back to the bounty pool
+    self:CreatePlayerDeduction(pid,cid,math.abs(amount))
+    self:IncreaseAvailableBounty(math.abs(amount))
+  else
+    -- If earning: add DKP and subtract it from the bounty pool
+    self:CreatePlayerEarning(pid,cid,amount)
+    self:DecreaseAvailableBounty(amount)
+  end
   
   return cid
 end
@@ -2745,6 +2779,32 @@ function EminentDKP:GetBountyReasons()
   return reasons
 end
 
+function EminentDKP:AdminIssueAdjustment(who,amount,deduction,reason)
+  if not self:EnsureOfficership() then return end
+  if not auction_active then
+    local p = tonumber(amount) or 0
+    if (deduction and p <= self:GetCurrentDKP(who) and p >= 1) or (not deduction and p <= self:GetAvailableBounty() and p >= 1) then      
+      local amount = (percent and (self:GetAvailableBounty() * (p/100)) or p)
+      local dividend = (amount/#(players))
+      
+      self:CreateAdjustmentSyncEvent(who,p,deduction,reason)
+      
+      -- Announce bounty to the other addons
+	    self:InformPlayer("adjustment",{ amount = p, receiver = who })
+	    
+	    if deduction then
+	       sendchat(L["%s has received a deduction of %.02f DKP."]:format(who,p), "raid", "preset")
+      else
+        sendchat(L["%s has been awarded %.02f DKP."]:format(who,p), "raid", "preset")
+      end
+    else
+      self:DisplayActionResult(L["ERROR: Invalid bounty amount given."])
+    end
+  else
+    self:DisplayActionResult(L["ERROR: An auction must not be active."])
+  end
+end
+
 function EminentDKP:AdminDistributeBounty(percent,value,reason)
   if not self:EnsureOfficership() then return end
   if not auction_active then
@@ -2770,7 +2830,6 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
   else
     self:DisplayActionResult(L["ERROR: An auction must not be active."])
   end
-  
 end
 
 -- Perform a vanity roll weighted by current vanity DKP

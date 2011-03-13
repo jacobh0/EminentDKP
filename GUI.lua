@@ -755,6 +755,58 @@ local function CreateBountyTab(container)
   container:AddChild(bountygrp)
 end
 
+local function CreateAdjustmentTab(container)
+  local adjustgrp = AceGUI:Create("InlineGroup")
+  adjustgrp:SetTitle("Issue Adjustment")
+  adjustgrp:SetLayout("Flow")
+  adjustgrp:SetWidth(200)
+  
+  local issue = AceGUI:Create("Button")
+  
+  local who = AceGUI:Create("Dropdown")
+  who:SetLabel("Player")
+  who:SetList(EminentDKP:GetPlayerNames())
+  who:SetWidth(150)
+  who:SetCallback("OnValueChanged",function(i,j,value)
+    issue:SetDisabled(false)
+  end)
+  
+  local reason = AceGUI:Create("EditBox")
+  reason:SetLabel("Reason")
+  reason:SetWidth(150)
+  reason:SetMaxLetters(25)
+  reason:SetValue("")
+  
+  local amount = AceGUI:Create("Slider")
+  amount:SetLabel("Amount")
+  
+  local deduct = AceGUI:Create("CheckBox")
+  deduct:SetLabel("Deduction")
+  deduct:SetValue(true)
+  deduct:SetCallback("OnValueChanged",function(i,j,checked)
+    if checked then
+      amount:SetSliderValues(1,TNum(EminentDKP:GetCurrentDKP(who:GetValue())),1)
+      amount:SetValue(1)
+    else
+      amount:SetSliderValues(1,math.floor(EminentDKP:GetAvailableBounty()),1)
+      amount:SetValue(1)
+    end
+  end)
+  
+  issue:SetText("Issue")
+  issue:SetWidth(150)
+  issue:SetCallback("OnClick",function(what)
+    EminentDKP:AdminIssueAdjustment(who:GetValue(),amount:GetValue(),deduct:GetValue(),reason:GetValue())
+  end)
+  
+  adjustgrp:AddChild(who)
+  adjustgrp:AddChild(reason)
+  adjustgrp:AddChild(deduct)
+  adjustgrp:AddChild(amount)
+  adjustgrp:AddChild(issue)
+  container:AddChild(adjustgrp)
+end
+
 -- Callback function for OnGroupSelected
 local function SelectGroup(container, event, group)
   container:ReleaseChildren()
@@ -766,6 +818,8 @@ local function SelectGroup(container, event, group)
     CreateRenameTab(container)
   elseif group == "bounty" then
     CreateBountyTab(container)
+  elseif group == "adjustment" then
+    CreateAdjustmentTab(container)
   end
   EminentDKP.actionpanel:SetStatusText("")
 end
@@ -793,7 +847,8 @@ function EminentDKP:CreateActionPanel()
     {text="Transfer", value="transfer"},
     {text="Vanity", value="vanity", disabled=(not EminentDKP:AmOfficer())},
     {text="Rename", value="rename", disabled=(not EminentDKP:AmOfficer())},
-    {text="Bounty", value="bounty", disabled=(not EminentDKP:AmMasterLooter())},
+    {text="Adjustment", value="adjustment", disabled=(not EminentDKP:AmOfficer())},
+    {text="Bounty", value="bounty", disabled=(not EminentDKP:AmOfficer())},
   })
   -- Register callback
   tab:SetCallback("OnGroupSelected", SelectGroup)
