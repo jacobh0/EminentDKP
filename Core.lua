@@ -85,6 +85,9 @@ local syncing = false
 
 local lastContainerName = nil
 
+-- Whether or not automated tracking is allowed to run
+local tracking = false
+
 local function convertToTimestamp(datetime)
   local t, d = strsplit(' ',datetime)
   local hour, min = strsplit(':',t)
@@ -782,7 +785,9 @@ function EminentDKP:ApplySettings(win)
 
 	-- Don't show window if we are solo, option.
 	-- Don't show window in a PvP instance, option.
-	if (self.db.profile.hidesolo and is_solo()) or (self.db.profile.hidepvp and is_in_pvp()) then
+	if (self.db.profile.hidesolo and is_solo()) or 
+	   (self.db.profile.hidepvp and is_in_pvp()) or 
+	   (self.db.profile.hideparty and is_in_party()) then
 	  win:Hide()
 	else
 		win:Show()
@@ -1123,6 +1128,7 @@ function EminentDKP:OnEnable()
 	self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
 	self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
 	self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
+	self:RegisterEvent("GUILD_PARTY_STATE_UPDATED") -- guild group tracking
 	self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
 	-- 4.1 insurance (until AceComm is updated)
 	if RegisterAddonMessagePrefix ~= nil then
@@ -2259,6 +2265,14 @@ function EminentDKP:UpdateLootEligibility()
 	end
 end
 
+function EminentDKP:CanTrack()
+  return tracking
+end
+
+function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, guild)
+  tracking = (self.db.profile.guildgroup and guild or true)
+end
+
 -- Keep track of any creature deaths
 function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
   if not self:AmOfficer() or not UnitInRaid("player") then return end
@@ -2353,8 +2367,7 @@ function EminentDKP:RAID_ROSTER_UPDATE()
 	end
   
   -- This only needs to be run by the masterlooter (and not in PVP)
-  -- todo: we really need someway to disable/enable the addon
-  if self:NeedSync() or not self:AmMasterLooter() or is_in_pvp() then return end
+  if not self:AmMasterLooter() or is_in_pvp() or self:NeedSync() then return end
   
   -- Make sure players exist in the pool
   for d = 1, GetNumRaidMembers() do

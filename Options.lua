@@ -75,6 +75,9 @@ EminentDKP.defaults = {
     showranks = true,
     daystoshow = 14,
     hideraidmessages = true,
+    guildgroup = true,
+    disablepvp = true,
+    disableparty = true,
     windows = { default_window },
     auctionframe = {
       itemfontsize = 14,
@@ -620,9 +623,9 @@ EminentDKP.options = {
 				},
       },
     },
-    masterlooter = {
+    officer = {
   	  type = "group",
-  		name = L["Masterlooter Options"],
+  		name = L["Officer Options"],
   		order = 2,
       args = {
         disenchanter = {
@@ -652,6 +655,36 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.expiretime end,
 					set= function(self, val) EminentDKP.db.profile.expiretime = val end,
 					order= 3,
+      	},
+      	guildgroup = {
+      	  type= "toggle",
+					name= L["Guild Group"],
+					desc= L["Only allow EminentDKP to function inside of a guild group."],
+					get= function() return EminentDKP.db.profile.guildgroup end,
+					set= function(self, val)
+					  EminentDKP.db.profile.guildgroup = not EminentDKP.db.profile.guildgroup
+					end,
+					order= 4,
+      	},
+      	disablepvp = {
+      	  type= "toggle",
+					name= L["Disable PVP"],
+					desc= L["Do not allow EminentDKP to function during PVP."],
+					get= function() return EminentDKP.db.profile.disablepvp end,
+					set= function(self, val)
+					  EminentDKP.db.profile.disablepvp = not EminentDKP.db.profile.disablepvp
+					end,
+					order= 5,
+      	},
+      	disableparty = {
+      	  type= "toggle",
+					name= L["Disable Party"],
+					desc= L["Do not allow EminentDKP to function in a party."],
+					get= function() return EminentDKP.db.profile.disableparty end,
+					set= function(self, val)
+					  EminentDKP.db.profile.disableparty = not EminentDKP.db.profile.disableparty
+					end,
+					order= 6,
       	},
       },
     },
