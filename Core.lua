@@ -2413,20 +2413,22 @@ end
 -- Make sure players exist in the pool
 function EminentDKP:CheckGroupPlayers()
   -- This only needs to be run by the masterlooter
-  if not self:AmMasterLooter() or self:IsEnabled() then return end
+  if not self:AmMasterLooter() or not self:IsEnabled() then return end
   
   if GetNumRaidMembers() > 0 then
     for d = 1, GetNumRaidMembers() do
-  		local name = select(1,GetRaidRosterInfo(d))
+  		local name = UnitName("raid"..d)
   		if name and not self:PlayerExistsInPool(name) then
-  		  self:CreateAddPlayerSyncEvent(name,select(2,UnitClass(name)))
+  		  local classname = select(2,UnitClass(name))
+  		  self:CreateAddPlayerSyncEvent(name,classname)
   		end
   	end
   elseif GetNumPartyMembers() > 0 then
     for d = 1, GetNumPartyMembers() do
   		local name = UnitName("party"..d)
   		if name and not self:PlayerExistsInPool(name) then
-  		  self:CreateAddPlayerSyncEvent(name,select(2,UnitClass(name)))
+  		  local classname = select(2,UnitClass(name))
+  		  self:CreateAddPlayerSyncEvent(name,classname)
   		end
   	end
   end
