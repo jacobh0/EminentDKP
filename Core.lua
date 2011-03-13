@@ -24,7 +24,6 @@ TODO:
 0. Add enable/disable option for officers
 1. Organize meter display code and move to GUI.lua
 2. Vanity rolls? (custom view mode)
-3. Localize action panel
 
 ]]
 
