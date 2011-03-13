@@ -21,9 +21,8 @@ end
 
 TODO:
 
-0. Add enable/disable option for officers
 1. Organize meter display code and move to GUI.lua
-2. Vanity rolls? (custom view mode)
+2. On-screen notifications for adjustments
 
 ]]
 
@@ -2325,7 +2324,7 @@ end
 function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, guild)
   -- if disable in party, and in a party, ignore
   if self.db.profile.disableparty and is_in_party() then return end
-    -- if disable in pvp, and in pvp, ignore
+  -- if disable in pvp, and in pvp, ignore
   if self.db.profile.disablepvp and is_in_pvp() then return end
   
   enabled = (self.db.profile.guildgroup and guild or true)
