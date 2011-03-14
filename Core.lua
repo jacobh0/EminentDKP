@@ -2546,7 +2546,7 @@ function EminentDKP:LOOT_OPENED()
     unitName = UnitName("target")
     guid = UnitGUID("target")
   end
-  if not recent_loots[guid] and GetNumLootItems() > 0 then
+  if GetNumLootItems() > 0 then
     local eligible_items = {}
     local slotlist = {}
     local itemlist = {}
@@ -2561,16 +2561,23 @@ function EminentDKP:LOOT_OPENED()
 		end
 		
 		if #(eligible_items) > 0 then
-			self:MessageGroup(L["Loot from %s:"]:format(unitName))
-		  for i,loot in ipairs(eligible_items) do
-		    self:MessageGroup(loot)
-	    end
-	    
-	    -- Share loot list with group
-	    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
-	    
-	    -- Ensure that we only print once by keeping track of the GUID
-			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
+		  if not recent_loots[guid] then
+  			self:MessageGroup(L["Loot from %s:"]:format(unitName))
+  		  for i,loot in ipairs(eligible_items) do
+  		    self:MessageGroup(loot)
+  	    end
+  	    
+  	    -- Share loot list with group
+  	    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
+  	    -- Ensure that we only print once by keeping track of the GUID
+  	    recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
+      else
+	      if recent_loots[guid].slots[1] ~= slotlist[1] or #(recent_loots[guid].slots) ~= #(slotlist) then
+    	    -- Re-share updated lootlist
+    	    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
+    	    -- Update recorded lootlist
+    			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
+    		end
 		end
   end
 end
@@ -2715,11 +2722,7 @@ function EminentDKP:AdminStartAuction()
     		
     		while not itemLink and #(recent_loots[guid].slots) > 0 do
     		  slot = tremove(recent_loots[guid].slots)
-    		  Debug("looking at slot: "..slot)
     		  itemLink = GetLootSlotLink(slot)
-    		  if itemLink then
-    		    Debug("link was: "..itemLink)
-  		    end
   		  end
   		  
   		  if not itemLink then
