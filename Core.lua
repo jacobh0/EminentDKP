@@ -1798,6 +1798,7 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   else
     -- We're up to date!
     self:UpdateSyncedDays()
+    wipe(events_cache)
     syncing = false
   end
 end

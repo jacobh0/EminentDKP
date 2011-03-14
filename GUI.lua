@@ -793,7 +793,7 @@ local function CreateAdjustmentTab(container)
   local reason = AceGUI:Create("EditBox")
   reason:SetLabel(L["Reason"])
   reason:SetWidth(150)
-  reason:SetMaxLetters(25)
+  reason:SetMaxLetters(20)
   
   deduct:SetLabel(L["Deduction"])
   deduct:SetValue(true)
