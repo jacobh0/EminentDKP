@@ -2715,7 +2715,11 @@ function EminentDKP:AdminStartAuction()
     		
     		while not itemLink and #(recent_loots[guid].slots) > 0 do
     		  slot = tremove(recent_loots[guid].slots)
+    		  Debug("looking at slot: "..slot)
     		  itemLink = GetLootSlotLink(slot)
+    		  if itemLink then
+    		    Debug("link was: "..itemLink)
+  		    end
   		  end
   		  
   		  if not itemLink then
