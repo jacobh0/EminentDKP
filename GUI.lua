@@ -600,7 +600,7 @@ local function CreateTransferTab(container)
   
   local amount = AceGUI:Create("Slider")
   amount:SetLabel("Amount")
-  amount:SetSliderValues(1,TNum(EminentDKP:GetMyCurrentDKP()),1)
+  amount:SetSliderValues(1,TNum(EminentDKP:GetMyCurrentDKP() or 0),1)
   amount:SetValue(1)
   
   local send = AceGUI:Create("Button")
