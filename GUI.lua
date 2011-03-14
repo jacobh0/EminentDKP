@@ -816,7 +816,7 @@ local function CreateAdjustmentTab(container)
   issue:SetText(L["Issue"])
   issue:SetWidth(150)
   issue:SetCallback("OnClick",function(what)
-    EminentDKP:AdminIssueAdjustment(who:GetValue(),amount:GetValue(),deduct:GetValue(),reason:GetValue())
+    EminentDKP:AdminIssueAdjustment(who:GetValue(),amount:GetValue(),deduct:GetValue(),reason:GetText())
   end)
   issue:SetDisabled(true)
   
