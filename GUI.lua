@@ -818,6 +818,7 @@ local function CreateAdjustmentTab(container)
   issue:SetCallback("OnClick",function(what)
     EminentDKP:AdminIssueAdjustment(who:GetValue(),amount:GetValue(),deduct:GetValue(),reason:GetValue())
   end)
+  issue:SetDisabled(true)
   
   adjustgrp:AddChild(who)
   adjustgrp:AddChild(reason)
