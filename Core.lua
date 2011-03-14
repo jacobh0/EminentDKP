@@ -1194,6 +1194,27 @@ function EminentDKP:LevelUpDisplayShow(frame)
     if frame.type == "BOUNTY_RECEIVED" then
       frame.levelFrame.reachedText:SetFormattedText(L["You have received a bounty of"])
       frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+    elseif frame.type == "ADJUSTMENT_RECEIVED" then
+      if self.notifyDetails.extra then
+        -- This is a deduction
+        frame.levelFrame.reachedText:SetFormattedText(L["You have been deducted"])
+        texcoords.textTint = { 0.92, 0.49, 0.04 }
+      else
+        frame.levelFrame.reachedText:SetFormattedText(L["You have been awarded"])
+      end
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+    elseif frame.type == "ADJUSTMENT_MADE" then
+      frame:SetHeight(50)
+      frame.levelFrame:SetHeight(50)
+      if self.notifyDetails.extra then
+        -- This is a deduction
+        frame.levelFrame.reachedText:SetFormattedText(L["%s has been deducted"],self.notifyDetails.src)
+        texcoords.textTint = { 0.92, 0.49, 0.04 }
+      else
+        frame.levelFrame.reachedText:SetFormattedText(L["%s has been awarded"],self.notifyDetails.src)
+      end
+      frame.levelFrame.levelText:SetFontObject("GameFontNormalLarge")
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
     elseif frame.type == "TRANSFER_RECEIVED" then
       frame.levelFrame.reachedText:SetFormattedText(L["%s has transferred you"],self.notifyDetails.src)
       frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
@@ -1499,7 +1520,10 @@ end
 
 -- Request the missing events
 function EminentDKP:RequestMissingEvents()
+  -- No longer syncing at this point...
   syncing = false
+  self:UpdateStatusBar()
+  
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
     self.requestCooldown = true
@@ -1932,7 +1956,7 @@ function EminentDKP:GetPlayersOfClass(name,fresh)
   local list = {}
   for pid,data in pairs(self:GetActivePool().players) do
     if playerid ~= pid and data.class == player.class then
-      if not fresh or (fresh and self:IsPlayerFresh(player)) then
+      if not fresh or (fresh and self:IsPlayerFresh(data)) then
         local name = self:GetPlayerNameByID(pid)
         list[name] = name
       end
@@ -2831,13 +2855,10 @@ function EminentDKP:AdminIssueAdjustment(who,amount,deduction,reason)
   if not auction_active then
     local p = tonumber(amount) or 0
     if (deduction and p <= self:GetCurrentDKP(who) and p >= 1) or (not deduction and p <= self:GetAvailableBounty() and p >= 1) then      
-      local amount = (percent and (self:GetAvailableBounty() * (p/100)) or p)
-      local dividend = (amount/#(players))
-      
       self:CreateAdjustmentSyncEvent(who,p,deduction,reason)
       
-      -- Announce bounty to the other addons
-	    self:InformPlayer("adjustment",{ amount = p, receiver = who })
+      -- Announce adjustment to the other addons
+	    self:InformPlayer("adjustment",{ amount = p, receiver = who, deduct = deduction })
 	    
 	    if deduction then
 	       self:MessageGroup(L["%s has received a deduction of %.02f DKP."]:format(who,p))
@@ -3040,6 +3061,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
     if data.from == "transfer" then
       self:DisplayActionResult(data.message)
     elseif data.from == "bid" then
+      -- Accept or reject the last bid
       if notifyType == "accept" then
         self:AcceptLastItemBid()
       else
@@ -3054,14 +3076,25 @@ function EminentDKP:ActuateNotification(notifyType,data)
     for i,item in ipairs(data.items) do
       GetItemInfo(item.info)
     end
-    -- Have to wait 1.5s to ensure the items are in the itemcache
+    -- Wait 1.5s to ensure the items are in the itemcache
     self:ScheduleTimer("RunCachedNotifications",1.5)
+  elseif notifyType == "adjustment" then
+    if data.receiver == self.myName then
+      -- We received an adjustment
+      self:NotifyOnScreen("ADJUSTMENT_RECEIVED",data.amount,data.receiver,data.deduct)
+    else
+      -- Somebody else got adjusted
+      self:NotifyOnScreen("ADJUSTMENT_MADE",data.amount,data.receiver,data.deduct)
+    end
   elseif notifyType == "bounty" then
+    -- Bounty received
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)
   elseif notifyType == "transfer" then
     if data.receiver == self.myName then
+      -- We received a transfer
       self:NotifyOnScreen("TRANSFER_RECEIVED",data.amount,data.sender)
     else
+      -- Somebody else made a transfer
       self:NotifyOnScreen("TRANSFER_MADE",data.amount,data.sender,data.receiver)
     end
   elseif notifyType == "auction" then
