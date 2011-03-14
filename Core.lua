@@ -1931,23 +1931,22 @@ function EminentDKP:GetMyCurrentDKP()
   return self:GetCurrentDKP(self.myName)
 end
 
--- Get the names of everybody else in the pool
-function EminentDKP:GetOtherPlayersNames()
+-- Get the names of everybody in the pool
+function EminentDKP:GetPlayerNames(active)
   local list = {}
   for name,pid in pairs(self:GetActivePool().playerIDs) do
-    local pdata = self:GetPlayerByID(pid)
-    if pdata.active and name ~= self.myName then
+    local player = self:GetPlayerByID(pid)
+    if not active or (active and player.active) then
       list[name] = name
     end
   end
   return list
 end
 
-function EminentDKP:GetPlayerNames()
-  local list = {}
-  for name,pid in pairs(self:GetActivePool().playerIDs) do
-    list[name] = name
-  end
+-- Get the names of everybody else in the pool
+function EminentDKP:GetOtherPlayersNames(active)
+  local list = self:GetPlayerNames(active)
+  list[self.myName] = nil
   return list
 end
 
@@ -2005,7 +2004,7 @@ end
 -- Construct list of players currently in the group
 function EminentDKP:GetCurrentGroupMembers()
   local players = {}
-  for i, pid in ipairs(self:GetCurrentGroupMembersIDs())
+  for i, pid in ipairs(self:GetCurrentGroupMembersIDs()) do
     local pdata = self:GetPlayerByID(pid)
     players[pid] = pdata
   end

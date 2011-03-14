@@ -595,13 +595,17 @@ local function CreateTransferTab(container)
   
   local recip = AceGUI:Create("Dropdown")
   recip:SetLabel(L["Recipient"])
-  recip:SetList(EminentDKP:GetOtherPlayersNames())
+  recip:SetList(EminentDKP:GetOtherPlayersNames(true))
   recip:SetWidth(150)
   
   local amount = AceGUI:Create("Slider")
   amount:SetLabel("Amount")
-  amount:SetSliderValues(1,TNum(EminentDKP:GetMyCurrentDKP() or 0),1)
-  amount:SetValue(1)
+  if EminentDKP:GetMyCurrentDKP() and EminentDKP:GetMyCurrentDKP() >= 1 then
+    amount:SetSliderValues(1,TNum(EminentDKP:GetMyCurrentDKP()),1)
+    amount:SetValue(1)
+  else
+    recip:SetDisabled(true)
+  end
   
   local send = AceGUI:Create("Button")
   send:SetText(L["Send"])
@@ -760,36 +764,53 @@ local function CreateAdjustmentTab(container)
   adjustgrp:SetLayout("Flow")
   adjustgrp:SetWidth(200)
   
+  local deduct = AceGUI:Create("CheckBox")
+  
   local issue = AceGUI:Create("Button")
+  
+  local amount = AceGUI:Create("Slider")
+  amount:SetLabel(L["Amount"])
   
   local who = AceGUI:Create("Dropdown")
   who:SetLabel(L["Player"])
-  who:SetList(EminentDKP:GetPlayerNames())
+  who:SetList(EminentDKP:GetPlayerNames(true))
   who:SetWidth(150)
   who:SetCallback("OnValueChanged",function(i,j,value)
     issue:SetDisabled(false)
+    if deduct:GetValue() then
+      if EminentDKP:GetCurrentDKP(value) < 1 then
+        issue:SetDisabled(true)
+        amount:SetSliderValues(0,0,0)
+      else
+        amount:SetSliderValues(1,TNum(EminentDKP:GetCurrentDKP(value)),1)
+      end
+    else
+      amount:SetSliderValues(1,math.floor(EminentDKP:GetAvailableBounty()),1)
+    end
+    amount:SetValue(1)
   end)
   
   local reason = AceGUI:Create("EditBox")
   reason:SetLabel(L["Reason"])
   reason:SetWidth(150)
   reason:SetMaxLetters(25)
-  reason:SetValue("")
   
-  local amount = AceGUI:Create("Slider")
-  amount:SetLabel(L["Amount"])
-  
-  local deduct = AceGUI:Create("CheckBox")
   deduct:SetLabel(L["Deduction"])
   deduct:SetValue(true)
   deduct:SetCallback("OnValueChanged",function(i,j,checked)
-    if checked then
-      amount:SetSliderValues(1,TNum(EminentDKP:GetCurrentDKP(who:GetValue())),1)
-      amount:SetValue(1)
+    if checked and who:GetValue() ~= "" then
+      if EminentDKP:GetCurrentDKP(who:GetValue()) < 1 then
+        issue:SetDisabled(true)
+        amount:SetSliderValues(0,0,0)
+      else
+        issue:SetDisabled(false)
+        amount:SetSliderValues(1,TNum(EminentDKP:GetCurrentDKP(who:GetValue())),1)
+      end
     else
+      issue:SetDisabled(false)
       amount:SetSliderValues(1,math.floor(EminentDKP:GetAvailableBounty()),1)
-      amount:SetValue(1)
     end
+    amount:SetValue(1)
   end)
   
   issue:SetText(L["Issue"])
@@ -830,7 +851,7 @@ function EminentDKP:CreateActionPanel()
   end
   self.actionpanel = AceGUI:Create("EminentDKPFrame")
   self.actionpanel:SetWidth(400)
-  self.actionpanel:SetHeight(300)
+  self.actionpanel:SetHeight(350)
   self.actionpanel:SetTitle(L["EminentDKP Action Panel"])
   self.actionpanel:SetCallback("OnClose", function(widget)
     AceGUI:Release(widget)
