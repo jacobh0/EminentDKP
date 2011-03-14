@@ -1117,7 +1117,9 @@ function EminentDKP:OnEnable()
 	self:RegisterChatEvent("CHAT_MSG_WHISPER") -- whisper commands received
 	self:RegisterChatEvent("CHAT_MSG_WHISPER_INFORM") -- whispers sent
 	self:RegisterChatEvent("CHAT_MSG_PARTY") -- party messages
+	self:RegisterChatEvent("CHAT_MSG_PARTY_LEADER") -- party messages
 	self:RegisterChatEvent("CHAT_MSG_RAID") -- raid messages
+	self:RegisterChatEvent("CHAT_MSG_RAID_LEADER") -- raid messages
 	self:RegisterChatEvent("CHAT_MSG_RAID_WARNING") -- raid warnings
 	self:RegisterEvent("ACHIEVEMENT_EARNED") -- achievement tracking
 	self:RegisterEvent("LOOT_OPENED") -- loot listing
@@ -2975,7 +2977,15 @@ function EminentDKP:CHAT_MSG_PARTY_CONTROLLER(eventController, message, from, ..
   self:FILTER_EMINENTDKP_MESSAGES(eventController, message)
 end
 
+function EminentDKP:CHAT_MSG_PARTY_LEADER_CONTROLLER(eventController, message, from, ...)
+  self:FILTER_EMINENTDKP_MESSAGES(eventController, message)
+end
+
 function EminentDKP:CHAT_MSG_RAID_CONTROLLER(eventController, message, from, ...)
+  self:FILTER_EMINENTDKP_MESSAGES(eventController, message)
+end
+
+function EminentDKP:CHAT_MSG_RAID_LEADER_CONTROLLER(eventController, message, from, ...)
   self:FILTER_EMINENTDKP_MESSAGES(eventController, message)
 end
 
