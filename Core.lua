@@ -2578,6 +2578,7 @@ function EminentDKP:LOOT_OPENED()
     	    -- Update recorded lootlist
     			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
     		end
+  		end
 		end
   end
 end
