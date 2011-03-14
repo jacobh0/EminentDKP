@@ -2871,7 +2871,6 @@ function EminentDKP:CHAT_MSG_WHISPER_CONTROLLER(eventController, message, from, 
 end
 
 function EminentDKP:InformPlayer(...)
-  if not self:IsAnOfficer(sender) then return end
   local notifyType, rawdata, target = ...
   local data = notifyType .. "_" .. libS:Serialize(rawdata)
   local tosync = libCE:Encode(libC:CompressHuffman(data))
