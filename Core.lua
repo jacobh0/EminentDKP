@@ -1162,9 +1162,12 @@ function EminentDKP:OnEnable()
   self:ScheduleRepeatingTimer("BroadcastVersion", 300)
 end
 
+local notify_types = { "BOUNTY_RECEIVED", "TRANSFER_RECEIVED", "AUCTION_WON", 
+                       "TRANSFER_MADE", "ADJUSTMENT_RECEIVED", "ADJUSTMENT_MADE" }
+
 -- Hook the animation step function to change the font size of the flavor text
 function EminentDKP:LevelUpDisplayFinished(frame)
-  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" or frame.type == "TRANSFER_MADE" then
+  if tContains(notify_types,frame.type) then
     frame.spellFrame.flavorText:SetFontObject("GameFontNormalLarge")
   end
   self.hooks["LevelUpDisplay_AnimStep"](frame)
@@ -1185,7 +1188,7 @@ function EminentDKP:LevelUpDisplayShow(frame)
     gLine = { 0.00195313, 0.81835938, 0.01953125, 0.03320313 },
     textTint = { 0.67, 0.93, 0.45 },
   }
-  if frame.type == "BOUNTY_RECEIVED" or frame.type == "TRANSFER_RECEIVED" or frame.type == "AUCTION_WON" or frame.type == "TRANSFER_MADE" then
+  if tContains(notify_types,frame.type) then
     frame.currSpell = 2 -- currSpell > #(unlockList)
     frame.unlockList = { }
     frame.levelFrame.levelText:SetFontObject("GameFont_Gigantic")
