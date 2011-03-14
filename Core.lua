@@ -1772,8 +1772,8 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     local sname = self:GetPlayerNameByID(event.source)
     self:CreateVanityResetEvent(sname,event.datetime)
   elseif event.eventType == 'adjustment' then
-    local sname = self:GetPlayerNameByID(event.source)
-    self:CreateAdjustmentEvent(sname,math.abs(event.value),(event.value < 0),event.extraInfo,event.datetime)
+    local tname = self:GetPlayerNameByID(event.target)
+    self:CreateAdjustmentEvent(tname,math.abs(event.value),(event.value < 0),event.source,event.datetime)
   elseif event.eventType == 'rename' then
     self:CreateRenameEvent(event.extraInfo,event.value,event.datetime)
   end
@@ -2218,7 +2218,7 @@ function EminentDKP:CreateAdjustmentEvent(name,amount,deduction,reason,dtime)
   if deduction then amount = amount * -1 end
   
   -- Create the event
-  local cid = self:CreateEvent(pid,"adjustment",reason,"","",amount,dtime)
+  local cid = self:CreateEvent(reason,"adjustment","",pid,"",amount,dtime)
   
   if deduction then
     -- If deducting: subtract DKP and add it back to the bounty pool
