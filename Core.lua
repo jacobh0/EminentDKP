@@ -89,6 +89,9 @@ local lastContainerName = nil
 -- Whether or not officer functionality is allowed to run
 local enabled = true
 
+-- When logging in, officer functionality is disabled temporarily
+local tempdisabled = true
+
 local function convertToTimestamp(datetime)
   local t, d = strsplit(' ',datetime)
   local hour, min = strsplit(':',t)
@@ -1071,8 +1074,17 @@ function EminentDKP:OnInitialize()
   -- the settings again to ensure everything is how it should be, an unfortunate work-around...
   self:ScheduleTimer("GlobalApplySettings", 2)
   
+  -- Temporarily disable officer functionality for the first 10seconds, ensures no accidental database recreation
+  self:ScheduleTimer("UndoTempDisable", 10)
+  
   DEFAULT_CHAT_FRAME:AddMessage("|rYou are using |cFFEBAA32EminentDKP |cFFAAEB32v"..VERSION.."|r")
   DEFAULT_CHAT_FRAME:AddMessage("|rVisit |cFFD2691Ehttp://eminent.enjin.com|r for feedback and support.")
+end
+
+-- Restore officer functionality, we should know sync status by now
+function EminentDKP:UndoTempDisable()
+  tempdisabled = false
+  self:PARTY_LOOT_METHOD_CHANGED()
 end
 
 function EminentDKP:GlobalApplySettings()
@@ -2352,7 +2364,7 @@ function EminentDKP:UpdateLootEligibility()
 end
 
 function EminentDKP:IsEnabled()
-  return enabled and not self:NeedSync()
+  return enabled and not self:NeedSync() and not tempdisabled
 end
 
 function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, guild)
