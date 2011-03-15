@@ -22,37 +22,39 @@ end
 TODO:
 
 1. Organize meter display code and move to GUI.lua
-2. On-screen notifications for adjustments
 
 ]]
 
 -- High resolution timer, adds milliseconds to the regular timestamp from time()
 HighResTimer = {
   Get = function(self)
-    return self.TimeDelta and self.TimeStart + GetTime() - self.TimeDelta or time()
+    return (self.TimeDelta and self.TimeStart + GetTime() - self.TimeDelta) or time()
   end,
 
   OnUpdate = function(self)
-    if (self.TimeDelta ~= nil) then
-      return
-    end
-    
     local t = time()
     local gt = GetTime()
     if (self.LastTime == nil) then
       self.LastTime = t
+      self.LastGameTime = gt
       return
     end
-    -- Soon as our second changes, record GetTime delta
+
     if (t > self.LastTime) then
-      self.TimeStart = t
-      self.TimeDelta = gt
+      local gap = gt - self.LastGameTime
+      if (self.TimeDelta == nil or gap < self.TimeGap or math.floor(self:Get(self)) ~= t) then
+        self.TimeStart = t
+        self.TimeDelta = gt
+        self.TimeGap = gap
+      end
+      self.LastTime = nil
+      self.LastGameTime = nil
     end
   end,
 
   Initialize = function(self)
-  	self.Frame = CreateFrame("Frame")
-  	self.Frame:SetScript("OnUpdate", function() self:OnUpdate() end)
+    self.Frame = CreateFrame("Frame")
+    self.Frame:SetScript("OnUpdate", function() self:OnUpdate() end)
   end
 }
 HighResTimer:Initialize()
@@ -112,21 +114,21 @@ local function GetDaysSince(timestamp)
 end
 
 local function IsGroupInCombat()
-	if GetNumRaidMembers() > 0 then
-		-- We are in a raid.
-		for i = 1, GetNumRaidMembers(), 1 do
-			if UnitExists("raid"..i) and UnitAffectingCombat("raid"..i) then
-				return true
-			end
-		end
-	elseif GetNumPartyMembers() > 0 then
-		-- In party.
-		for i = 1, GetNumPartyMembers(), 1 do
-			if UnitExists("party"..i) and UnitAffectingCombat("party"..i) then
-				return true
-			end
-		end
-	end
+  if GetNumRaidMembers() > 0 then
+    -- We are in a raid.
+    for i = 1, GetNumRaidMembers(), 1 do
+      if UnitExists("raid"..i) and UnitAffectingCombat("raid"..i) then
+        return true
+      end
+    end
+  elseif GetNumPartyMembers() > 0 then
+    -- In party.
+    for i = 1, GetNumPartyMembers(), 1 do
+      if UnitExists("party"..i) and UnitAffectingCombat("party"..i) then
+        return true
+      end
+    end
+  end
 end
 
 local function MergeTables(source,other,front)
@@ -146,19 +148,19 @@ end
 local function sendchat(msg, chan, chantype)
   local prepend = "[EminentDKP] "
   
-	if chantype == "self" then
-		-- To self.
-		EminentDKP:Print(msg)
-	elseif chantype == "channel" then
-		-- To channel.
-		SendChatMessage(prepend .. msg, "CHANNEL", nil, chan)
-	elseif chantype == "preset" then
-		-- To a preset channel id (say, guild, etc).
-		SendChatMessage(prepend .. msg, string.upper(chan))
-	elseif chantype == "whisper" then
-		-- To player.
-		SendChatMessage(prepend .. msg, "WHISPER", nil, chan)
-	end
+  if chantype == "self" then
+    -- To self.
+    EminentDKP:Print(msg)
+  elseif chantype == "channel" then
+    -- To channel.
+    SendChatMessage(prepend .. msg, "CHANNEL", nil, chan)
+  elseif chantype == "preset" then
+    -- To a preset channel id (say, guild, etc).
+    SendChatMessage(prepend .. msg, string.upper(chan))
+  elseif chantype == "whisper" then
+    -- To player.
+    SendChatMessage(prepend .. msg, "WHISPER", nil, chan)
+  end
 end
 
 -- Compare two version numbers
@@ -210,12 +212,12 @@ end
 
 -- Are we in a PVP zone?
 local function is_in_pvp()
-	return select(2,IsInInstance()) == "pvp" or select(2,IsInInstance()) == "arena"
+  return select(2,IsInInstance()) == "pvp" or select(2,IsInInstance()) == "arena"
 end
 
 -- Are we solo?
 local function is_solo()
-	return GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0
+  return GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0
 end
 
 -- Are we in a party?
@@ -224,11 +226,11 @@ local function is_in_party()
 end
 
 local function find_mode(name)
-	for i, mode in ipairs(modes) do
-		if mode:GetName() == name then
-			return mode
-		end
-	end
+  for i, mode in ipairs(modes) do
+    if mode:GetName() == name then
+      return mode
+    end
+  end
 end
 
 -- Our window type.
@@ -250,9 +252,9 @@ function Window:new()
 end
 
 function Window:AddOptions()
-	local settings = self.settings
-	
-	local options = {
+  local settings = self.settings
+  
+  local options = {
     type = "group",
     name = function() return settings.name end,
     args = {
@@ -293,7 +295,7 @@ function Window:AddOptions()
         get= function() return settings.barslocked end,
         set= function(win)
           settings.barslocked = not settings.barslocked
-        	EminentDKP:ApplySettings(win[2])
+          EminentDKP:ApplySettings(win[2])
         end,
         order= 3,
       },
@@ -309,134 +311,134 @@ function Window:AddOptions()
         order= 4,
       },
     }
-	}
-	self.display:AddDisplayOptions(self, options.args)
-	EminentDKP.options.args.windows.args[self.settings.name] = options
+  }
+  self.display:AddDisplayOptions(self, options.args)
+  EminentDKP.options.args.windows.args[self.settings.name] = options
 end
 
 function Window:destroy()
-	self.dataset = nil
-	self.display:Destroy(self)
+  self.dataset = nil
+  self.display:Destroy(self)
 end
 
 function Window:SetDisplay(name)
-	-- Don't do anything if nothing actually changed.
-	if name ~= self.settings.display or self.display == nil then
-		if self.display then
-			-- Destroy old display.
-			self.display:Destroy(self)
-		end
-		
-		-- Set new display.
-		self.settings.display = name
-		self.display = EminentDKP.displays[self.settings.display]
-		
-		-- Add options. Replaces old options.
-		self:AddOptions()
-	end
+  -- Don't do anything if nothing actually changed.
+  if name ~= self.settings.display or self.display == nil then
+    if self.display then
+      -- Destroy old display.
+      self.display:Destroy(self)
+    end
+    
+    -- Set new display.
+    self.settings.display = name
+    self.display = EminentDKP.displays[self.settings.display]
+    
+    -- Add options. Replaces old options.
+    self:AddOptions()
+  end
 end
 
 -- Tells window to update the display of its dataset, using its display provider.
 function Window:UpdateDisplay()
-	-- Fetch max value if our mode has not done this itself.
-	if not self.metadata.maxvalue then
-		self.metadata.maxvalue = 0
-		for i, data in ipairs(self.dataset) do
-			if data.id and data.value > self.metadata.maxvalue then
-				self.metadata.maxvalue = data.value
-			end
-		end
-	end
-	
-	-- Display it.
-	self.display:Update(self)
+  -- Fetch max value if our mode has not done this itself.
+  if not self.metadata.maxvalue then
+    self.metadata.maxvalue = 0
+    for i, data in ipairs(self.dataset) do
+      if data.id and data.value > self.metadata.maxvalue then
+        self.metadata.maxvalue = data.value
+      end
+    end
+  end
+  
+  -- Display it.
+  self.display:Update(self)
 end
 
 function Window:Show()
-	self.display:Show(self)
+  self.display:Show(self)
 end
 
 function Window:Hide()
-	self.display:Hide(self)
+  self.display:Hide(self)
 end
 
 function Window:IsShown()
-	return self.display:IsShown(self)
+  return self.display:IsShown(self)
 end
 
 function Window:Wipe()
-	-- Clear dataset.
-	wipe(self.dataset)
-	
-	-- Clear display.
-	self.display:Wipe(self)
+  -- Clear dataset.
+  wipe(self.dataset)
+  
+  -- Clear display.
+  self.display:Wipe(self)
 end
 
 -- Sets up the mode view.
 function Window:DisplayMode(mode)
-	self:Wipe()
-	self.selectedmode = mode
-	self.metadata = {}
-	
-	-- Apply mode's metadata.
-	if mode.metadata then
-		for key, value in pairs(mode.metadata) do
-			self.metadata[key] = value
-		end
-	end
+  self:Wipe()
+  self.selectedmode = mode
+  self.metadata = {}
   
-	-- Save for remembrance
-	self.settings.mode = mode:GetName()
-	self.metadata.title = mode.title or mode:GetName()
+  -- Apply mode's metadata.
+  if mode.metadata then
+    for key, value in pairs(mode.metadata) do
+      self.metadata[key] = value
+    end
+  end
+  
+  -- Save for remembrance
+  self.settings.mode = mode:GetName()
+  self.metadata.title = mode.title or mode:GetName()
 
-	EminentDKP:UpdateDisplay(self)
+  EminentDKP:UpdateDisplay(self)
 end
 
 local function click_on_mode(win, id, label, button)
-	if button == "LeftButton" then
-		local mode = find_mode(id)
-		if mode then
-			win:DisplayMode(mode)
-		end
-	elseif button == "RightButton" then
-		win:RightClick()
-	end
+  if button == "LeftButton" then
+    local mode = find_mode(id)
+    if mode then
+      win:DisplayMode(mode)
+    end
+  elseif button == "RightButton" then
+    win:RightClick()
+  end
 end
 
 -- Sets up the mode list.
 function Window:DisplayModes(setid)
-	self.history = {}
-	self:Wipe()
+  self.history = {}
+  self:Wipe()
 
-	self.selectedplayer = nil
-	self.selectedmode = nil
+  self.selectedplayer = nil
+  self.selectedmode = nil
 
-	self.metadata = {}
-	self.metadata.title = L["EminentDKP: Modes"]
+  self.metadata = {}
+  self.metadata.title = L["EminentDKP: Modes"]
 
-	-- Verify the selected set
-	if sets[setid] then
-	  self.selectedset = setid
+  -- Verify the selected set
+  if sets[setid] then
+    self.selectedset = setid
   else
     self.selectedset = "alltime"
   end
-	
-	-- Save for remembrance
-	self.settings.mode = nil
-	self.settings.set = self.selectedset
-	
-	self.metadata.click = click_on_mode
-	self.metadata.maxvalue = 1
+  
+  -- Save for remembrance
+  self.settings.mode = nil
+  self.settings.set = self.selectedset
+  
+  self.metadata.click = click_on_mode
+  self.metadata.maxvalue = 1
 
-	EminentDKP:UpdateDisplay(self)
+  EminentDKP:UpdateDisplay(self)
 end
 
 local function click_on_set(win, id, label, button)
-	if button == "LeftButton" then
-		win:DisplayModes(id)
-	elseif button == "RightButton" then
-		win:RightClick() 
-	end
+  if button == "LeftButton" then
+    win:DisplayModes(id)
+  elseif button == "RightButton" then
+    win:RightClick() 
+  end
 end
 
 -- Default "right-click" behaviour in case no special click function is defined:
@@ -444,42 +446,42 @@ end
 -- 2) Go to modes list if we are in a mode.
 -- 3) Go to set list.
 function Window:RightClick(group, button)
-	if self.selectedmode then
-		-- If mode traversal history exists, go to last entry, else mode list.
-		if #(self.history) > 0 then
-			self:DisplayMode(tremove(self.history))
-		else
-			self:DisplayModes(self.selectedset)
-		end
-	elseif self.selectedset then
-		self:DisplaySets()
-	end
+  if self.selectedmode then
+    -- If mode traversal history exists, go to last entry, else mode list.
+    if #(self.history) > 0 then
+      self:DisplayMode(tremove(self.history))
+    else
+      self:DisplayModes(self.selectedset)
+    end
+  elseif self.selectedset then
+    self:DisplaySets()
+  end
 end
 
 -- Sets up the set list.
 function Window:DisplaySets()
-	self.history = {}
-	self:Wipe()
-	
-	self.metadata = {}
-	
-	self.selectedmode = nil
-	self.selectedset = nil
-	
-	self.settings.mode = nil
-	self.settings.set = nil
+  self.history = {}
+  self:Wipe()
+  
+  self.metadata = {}
+  
+  self.selectedmode = nil
+  self.selectedset = nil
+  
+  self.settings.mode = nil
+  self.settings.set = nil
 
-	self.metadata.title = L["EminentDKP: Days"]
+  self.metadata.title = L["EminentDKP: Days"]
 
-	self.metadata.click = click_on_set
-	self.metadata.maxvalue = 1
-	self.metadata.sortfunc = function(a,b)
+  self.metadata.click = click_on_set
+  self.metadata.maxvalue = 1
+  self.metadata.sortfunc = function(a,b)
     if a.sortnum < b.sortnum then return true end
     if b.sortnum < a.sortnum then return false end
     return a.starttime > b.starttime
   end
-	
-	EminentDKP:UpdateDisplay(self)
+  
+  EminentDKP:UpdateDisplay(self)
 end
 
 function Window:get_selected_set()
@@ -491,42 +493,42 @@ end
 
 -- Ask a mode to verify the contents of a set.
 local function verify_set(mode, set)
-	for j, player in ipairs(set.players) do
-		if mode.AddPlayerAttributes then
-			mode:AddPlayerAttributes(player)
-		end
-	end
-	mode:CalculateData(set)
+  for j, player in ipairs(set.players) do
+    if mode.AddPlayerAttributes then
+      mode:AddPlayerAttributes(player)
+    end
+  end
+  mode:CalculateData(set)
 end
 
 -- Create a set with default attributes and have the modes apply their attributes
 local function createSet(setname)
-	local set = {players = {}, events = {}, name = setname, sortnum = 3,
-	             starttime = 0, endtime = 0, changed = true, modedata = {}}
+  local set = {players = {}, events = {}, name = setname, sortnum = 3,
+               starttime = 0, endtime = 0, changed = true, modedata = {}}
   
-	-- Tell each mode to apply its needed attributes.
-	for i, mode in ipairs(modes) do 
-	  if mode.AddSetAttributes then
-  		mode:AddSetAttributes(set)
-  	end
+  -- Tell each mode to apply its needed attributes.
+  for i, mode in ipairs(modes) do 
+    if mode.AddSetAttributes then
+      mode:AddSetAttributes(set)
+    end
   end
 
-	return set
+  return set
 end
 
 function EminentDKP:GetWindows()
-	return windows
+  return windows
 end
 
 -- Toggle visibility of all the meter displays
 function EminentDKP:ToggleMeters(visible)
-	for i, win in ipairs(windows) do
-	  if visible and not win:IsShown() then
-		  win:Show()
-	  elseif not visible and win:IsShown() then
-	    win:Hide()
+  for i, win in ipairs(windows) do
+    if visible and not win:IsShown() then
+      win:Show()
+    elseif not visible and win:IsShown() then
+      win:Hide()
     end
-	end
+  end
 end
 
 -- Table copy function
@@ -547,54 +549,54 @@ end
 
 -- Create a window and its db settings
 function EminentDKP:CreateWindow(name, settings)
-	if not settings then
-		settings = {}
-		self:tcopy(settings, EminentDKP.windowdefaults)
-		table.insert(self.db.profile.windows, settings)
-	end
-
-	local window = Window:new()
-	window.settings = settings
-	window.settings.name = name
-	
-	window.selectedset = window.settings.set
-	if window.settings.mode then
-	  window.selectedmode = find_mode(window.settings.mode)
+  if not settings then
+    settings = {}
+    self:tcopy(settings, EminentDKP.windowdefaults)
+    table.insert(self.db.profile.windows, settings)
   end
-	
-	-- Set the window's display and call it's Create function.
-	window:SetDisplay(window.settings.display or "meter")
-	
-	window.display:Create(window)
-	
-	table.insert(windows, window)
-	
-	self:ApplySettings(window)
+
+  local window = Window:new()
+  window.settings = settings
+  window.settings.name = name
   
-	-- Display initial view depending on settings
-	if window.selectedmode then
-	  window:DisplayMode(window.selectedmode)
-	elseif window.selectedset then
-	  window:DisplayModes(window.selectedset)
+  window.selectedset = window.settings.set
+  if window.settings.mode then
+    window.selectedmode = find_mode(window.settings.mode)
+  end
+  
+  -- Set the window's display and call it's Create function.
+  window:SetDisplay(window.settings.display or "meter")
+  
+  window.display:Create(window)
+  
+  table.insert(windows, window)
+  
+  self:ApplySettings(window)
+  
+  -- Display initial view depending on settings
+  if window.selectedmode then
+    window:DisplayMode(window.selectedmode)
+  elseif window.selectedset then
+    window:DisplayModes(window.selectedset)
   else
-	  window:DisplaySets()
+    window:DisplaySets()
   end
 end
 
 -- Delete window from our windows table, and also from db.
 function EminentDKP:DeleteWindow(name)
-	for i, win in ipairs(windows) do
-		if win.settings.name == name then
-			win:destroy()
-			wipe(table.remove(windows, i))
-		end
-	end
-	for i, win in ipairs(self.db.profile.windows) do
-		if win.name == name then
-			table.remove(self.db.profile.windows, i)
-		end
-	end
-	self.options.args.windows.args[name] = nil
+  for i, win in ipairs(windows) do
+    if win.settings.name == name then
+      win:destroy()
+      wipe(table.remove(windows, i))
+    end
+  end
+  for i, win in ipairs(self.db.profile.windows) do
+    if win.name == name then
+      table.remove(self.db.profile.windows, i)
+    end
+  end
+  self.options.args.windows.args[name] = nil
 end
 
 -- Builds a unique list of players for a set
@@ -627,16 +629,16 @@ end
 
 -- Reload
 function EminentDKP:ReloadWindows()
-	-- Delete all existing windows in case of a profile change.
-	for i, win in ipairs(windows) do
-		win:destroy()
-	end
-	wipe(windows)
-	
-	-- Re-create sets
-	sets = self:GetMeterSets()
-	if not next(sets) then
-	  self:ReloadSets(false)
+  -- Delete all existing windows in case of a profile change.
+  for i, win in ipairs(windows) do
+    win:destroy()
+  end
+  wipe(windows)
+  
+  -- Re-create sets
+  sets = self:GetMeterSets()
+  if not next(sets) then
+    self:ReloadSets(false)
   else
     -- Verify the "Today" set is actually today
     local today = GetTodayDate()
@@ -648,29 +650,29 @@ function EminentDKP:ReloadWindows()
         oldtoday.name = oldtoday.date
         oldtoday.sortnum = 3
         sets[oldtoday.date] = oldtoday
-    	  sets.today = createSet(L["Today"])
-    	  sets.today.date = today
-    	  sets.today.sortnum = 2
-  	  
-  	    self:VerifySet(sets.today)
-  		else
-  		  sets.today.date = date
-		  end
-  	end
-  	-- Prune any sets that extend beyond our given timeframe
-  	for name, set in pairs(sets) do
-  	  if set.sortnum == 3 then
-  	    if GetDaysSince(set.starttime) > self.db.profile.daystoshow then
-  	      sets[name] = nil
-	      end
-	    end
-	  end
+        sets.today = createSet(L["Today"])
+        sets.today.date = today
+        sets.today.sortnum = 2
+      
+        self:VerifySet(sets.today)
+      else
+        sets.today.date = date
+      end
+    end
+    -- Prune any sets that extend beyond our given timeframe
+    for name, set in pairs(sets) do
+      if set.sortnum == 3 then
+        if GetDaysSince(set.starttime) > self.db.profile.daystoshow then
+          sets[name] = nil
+        end
+      end
+    end
   end
 
-	-- Re-create windows
-	for i, win in ipairs(self.db.profile.windows) do
-		self:CreateWindow(win.name, win)
-	end
+  -- Re-create windows
+  for i, win in ipairs(self.db.profile.windows) do
+    self:CreateWindow(win.name, win)
+  end
 end
 
 -- Reload all the "days" on the meter display
@@ -757,8 +759,8 @@ end
 function EminentDKP:VerifySet(set)
   for j, mode in ipairs(modes) do
     verify_set(mode, set)
-	end
-	set.changed = false
+  end
+  set.changed = false
 end
 
 -- For every set, have each mode verify their data
@@ -770,9 +772,9 @@ end
 
 function EminentDKP:ApplySettingsAll()
   for i, win in ipairs(windows) do
-		self:ApplySettings(win)
-	end
-	self:UpdateStatusBar()
+    self:ApplySettings(win)
+  end
+  self:UpdateStatusBar()
 end
 
 function EminentDKP:ApplySettings(win)
@@ -780,31 +782,31 @@ function EminentDKP:ApplySettings(win)
   if type(win) == "string" then
     win = self:GetWindow(win)
   end
-	win.display:ApplySettings(win)
+  win.display:ApplySettings(win)
 
-	-- Don't show window if we are solo, option.
-	-- Don't show window in a PvP instance, option.
-	if (self.db.profile.hidesolo and is_solo()) or 
-	   (self.db.profile.hidepvp and is_in_pvp()) or 
-	   (self.db.profile.hideparty and is_in_party()) then
-	  win:Hide()
-	else
-		win:Show()
-		
-		-- Hide specific windows if window is marked as hidden (ie, if user manually hid the window, keep hiding it).
-		if win.settings.hidden and win:IsShown() then
-			win:Hide()
-		end
-	end
+  -- Don't show window if we are solo, option.
+  -- Don't show window in a PvP instance, option.
+  if (self.db.profile.hidesolo and is_solo()) or 
+     (self.db.profile.hidepvp and is_in_pvp()) or 
+     (self.db.profile.hideparty and is_in_party()) then
+    win:Hide()
+  else
+    win:Show()
+    
+    -- Hide specific windows if window is marked as hidden (ie, if user manually hid the window, keep hiding it).
+    if win.settings.hidden and win:IsShown() then
+      win:Hide()
+    end
+  end
   
-	self:UpdateDisplay(win)
+  self:UpdateDisplay(win)
 end
 
 -- Called before dataset is updated.
 function Window:UpdateInProgress()
-	for i, data in ipairs(self.dataset) do
-		data.id = nil
-	end
+  for i, data in ipairs(self.dataset) do
+    data.id = nil
+  end
 end
 
 -- Loop through and update each window's display
@@ -816,85 +818,85 @@ end
 
 -- Update a given window's display
 function EminentDKP:UpdateDisplay(win)
-	if win.selectedmode then
-		local set = win:get_selected_set()
-		
-		-- Inform window that a data update will take place.
-		win:UpdateInProgress()
-	
-		-- Let mode update data.
-		if win.selectedmode.PopulateData then
-			win.selectedmode:PopulateData(win, set)
-		else
-			self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
-		end
-		-- Let window display the data.
-		win:UpdateDisplay()
-	elseif win.selectedset then
-		local set = win:get_selected_set()
-		
-		win:Wipe()
-		
-		-- View available modes.
-		for i, mode in ipairs(modes) do
-			local d = win.dataset[i] or {}
-			win.dataset[i] = d
-			d.id, d.label, d.value = mode:GetName(), mode:GetName(), 1
-			if mode.GetSetSummary then
-				d.valuetext = mode:GetSetSummary(set)
-			end
-		end
-		-- Tell window to sort by our data order.
-		win.metadata.ordersort = true
-		-- Let window display the data.
-		win:UpdateDisplay()
-	else
-	  win:Wipe()
-	  
-		-- View available sets.
-		local nr = 0
+  if win.selectedmode then
+    local set = win:get_selected_set()
     
-		for setid, set in pairs(sets) do
-			nr = nr + 1
-			local d = win.dataset[nr] or {}
-			win.dataset[nr] = d
-			d.id, d.label, d.value, d.sortnum, d.starttime = setid, set.name, 1, set.sortnum, set.starttime
-			if set.starttime > 0 then
-			  d.valuetext = date("%H:%M",set.starttime).." - "..date("%H:%M",set.endtime)
-		  else
-		    d.valuetext = nil
-	    end
-		end
-		-- Tell window to sort by our data order.
-		win.metadata.ordersort = true
-		-- Let window display the data.
-		win:UpdateDisplay()
-	end
+    -- Inform window that a data update will take place.
+    win:UpdateInProgress()
+  
+    -- Let mode update data.
+    if win.selectedmode.PopulateData then
+      win.selectedmode:PopulateData(win, set)
+    else
+      self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
+    end
+    -- Let window display the data.
+    win:UpdateDisplay()
+  elseif win.selectedset then
+    local set = win:get_selected_set()
+    
+    win:Wipe()
+    
+    -- View available modes.
+    for i, mode in ipairs(modes) do
+      local d = win.dataset[i] or {}
+      win.dataset[i] = d
+      d.id, d.label, d.value = mode:GetName(), mode:GetName(), 1
+      if mode.GetSetSummary then
+        d.valuetext = mode:GetSetSummary(set)
+      end
+    end
+    -- Tell window to sort by our data order.
+    win.metadata.ordersort = true
+    -- Let window display the data.
+    win:UpdateDisplay()
+  else
+    win:Wipe()
+    
+    -- View available sets.
+    local nr = 0
+    
+    for setid, set in pairs(sets) do
+      nr = nr + 1
+      local d = win.dataset[nr] or {}
+      win.dataset[nr] = d
+      d.id, d.label, d.value, d.sortnum, d.starttime = setid, set.name, 1, set.sortnum, set.starttime
+      if set.starttime > 0 then
+        d.valuetext = date("%H:%M",set.starttime).." - "..date("%H:%M",set.endtime)
+      else
+        d.valuetext = nil
+      end
+    end
+    -- Tell window to sort by our data order.
+    win.metadata.ordersort = true
+    -- Let window display the data.
+    win:UpdateDisplay()
+  end
 end
 
 local function scan_for_columns(mode)
-	-- Only process if not already scanned.
-	if not mode.scanned then
-		mode.scanned = true
-	
-		-- Add options for this mode if available.
-		if mode.metadata and mode.metadata.columns then
-			EminentDKP:AddColumnOptions(mode)
-		end
-		
-		-- Scan any linked modes.
-		if mode.metadata then
-			if mode.metadata.click1 then
-				scan_for_columns(mode.metadata.click1)
-			end
-			if mode.metadata.click2 then
-				scan_for_columns(mode.metadata.click2)
-			end
-			if mode.metadata.click3 then
-				scan_for_columns(mode.metadata.click3)
-			end
-		end
-	end
+  -- Only process if not already scanned.
+  if not mode.scanned then
+    mode.scanned = true
+  
+    -- Add options for this mode if available.
+    if mode.metadata and mode.metadata.columns then
+      EminentDKP:AddColumnOptions(mode)
+    end
+    
+    -- Scan any linked modes.
+    if mode.metadata then
+      if mode.metadata.click1 then
+        scan_for_columns(mode.metadata.click1)
+      end
+      if mode.metadata.click2 then
+        scan_for_columns(mode.metadata.click2)
+      end
+      if mode.metadata.click3 then
+        scan_for_columns(mode.metadata.click3)
+      end
+    end
+  end
 end
 
 function EminentDKP:GetWindow(name)
@@ -908,93 +910,93 @@ end
 
 -- Register a mode.
 function EminentDKP:AddMode(mode)
-	table.insert(modes, mode)
-	
-	-- Add column configuration if available.
-	if mode.metadata then
-		scan_for_columns(mode)
-	end
-	
-	-- Sort modes.
-	table.sort(modes, function(a, b) return a.sortnum < b.sortnum or (not (b.sortnum < a.sortnum) and a.name < b.name) end)
+  table.insert(modes, mode)
+  
+  -- Add column configuration if available.
+  if mode.metadata then
+    scan_for_columns(mode)
+  end
+  
+  -- Sort modes.
+  table.sort(modes, function(a, b) return a.sortnum < b.sortnum or (not (b.sortnum < a.sortnum) and a.name < b.name) end)
 end
 
 -- Unregister a mode.
 function EminentDKP:RemoveMode(mode)
-	table.remove(modes, mode)
+  table.remove(modes, mode)
 end
 
 function EminentDKP:SetTooltipPosition(tooltip, frame)
-	local p = self.db.profile.tooltippos
-	if p == "default" then
+  local p = self.db.profile.tooltippos
+  if p == "default" then
     tooltip:SetOwner(UIParent, "ANCHOR_NONE")
     tooltip:SetPoint("BOTTOMRIGHT", "UIParent", "BOTTOMRIGHT", -40, 40)
-	elseif p == "topleft" then
+  elseif p == "topleft" then
     tooltip:SetOwner(frame, "ANCHOR_NONE")
     tooltip:SetPoint("TOPRIGHT", frame, "TOPLEFT")
-	elseif p == "topright" then
+  elseif p == "topright" then
     tooltip:SetOwner(frame, "ANCHOR_NONE")
     tooltip:SetPoint("TOPLEFT", frame, "TOPRIGHT")
    end
 end
 
 local function value_sort(a,b)
-	if not a or a.value == nil then
-		return false
-	elseif not b or b.value == nil then
-		return true
-	else
-		return a.value > b.value
-	end
+  if not a or a.value == nil then
+    return false
+  elseif not b or b.value == nil then
+    return true
+  else
+    return a.value > b.value
+  end
 end
 
 -- Tooltip display. Shows subview data for a specific row.
 -- Using a fake window, the subviews are asked to populate the window's dataset normally.
 local ttwin = Window:new()
 function EminentDKP:AddSubviewToTooltip(tooltip, win, mode, id, label)
-	-- Clean dataset.
-	wipe(ttwin.dataset)
-	
-	-- Tell mode we are entering our real window.
-	mode:Enter(win, id, label)
-	
-	-- Ask mode to populate dataset in our fake window.
-	mode:PopulateData(ttwin, win:get_selected_set())
-	
-	-- Sort dataset unless we are using ordersort.
-	if not mode.metadata or not mode.metadata.ordersort then
-		table.sort(ttwin.dataset, value_sort)
-	end
-	if mode.metadata and mode.metadata.sortfunc then
-	  table.sort(ttwin.dataset, mode.metadata.sortfunc)
+  -- Clean dataset.
+  wipe(ttwin.dataset)
+  
+  -- Tell mode we are entering our real window.
+  mode:Enter(win, id, label)
+  
+  -- Ask mode to populate dataset in our fake window.
+  mode:PopulateData(ttwin, win:get_selected_set())
+  
+  -- Sort dataset unless we are using ordersort.
+  if not mode.metadata or not mode.metadata.ordersort then
+    table.sort(ttwin.dataset, value_sort)
+  end
+  if mode.metadata and mode.metadata.sortfunc then
+    table.sort(ttwin.dataset, mode.metadata.sortfunc)
   end
 
-	-- Show title and data if we have data.
-	if #ttwin.dataset > 0 then
-		tooltip:AddLine(mode.title or mode:GetName(), 1,1,1)
+  -- Show title and data if we have data.
+  if #ttwin.dataset > 0 then
+    tooltip:AddLine(mode.title or mode:GetName(), 1,1,1)
 
-		-- Display the top X, default 3, rows.
-		local nr = 0
-		for i, data in ipairs(ttwin.dataset) do
-			if data.id and nr < EminentDKP.db.profile.tooltiprows then
-				nr = nr + 1
-				
-				local color = {r = 1, g = 1, b = 1}
-				if data.color then
-					-- Explicit color from dataset.
-					color = data.color
-				elseif data.class then
-					-- Class color.
-					local color = EminentDKP.classColors[data.class]
-				end
-				
-				tooltip:AddDoubleLine(nr..". "..data.label, data.valuetext, color.r, color.g, color.b)
-			end
-		end
-		
-		-- Add an empty line.
-		tooltip:AddLine(" ")
-	end
+    -- Display the top X, default 3, rows.
+    local nr = 0
+    for i, data in ipairs(ttwin.dataset) do
+      if data.id and nr < EminentDKP.db.profile.tooltiprows then
+        nr = nr + 1
+        
+        local color = {r = 1, g = 1, b = 1}
+        if data.color then
+          -- Explicit color from dataset.
+          color = data.color
+        elseif data.class then
+          -- Class color.
+          local color = EminentDKP.classColors[data.class]
+        end
+        
+        tooltip:AddDoubleLine(nr..". "..data.label, data.valuetext, color.r, color.g, color.b)
+      end
+    end
+    
+    -- Add an empty line.
+    tooltip:AddLine(" ")
+  end
 end
 
 --[[-------------------------------------------------------------------
@@ -1004,40 +1006,40 @@ end
 -- Setup basic info and get database from saved variables
 function EminentDKP:OnInitialize()
   -- Register the SharedMedia
-	media:Register("font", "Adventure",				[[Interface\Addons\EminentDKP\fonts\Adventure.ttf]])
-	media:Register("font", "ABF",					[[Interface\Addons\EminentDKP\fonts\ABF.ttf]])
-	media:Register("font", "Vera Serif",			[[Interface\Addons\EminentDKP\fonts\VeraSe.ttf]])
-	media:Register("font", "Diablo",				[[Interface\Addons\EminentDKP\fonts\Avqest.ttf]])
-	media:Register("font", "Accidental Presidency",	[[Interface\Addons\EminentDKP\fonts\Accidental Presidency.ttf]])
-	media:Register("statusbar", "Aluminium",		[[Interface\Addons\EminentDKP\statusbar\Aluminium]])
-	media:Register("statusbar", "Armory",			[[Interface\Addons\EminentDKP\statusbar\Armory]])
-	media:Register("statusbar", "BantoBar",			[[Interface\Addons\EminentDKP\statusbar\BantoBar]])
-	media:Register("statusbar", "Glaze2",			[[Interface\Addons\EminentDKP\statusbar\Glaze2]])
-	media:Register("statusbar", "Gloss",			[[Interface\Addons\EminentDKP\statusbar\Gloss]])
-	media:Register("statusbar", "Graphite",			[[Interface\Addons\EminentDKP\statusbar\Graphite]])
-	media:Register("statusbar", "Grid",				[[Interface\Addons\EminentDKP\statusbar\Grid]])
-	media:Register("statusbar", "Healbot",			[[Interface\Addons\EminentDKP\statusbar\Healbot]])
-	media:Register("statusbar", "LiteStep",			[[Interface\Addons\EminentDKP\statusbar\LiteStep]])
-	media:Register("statusbar", "Minimalist",		[[Interface\Addons\EminentDKP\statusbar\Minimalist]])
-	media:Register("statusbar", "Otravi",			[[Interface\Addons\EminentDKP\statusbar\Otravi]])
-	media:Register("statusbar", "Outline",			[[Interface\Addons\EminentDKP\statusbar\Outline]])
-	media:Register("statusbar", "Perl",				[[Interface\Addons\EminentDKP\statusbar\Perl]])
-	media:Register("statusbar", "Smooth",			[[Interface\Addons\EminentDKP\statusbar\Smooth]])
-	media:Register("statusbar", "Round",			[[Interface\Addons\EminentDKP\statusbar\Round]])
-	media:Register("statusbar", "TukTex",			[[Interface\Addons\EminentDKP\statusbar\normTex]])
+  media:Register("font", "Adventure",       [[Interface\Addons\EminentDKP\fonts\Adventure.ttf]])
+  media:Register("font", "ABF",         [[Interface\Addons\EminentDKP\fonts\ABF.ttf]])
+  media:Register("font", "Vera Serif",      [[Interface\Addons\EminentDKP\fonts\VeraSe.ttf]])
+  media:Register("font", "Diablo",        [[Interface\Addons\EminentDKP\fonts\Avqest.ttf]])
+  media:Register("font", "Accidental Presidency", [[Interface\Addons\EminentDKP\fonts\Accidental Presidency.ttf]])
+  media:Register("statusbar", "Aluminium",    [[Interface\Addons\EminentDKP\statusbar\Aluminium]])
+  media:Register("statusbar", "Armory",     [[Interface\Addons\EminentDKP\statusbar\Armory]])
+  media:Register("statusbar", "BantoBar",     [[Interface\Addons\EminentDKP\statusbar\BantoBar]])
+  media:Register("statusbar", "Glaze2",     [[Interface\Addons\EminentDKP\statusbar\Glaze2]])
+  media:Register("statusbar", "Gloss",      [[Interface\Addons\EminentDKP\statusbar\Gloss]])
+  media:Register("statusbar", "Graphite",     [[Interface\Addons\EminentDKP\statusbar\Graphite]])
+  media:Register("statusbar", "Grid",       [[Interface\Addons\EminentDKP\statusbar\Grid]])
+  media:Register("statusbar", "Healbot",      [[Interface\Addons\EminentDKP\statusbar\Healbot]])
+  media:Register("statusbar", "LiteStep",     [[Interface\Addons\EminentDKP\statusbar\LiteStep]])
+  media:Register("statusbar", "Minimalist",   [[Interface\Addons\EminentDKP\statusbar\Minimalist]])
+  media:Register("statusbar", "Otravi",     [[Interface\Addons\EminentDKP\statusbar\Otravi]])
+  media:Register("statusbar", "Outline",      [[Interface\Addons\EminentDKP\statusbar\Outline]])
+  media:Register("statusbar", "Perl",       [[Interface\Addons\EminentDKP\statusbar\Perl]])
+  media:Register("statusbar", "Smooth",     [[Interface\Addons\EminentDKP\statusbar\Smooth]])
+  media:Register("statusbar", "Round",      [[Interface\Addons\EminentDKP\statusbar\Round]])
+  media:Register("statusbar", "TukTex",     [[Interface\Addons\EminentDKP\statusbar\normTex]])
   
   -- DB
-	self.db = LibStub("AceDB-3.0"):New("EminentDKPDB", self.defaults, "Default")
-	LibStub("AceConfig-3.0"):RegisterOptionsTable("EminentDKP", self.options)
-	self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("EminentDKP", "EminentDKP")
+  self.db = LibStub("AceDB-3.0"):New("EminentDKPDB", self.defaults, "Default")
+  LibStub("AceConfig-3.0"):RegisterOptionsTable("EminentDKP", self.options)
+  self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("EminentDKP", "EminentDKP")
 
-	-- Profiles
-	LibStub("AceConfig-3.0"):RegisterOptionsTable("EminentDKP-Profiles", LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db))
-	self.profilesFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("EminentDKP-Profiles", "Profiles", "EminentDKP")
+  -- Profiles
+  LibStub("AceConfig-3.0"):RegisterOptionsTable("EminentDKP-Profiles", LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db))
+  self.profilesFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("EminentDKP-Profiles", "Profiles", "EminentDKP")
   
   self.db.RegisterCallback(self, "OnProfileChanged", "ReloadWindows")
-	self.db.RegisterCallback(self, "OnProfileCopied", "ReloadWindows")
-	self.db.RegisterCallback(self, "OnProfileReset", "ReloadWindows")
+  self.db.RegisterCallback(self, "OnProfileCopied", "ReloadWindows")
+  self.db.RegisterCallback(self, "OnProfileReset", "ReloadWindows")
   
   self:DatabaseUpdate()
   
@@ -1113,54 +1115,54 @@ function EminentDKP:DatabaseUpdate()
 end
 
 function EminentDKP:OnEnable()
-	self:RegisterEvent("PLAYER_ENTERING_WORLD") -- version broadcast
-	self:RegisterChatEvent("CHAT_MSG_WHISPER") -- whisper commands received
-	self:RegisterChatEvent("CHAT_MSG_WHISPER_INFORM") -- whispers sent
-	self:RegisterChatEvent("CHAT_MSG_PARTY") -- party messages
-	self:RegisterChatEvent("CHAT_MSG_PARTY_LEADER") -- party messages
-	self:RegisterChatEvent("CHAT_MSG_RAID") -- raid messages
-	self:RegisterChatEvent("CHAT_MSG_RAID_LEADER") -- raid messages
-	self:RegisterChatEvent("CHAT_MSG_RAID_WARNING") -- raid warnings
-	self:RegisterEvent("ACHIEVEMENT_EARNED") -- achievement tracking
-	self:RegisterEvent("LOOT_OPENED") -- loot listing
-	self:RegisterEvent("LOOT_CLOSED") -- auction cancellation
-	self:RegisterEvent("PARTY_LOOT_METHOD_CHANGED") -- masterloot change
-	self:RegisterEvent("RAID_ROSTER_UPDATE") -- raid member list update
-	self:RegisterEvent("PARTY_MEMBERS_CHANGED") -- party member list update
-	self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
-	self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
-	self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
-	self:RegisterEvent("GUILD_PARTY_STATE_UPDATED") -- guild group tracking
-	self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
-	-- 4.1 insurance (until AceComm is updated)
-	if RegisterAddonMessagePrefix ~= nil then
-	  RegisterAddonMessagePrefix("EminentDKP-SPP")
-	  RegisterAddonMessagePrefix("EminentDKP-SFF")
-	  RegisterAddonMessagePrefix("EminentDKP-SRQ")
-	  RegisterAddonMessagePrefix("EminentDKP-SV")
-	  RegisterAddonMessagePrefix("EminentDKP-SE")
-	  RegisterAddonMessagePrefix("EminentDKP-CMD")
-	  RegisterAddonMessagePrefix("EminentDKP-INF")
+  self:RegisterEvent("PLAYER_ENTERING_WORLD") -- version broadcast
+  self:RegisterChatEvent("CHAT_MSG_WHISPER") -- whisper commands received
+  self:RegisterChatEvent("CHAT_MSG_WHISPER_INFORM") -- whispers sent
+  self:RegisterChatEvent("CHAT_MSG_PARTY") -- party messages
+  self:RegisterChatEvent("CHAT_MSG_PARTY_LEADER") -- party messages
+  self:RegisterChatEvent("CHAT_MSG_RAID") -- raid messages
+  self:RegisterChatEvent("CHAT_MSG_RAID_LEADER") -- raid messages
+  self:RegisterChatEvent("CHAT_MSG_RAID_WARNING") -- raid warnings
+  self:RegisterEvent("ACHIEVEMENT_EARNED") -- achievement tracking
+  self:RegisterEvent("LOOT_OPENED") -- loot listing
+  self:RegisterEvent("LOOT_CLOSED") -- auction cancellation
+  self:RegisterEvent("PARTY_LOOT_METHOD_CHANGED") -- masterloot change
+  self:RegisterEvent("RAID_ROSTER_UPDATE") -- raid member list update
+  self:RegisterEvent("PARTY_MEMBERS_CHANGED") -- party member list update
+  self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
+  self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
+  self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
+  self:RegisterEvent("GUILD_PARTY_STATE_UPDATED") -- guild group tracking
+  self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
+  -- 4.1 insurance (until AceComm is updated)
+  if RegisterAddonMessagePrefix ~= nil then
+    RegisterAddonMessagePrefix("EminentDKP-SPP")
+    RegisterAddonMessagePrefix("EminentDKP-SFF")
+    RegisterAddonMessagePrefix("EminentDKP-SRQ")
+    RegisterAddonMessagePrefix("EminentDKP-SV")
+    RegisterAddonMessagePrefix("EminentDKP-SE")
+    RegisterAddonMessagePrefix("EminentDKP-CMD")
+    RegisterAddonMessagePrefix("EminentDKP-INF")
   end
-	-- Addon messages
-	self:RegisterComm("EminentDKP-SPP", "ProcessSyncProposal")
-	self:RegisterComm("EminentDKP-SFF", "ProcessSyncFulfill")
-	self:RegisterComm("EminentDKP-SRQ", "ProcessSyncRequest")
-	self:RegisterComm("EminentDKP-SV", "ProcessSyncVersion")
-	self:RegisterComm("EminentDKP-SE", "ProcessSyncEvent")
-	self:RegisterComm("EminentDKP-CMD", "ProcessCommand")
-	self:RegisterComm("EminentDKP-INF", "ProcessInformation")
-	-- Custom event notifications
-	self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
-	self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
-	self:RawHookScript(RaidWarningFrame, "OnEvent", "HideRaidWarning")
-	self:RawHook("LevelUpDisplay_AnimStep", "LevelUpDisplayFinished", true)
-	
-	if type(CUSTOM_CLASS_COLORS) == "table" then
-		self.classColors = CUSTOM_CLASS_COLORS
-	end
-	
-	-- Broadcast version every 5 minutes
+  -- Addon messages
+  self:RegisterComm("EminentDKP-SPP", "ProcessSyncProposal")
+  self:RegisterComm("EminentDKP-SFF", "ProcessSyncFulfill")
+  self:RegisterComm("EminentDKP-SRQ", "ProcessSyncRequest")
+  self:RegisterComm("EminentDKP-SV", "ProcessSyncVersion")
+  self:RegisterComm("EminentDKP-SE", "ProcessSyncEvent")
+  self:RegisterComm("EminentDKP-CMD", "ProcessCommand")
+  self:RegisterComm("EminentDKP-INF", "ProcessInformation")
+  -- Custom event notifications
+  self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
+  self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
+  self:RawHookScript(RaidWarningFrame, "OnEvent", "HideRaidWarning")
+  self:RawHook("LevelUpDisplay_AnimStep", "LevelUpDisplayFinished", true)
+  
+  if type(CUSTOM_CLASS_COLORS) == "table" then
+    self.classColors = CUSTOM_CLASS_COLORS
+  end
+  
+  -- Broadcast version every 5 minutes
   self:ScheduleRepeatingTimer("BroadcastVersion", 300)
 end
 
@@ -1689,7 +1691,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
     if compare.event < 0 or compare.bug < 0 then
       if compare.event < 0 then
         -- Event data is out of date
-        self:ScheduleEventsRequest(math.random(3,6))
+        self:ScheduleEventsRequest(math.random(3,8))
       end
     end
   end
@@ -1718,8 +1720,8 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   -- Decompress the decoded data
   local two, message = libC:Decompress(one)
   if not two then
-  	self:Print("Error occured while decoding a sync event:" .. message)
-  	return
+    self:Print("Error occured while decoding a sync event:" .. message)
+    return
   end
   
   local version, eventID, data = strsplit('_',two,3)
@@ -1730,7 +1732,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   local success, event = libS:Deserialize(data)
   if not success then
     self:Print("Error occured while deserializing a sync event.")
-  	return
+    return
   end
   
   -- We will only act on the next chronological event and cache future events
@@ -1781,6 +1783,9 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     self:CreateAdjustmentEvent(tname,math.abs(event.value),(event.value < 0),event.source,event.datetime)
   elseif event.eventType == 'rename' then
     self:CreateRenameEvent(event.extraInfo,event.value,event.datetime)
+  else
+    -- This is an unknown event type
+    return
   end
   
   local next_eventID = tostring(tonumber(eventID) + 1)
@@ -1798,13 +1803,13 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
       self:ReplicateSyncEvent(next_eventID,events_cache[next_eventID])
     else
       -- We lack what we need to continue onward...
-      self:ScheduleEventsRequest()
+      self:ScheduleEventsRequest(math.random(3,8))
     end
   else
     -- We're up to date!
-    self:UpdateSyncedDays()
     wipe(events_cache)
     syncing = false
+    self:UpdateSyncedDays()
   end
 end
 
@@ -1812,17 +1817,17 @@ end
 
 -- Formats a number into human readable form.
 function EminentDKP:FormatNumber(number)
-	if number then
-		if self.db.profile.numberformat == 1 then
-			if number > 1000000 then
-				return ("%02.2fM"):format(number / 1000000)
-			else
-				return ("%02.1fK"):format(number / 1000)
-			end
-		else
-			return self:StdNumber(number)
-		end
-	end
+  if number then
+    if self.db.profile.numberformat == 1 then
+      if number > 1000000 then
+        return ("%02.2fM"):format(number / 1000000)
+      else
+        return ("%02.1fK"):format(number / 1000)
+      end
+    else
+      return self:StdNumber(number)
+    end
+  end
 end
 
 function EminentDKP:MessageGroup(what)
@@ -1992,17 +1997,17 @@ function EminentDKP:GetCurrentGroupMembersIDs()
   if is_in_party() then
     for spot = 1, 5 do
       local name = UnitName("party"..spot)
-  		if name then
-  		  table.insert(players,self:GetPlayerIDByName(name))
-  		end
+      if name then
+        table.insert(players,self:GetPlayerIDByName(name))
+      end
     end
   else
     for spot = 1, 40 do
       local name = UnitName("raid"..spot)
-  		if name then
-  		  table.insert(players,self:GetPlayerIDByName(name))
-  		end
-		end
+      if name then
+        table.insert(players,self:GetPlayerIDByName(name))
+      end
+    end
   end
   return players
 end
@@ -2340,10 +2345,10 @@ function EminentDKP:UpdateLootEligibility()
   wipe(eligible_looters)
   local count = (is_in_party() and GetNumPartyMembers() or GetNumRaidMembers())
   for d = 1, count do
-		if GetMasterLootCandidate(d) then
-			eligible_looters[GetMasterLootCandidate(d)] = d
-		end
-	end
+    if GetMasterLootCandidate(d) then
+      eligible_looters[GetMasterLootCandidate(d)] = d
+    end
+  end
 end
 
 function EminentDKP:IsEnabled()
@@ -2445,20 +2450,20 @@ function EminentDKP:CheckGroupPlayers()
   
   if GetNumRaidMembers() > 0 then
     for d = 1, GetNumRaidMembers() do
-  		local name = UnitName("raid"..d)
-  		if name and not self:PlayerExistsInPool(name) then
-  		  local classname = select(2,UnitClass(name))
-  		  self:CreateAddPlayerSyncEvent(name,classname)
-  		end
-  	end
+      local name = UnitName("raid"..d)
+      if name and not self:PlayerExistsInPool(name) then
+        local classname = select(2,UnitClass(name))
+        self:CreateAddPlayerSyncEvent(name,classname)
+      end
+    end
   elseif GetNumPartyMembers() > 0 then
     for d = 1, GetNumPartyMembers() do
-  		local name = UnitName("party"..d)
-  		if name and not self:PlayerExistsInPool(name) then
-  		  local classname = select(2,UnitClass(name))
-  		  self:CreateAddPlayerSyncEvent(name,classname)
-  		end
-  	end
+      local name = UnitName("party"..d)
+      if name and not self:PlayerExistsInPool(name) then
+        local classname = select(2,UnitClass(name))
+        self:CreateAddPlayerSyncEvent(name,classname)
+      end
+    end
   end
 end
 
@@ -2470,8 +2475,8 @@ function EminentDKP:PARTY_MEMBERS_CHANGED()
     end
   elseif self.db.profile.hidesolo then
     self:ToggleMeters(not is_solo())
-	end
-	if self.db.profile.disableparty then
+  end
+  if self.db.profile.disableparty then
     enabled = not is_in_party()
   end
   
@@ -2482,7 +2487,7 @@ end
 function EminentDKP:RAID_ROSTER_UPDATE()
   if self.db.profile.hidesolo then
     self:ToggleMeters(not is_solo())
-	end
+  end
   
   self:CheckGroupPlayers()
 end
@@ -2551,35 +2556,37 @@ function EminentDKP:LOOT_OPENED()
     local slotlist = {}
     local itemlist = {}
     for slot = 1, GetNumLootItems() do 
-			local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-			if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
-			  local link = GetLootSlotLink(slot)
-			  table.insert(eligible_items,link)
-			  table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), slot=slot })
-			  table.insert(slotlist,1,slot)
-			end
-		end
-		
-		if #(eligible_items) > 0 then
-		  if not recent_loots[guid] then
-  			self:MessageGroup(L["Loot from %s:"]:format(unitName))
-  		  for i,loot in ipairs(eligible_items) do
-  		    self:MessageGroup(loot)
-  	    end
-  	    
-  	    -- Share loot list with group
-  	    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
-  	    -- Ensure that we only print once by keeping track of the GUID
-  	    recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
+      local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
+      if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
+        local link = GetLootSlotLink(slot)
+        table.insert(eligible_items,link)
+        table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), slot=slot })
+        table.insert(slotlist,1,slot)
+      end
+    end
+    
+    if #(eligible_items) > 0 then
+      if not recent_loots[guid] then
+        self:MessageGroup(L["Loot from %s:"]:format(unitName))
+        for i,loot in ipairs(eligible_items) do
+          self:MessageGroup(loot)
+        end
+        
+        -- Share loot list with group
+        self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
+        -- Ensure that we only print once by keeping track of the GUID
+        recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
       else
-	      if recent_loots[guid].slots[1] ~= slotlist[1] or #(recent_loots[guid].slots) ~= #(slotlist) then
-    	    -- Re-share updated lootlist
-    	    self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
-    	    -- Update recorded lootlist
-    			recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
-    		end
-  		end
-		end
+        if #(recent_loots[guid].slots) ~= #(slotlist) or recent_loots[guid].slots[1] ~= slotlist[1] then
+          -- Re-share updated lootlist
+          self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
+          -- Update recorded lootlist
+          recent_loots[guid].name = unitName
+          recent_loots[guid].slots = slotlist
+          recent_loots[guid].items = itemlist
+        end
+      end
+    end
   end
 end
 
@@ -2668,8 +2675,8 @@ function EminentDKP:GetStandings(stat)
   end
   for id,data in pairs(players) do
     local b = (data[stat] ~= nil and data[stat] or data.currentDKP)
-		table.insert(a, { n=self:GetPlayerNameByID(id), dkp=b })
-	end
+    table.insert(a, { n=self:GetPlayerNameByID(id), dkp=b })
+  end
   table.sort(a, function(a,b) return a.dkp>b.dkp end)
   return a
 end
@@ -2717,42 +2724,42 @@ function EminentDKP:AdminStartAuction()
     local guid = UnitExists("target") and UnitGUID("target") or 'container'
     if #(recent_loots[guid].slots) > 0 then
       if not auction_active then
-    		-- Fast forward to next eligible slot
-    		local slot
-    		local itemLink
-    		
-    		while not itemLink and #(recent_loots[guid].slots) > 0 do
-    		  slot = tremove(recent_loots[guid].slots)
-    		  itemLink = GetLootSlotLink(slot)
-  		  end
-  		  
-  		  if not itemLink then
-  		    self:DisplayActionResult(L["There is no loot available to auction."])
-  		    return
-		    end
-  		  
-    		-- Gather some info about this item
-    		local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-    		
-    		-- Update eligibility list
+        -- Fast forward to next eligible slot
+        local slot
+        local itemLink
+        
+        while not itemLink and #(recent_loots[guid].slots) > 0 do
+          slot = tremove(recent_loots[guid].slots)
+          itemLink = GetLootSlotLink(slot)
+        end
+        
+        if not itemLink then
+          self:DisplayActionResult(L["There is no loot available to auction."])
+          return
+        end
+        
+        -- Gather some info about this item
+        local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
+        
+        -- Update eligibility list
         self:UpdateLootEligibility()
-		    
-  			auction_active = true
-  			self.bidItem = {
-  			  itemString=string.match(itemLink, "item[%-?%d:]+"), 
-  			  elapsed=0, 
-  			  bids={}, 
-  			  slotNum=slot,
-  			  srcGUID=guid,
-  			  start=self:GetTime(),
-  			}
-  			self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
-  			self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
-		    
-		    if not is_in_party() then
-  			  sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
-			  end
-  			self:MessageGroup(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink))
+        
+        auction_active = true
+        self.bidItem = {
+          itemString=string.match(itemLink, "item[%-?%d:]+"), 
+          elapsed=0, 
+          bids={}, 
+          slotNum=slot,
+          srcGUID=guid,
+          start=self:GetTime(),
+        }
+        self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
+        self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
+        
+        if not is_in_party() then
+          sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
+        end
+        self:MessageGroup(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink))
       else
         self:DisplayActionResult(L["An auction is already active."])
       end
@@ -2775,9 +2782,9 @@ function EminentDKP:AuctionBidTimer()
     self:MessageGroup(L["Auction has closed. Determining winner..."])
     
     local looter = self.myName
-		local guid = self.bidItem.srcGUID
-		
-		-- Update eligibility list
+    local guid = self.bidItem.srcGUID
+    
+    -- Update eligibility list
     self:UpdateLootEligibility()
     
     if next(self.bidItem.bids) == nil then
@@ -2871,10 +2878,10 @@ function EminentDKP:AdminIssueAdjustment(who,amount,deduction,reason)
       self:CreateAdjustmentSyncEvent(who,p,deduction,reason)
       
       -- Announce adjustment to the other addons
-	    self:InformPlayer("adjustment",{ amount = p, receiver = who, deduct = deduction })
-	    
-	    if deduction then
-	       self:MessageGroup(L["%s has received a deduction of %.02f DKP."]:format(who,p))
+      self:InformPlayer("adjustment",{ amount = p, receiver = who, deduct = deduction })
+      
+      if deduction then
+         self:MessageGroup(L["%s has received a deduction of %.02f DKP."]:format(who,p))
       else
         self:MessageGroup(L["%s has been awarded %.02f DKP."]:format(who,p))
       end
@@ -2900,7 +2907,7 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
       self:CreateBountySyncEvent(players,amount,reason)
       
       -- Announce bounty to the other addons
-	    self:InformPlayer("bounty",{ amount = dividend })
+      self:InformPlayer("bounty",{ amount = dividend })
       
       self:MessageGroup(L["A bounty of %.02f has been awarded to %d players."]:format(amount,#(players)))
       self:MessageGroup(L["Each player has received %.02f DKP."]:format(dividend))
@@ -2919,17 +2926,17 @@ function EminentDKP:AdminVanityRoll()
   if not auction_active then
     local ranks = {}
     for pid, data in pairs(self:GetCurrentGroupMembers()) do
-  		local name = self:GetPlayerNameByID(pid)
-			if data.currentVanityDKP > 0 then
-			  local roll = math.random(math.floor(data.currentVanityDKP))/1000
-			  table.insert(ranks, { n=name, v=data.currentVanityDKP, r=roll })
-		  end
-	  end
-	  table.sort(ranks, function(a,b) return a.r>b.r end)
-	  
-	  self:MessageGroup(L["Vanity item rolls weighted by current vanity DKP:"])
-	  for rank,data in ipairs(ranks) do
-	    self:MessageGroup(("%d. %s (%.02f) - %.02f"):format(rank,data.n,data.v,data.r))
+      local name = self:GetPlayerNameByID(pid)
+      if data.currentVanityDKP > 0 then
+        local roll = math.random(math.floor(data.currentVanityDKP))/1000
+        table.insert(ranks, { n=name, v=data.currentVanityDKP, r=roll })
+      end
+    end
+    table.sort(ranks, function(a,b) return a.r>b.r end)
+    
+    self:MessageGroup(L["Vanity item rolls weighted by current vanity DKP:"])
+    for rank,data in ipairs(ranks) do
+      self:MessageGroup(("%d. %s (%.02f) - %.02f"):format(rank,data.n,data.v,data.r))
     end
   else
     self:DisplayActionResult(L["ERROR: An auction must not be active."])
@@ -3044,8 +3051,8 @@ function EminentDKP:ProcessInformation(prefix, message, distribution, sender)
   -- Decompress the decoded data
   local two, message = libC:Decompress(one)
   if not two then
-  	self:Print('Error occured while decoding a notification: '..message)
-  	return
+    self:Print('Error occured while decoding a notification: '..message)
+    return
   end
   
   local notifyType, rawdata = strsplit('_',two,2)
@@ -3054,7 +3061,7 @@ function EminentDKP:ProcessInformation(prefix, message, distribution, sender)
   local success, data = libS:Deserialize(rawdata)
   if not success then
     self:Print('Error occured while deserializing notification data.')
-  	return
+    return
   end
   
   self:ActuateNotification(notifyType,data)
@@ -3202,8 +3209,8 @@ end
 function EminentDKP:CHAT_MSG_WHISPER(message, from)
   -- Only interpret messages starting with $
   local a, command, arg1, arg2 = strsplit(" ", message, 4)
-	if a ~= "$" then return end
-	
+  if a ~= "$" then return end
+  
   if command == 'bid' then
     self:Bid(false,from,arg1)
   elseif command == 'balance' then
@@ -3221,14 +3228,14 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
   elseif command == 'transfer' then
     self:Transfer(false,from,arg1,arg2)
   elseif command == 'help' then
-	  sendchat(L["Available Commands:"], from, 'whisper')
-		sendchat("$ balance -- " .. L["Check your current balance"], from, 'whisper')
-		sendchat("$ check X -- " .. L["Check the current balance of player X"], from, 'whisper')						
-		sendchat("$ standings -- " .. L["Display the current dkp standings"], from, 'whisper')
-		sendchat("$ lifetime -- " .. L["Display the lifetime earned dkp standings"], from, 'whisper')
-		sendchat("$ bid X -- " .. L["Place a bid of X DKP on the active auction"] .. " **", from, 'whisper')
-		sendchat("$ transfer X Y -- " .. L["Transfer X DKP to player Y"] .. " **", from, 'whisper')						
-		sendchat("** " .. L["These commands can only be sent to the master looter and only during a raid"], from, 'whisper')
+    sendchat(L["Available Commands:"], from, 'whisper')
+    sendchat("$ balance -- " .. L["Check your current balance"], from, 'whisper')
+    sendchat("$ check X -- " .. L["Check the current balance of player X"], from, 'whisper')            
+    sendchat("$ standings -- " .. L["Display the current dkp standings"], from, 'whisper')
+    sendchat("$ lifetime -- " .. L["Display the lifetime earned dkp standings"], from, 'whisper')
+    sendchat("$ bid X -- " .. L["Place a bid of X DKP on the active auction"] .. " **", from, 'whisper')
+    sendchat("$ transfer X Y -- " .. L["Transfer X DKP to player Y"] .. " **", from, 'whisper')           
+    sendchat("** " .. L["These commands can only be sent to the master looter and only during a raid"], from, 'whisper')
   else
     sendchat(L["Unrecognized command. Whisper %s for a list of valid commands."]:format("'$ help'"), from, 'whisper')
   end
