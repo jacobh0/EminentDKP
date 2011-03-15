@@ -2545,8 +2545,10 @@ function EminentDKP:LOOT_CLOSED()
     auction_active = false
     self:CancelTimer(self.bidTimer)
     self:MessageGroup(L["Auction cancelled. All bids have been voided."])
-    self:InformPlayer("auctioncancel",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
-    table.insert(recent_loots[self.bidItem.srcGUID].slots,self.bidItem.slotNum)
+    self:InformPlayer("auctioncancel",{
+      guid = self.bidItem.srcGUID,
+      slot = (recent_loots[self.bidItem.srcGUID].slotoffset + self.bidItem.slotNum),
+    })
     self.bidItem = nil
   end
 end
@@ -2587,16 +2589,18 @@ function EminentDKP:LOOT_OPENED()
         -- Share loot list with group
         self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
         -- Ensure that we only print once by keeping track of the GUID
-        recent_loots[guid] = { name=unitName, slots=slotlist, items=itemlist }
+        recent_loots[guid] = {
+          name=unitName,
+          slots=slotlist,
+          items=itemlist,
+          auctioncount=0,
+          slotoffset=0
+        }
       else
-        if #(recent_loots[guid].slots) ~= #(slotlist) or recent_loots[guid].slots[1] ~= slotlist[1] then
-          -- Re-share updated lootlist
-          self:InformPlayer("lootlist",{ guid=guid, name=unitName, items=itemlist })
-          -- Update recorded lootlist
-          recent_loots[guid].name = unitName
-          recent_loots[guid].slots = slotlist
-          recent_loots[guid].items = itemlist
-        end
+        -- Update slot list
+        recent_loots[guid].slots = slotlist
+        -- Snapshot our offset, it is the basis for the slot position in the GUI
+        recent_loots[guid].slotoffset = recent_loots[guid].auctioncount
       end
     end
   end
@@ -2752,6 +2756,7 @@ function EminentDKP:AdminStartAuction()
         
         -- Gather some info about this item
         local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
+        local gui_slot = (recent_loots[guid].slotoffset + slot)
         
         -- Update eligibility list
         self:UpdateLootEligibility()
@@ -2766,7 +2771,7 @@ function EminentDKP:AdminStartAuction()
           start=self:GetTime(),
         }
         self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
-        self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = slot, start = self.bidItem.start })
+        self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = gui_slot, start = self.bidItem.start })
         
         if not is_in_party() then
           sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
@@ -2795,6 +2800,7 @@ function EminentDKP:AuctionBidTimer()
     
     local looter = self.myName
     local guid = self.bidItem.srcGUID
+    local gui_slot = (recent_loots[guid].slotoffset + self.bidItem.slotNum)
     
     -- Update eligibility list
     self:UpdateLootEligibility()
@@ -2807,7 +2813,7 @@ function EminentDKP:AuctionBidTimer()
       else
         self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter))
       end
-      self:InformPlayer("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = self.bidItem.slotNum })
+      self:InformPlayer("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = gui_slot })
     else
       local secondHighestBid = 0
       local winningBid = 0
@@ -2849,10 +2855,12 @@ function EminentDKP:AuctionBidTimer()
         amount = secondHighestBid, 
         receiver = looter, 
         item = self.bidItem.itemString, 
-        slot = self.bidItem.slotNum,
+        slot = gui_slot,
         tie = (#(winners) > 1)
       })
     end
+    
+    recent_loots[guid].auctioncount = recent_loots[guid].auctioncount + 1
     
     -- Distribute the loot
     GiveMasterLoot(self.bidItem.slotNum, eligible_looters[looter])
