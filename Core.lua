@@ -1067,9 +1067,6 @@ function EminentDKP:OnInitialize()
   self:CreateAuctionFrame()
   self:ReloadWindows()
   
-  -- Broadcast version
-  self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
-  
   -- Since SharedMedia doesn't finish loading until after this executes, we need to re-apply
   -- the settings again to ensure everything is how it should be, an unfortunate work-around...
   self:ScheduleTimer("GlobalApplySettings", 2)
@@ -1091,6 +1088,9 @@ function EminentDKP:GlobalApplySettings()
   self:ApplySettingsAll()
   self:ApplyAuctionFrameSettings()
   self:PARTY_LOOT_METHOD_CHANGED()
+  
+  -- Broadcast version
+  self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
 end
 
 -- DATABASE UPDATES
