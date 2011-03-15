@@ -494,6 +494,8 @@ function EminentDKP:StartAuction(slot,start)
   frame.bid:Show()
   frame.bid.bidamt:SetBackdropBorderColor(0.5,0.5,0.5,1)
   frame.bid.bidamt:Show()
+  print("start time was: "..start)
+  print("current time is: "..EminentDKP:GetTime())
   frame.endtime = start + 30
   frame.status:SetValue(30)
   frame.status:Show()

@@ -1321,6 +1321,10 @@ function EminentDKP:EnsureToMasterlooter(addon,method,from)
     self:WhisperPlayer(addon,method,L["You are not in the current group."],from)
     return false
   end
+  if not self:IsEnabled() then
+    self:WhisperPlayer(addon,method,L["EminentDKP is currently disabled."],from)
+    return false
+  end
   return true
 end
 
@@ -1569,7 +1573,7 @@ end
 
 -- Determine if we are the proposal winner, and if so do the syncing
 function EminentDKP:ProcessRequestProposals(who)
-  if not self:AmOfficer() then return end
+  if not self:AmOfficer() or not self:IsEnabled() then return end
   if not self.syncProposals[who] then return end
   
   -- First determine who has the latest event version
@@ -1631,7 +1635,7 @@ end
 
 -- Record a proposal to somebody's event request
 function EminentDKP:ProcessSyncProposal(prefix, message, distribution, sender)
-  if not self:AmOfficer() then return end
+  if not self:AmOfficer() or not self:IsEnabled() then return end
   if not self:IsAnOfficer(sender) then return end
   
   local version, person, numbers = strsplit('_',message)
@@ -1650,6 +1654,7 @@ end
 -- Acknowledge an event request fulfillment for a person
 function EminentDKP:ProcessSyncFulfill(prefix, message, distribution, sender)
   if sender == self.myName then return end
+  if not self:AmOfficer() or not self:IsEnabled() then return end
   if not self:IsAnOfficer(sender) then return end
   local version, person = strsplit('_',message)
   if not CheckVersionCompatability(version) then return end
@@ -1670,12 +1675,14 @@ function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   local needed_ranges = { strsplit(',',ranges) }
   
   if self:AmOfficer() then
-    -- If an officer, create a proposal to fulfill this request
-    local numbers = { math.random(1000), math.random(1000), math.random(1000) }
-    self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
-    self.syncProposals[sender] = { }
+    if self:IsEnabled() then
+      -- If an officer, create a proposal to fulfill this request
+      local numbers = { math.random(1000), math.random(1000), math.random(1000) }
+      self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
+      self.syncProposals[sender] = { }
     
-    self:SendCommMessage("EminentDKP-SPP",self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
+      self:SendCommMessage("EminentDKP-SPP",self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
+    end
   else
     -- If not an officer, remember which ranges were requested
     for i,range in ipairs(needed_ranges) do
