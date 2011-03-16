@@ -1685,7 +1685,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
         guid=self.bidItem.srcGUID, 
         slot=self.bidItem.slotNum, 
         timeleft=(self.bidItem.ending - GetTime()),
-        window=self.db.profile.auctionlength,
+        window=self.bidItem.window,
       },sender)
     end
   end
@@ -2738,18 +2738,19 @@ function EminentDKP:AdminStartAuction()
         auction_active = true
         self.bidItem = {
           itemString=string.match(itemLink, "item[%-?%d:]+"), 
-          elapsed=0, 
+          remaining=self.db.profile.auctionlength, 
           bids={}, 
           slotNum=slot,
           srcGUID=guid,
           ending=(GetTime() + self.db.profile.auctionlength),
+          window=self.db.profile.auctionlength,
         }
         self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
         self:InformPlayer("auction",{
           guid = self.bidItem.srcGUID,
           slot = gui_slot,
-          timeleft = self.db.profile.auctionlength,
-          window = self.db.profile.auctionlength,
+          timeleft = self.bidItem.window,
+          window = self.bidItem.window,
         })
         
         if not is_in_party() then
@@ -2769,10 +2770,10 @@ end
 
 function EminentDKP:AuctionBidTimer()
   -- Add 5 seconds to the elapsed time
-  self.bidItem.elapsed = self.bidItem.elapsed + 5
+  self.bidItem.remaining = self.bidItem.remaining - 5
   
-  -- If 30 seconds has elapsed, then close it
-  if self.bidItem.elapsed == self.db.profile.auctionlength then
+  -- If time is up, then close it
+  if self.bidItem.remaining == 0 then
     auction_active = false
     self:CancelTimer(self.bidTimer)
     self:MessageGroup(L["Auction has closed. Determining winner..."])
@@ -2854,7 +2855,7 @@ function EminentDKP:AuctionBidTimer()
       self.bidItem = nil
     end
   else
-    self:MessageGroup(("%d..."):format(self.db.profile.auctionlength-self.bidItem.elapsed))
+    self:MessageGroup(("%d..."):format(self.bidItem.remaining))
   end
 end
 
