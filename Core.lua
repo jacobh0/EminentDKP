@@ -2772,7 +2772,7 @@ function EminentDKP:AuctionBidTimer()
   self.bidItem.elapsed = self.bidItem.elapsed + 5
   
   -- If 30 seconds has elapsed, then close it
-  if self.bidItem.elapsed == 30 then
+  if self.bidItem.elapsed == self.db.profile.auctionlength then
     auction_active = false
     self:CancelTimer(self.bidTimer)
     self:MessageGroup(L["Auction has closed. Determining winner..."])
@@ -2854,7 +2854,7 @@ function EminentDKP:AuctionBidTimer()
       self.bidItem = nil
     end
   else
-    self:MessageGroup(("%d..."):format(30-self.bidItem.elapsed))
+    self:MessageGroup(("%d..."):format(self.db.profile.auctionlength-self.bidItem.elapsed))
   end
 end
 
