@@ -25,44 +25,6 @@ TODO:
 
 ]]
 
--- High resolution timer, adds milliseconds to the regular timestamp from time()
-HighResTimer = {
-  Get = function(self)
-    return (self.TimeDelta and self.TimeStart + GetTime() - self.TimeDelta) or time()
-  end,
-
-  OnUpdate = function(self)
-    local t = time()
-    local gt = GetTime()
-    if (self.LastTime == nil) then
-      self.LastTime = t
-      self.LastGameTime = gt
-      return
-    end
-
-    if (t > self.LastTime) then
-      local gap = gt - self.LastGameTime
-      if (self.TimeDelta == nil or gap < self.TimeGap or math.floor(self:Get(self)) ~= t) then
-        self.TimeStart = t
-        self.TimeDelta = gt
-        self.TimeGap = gap
-      end
-      self.LastTime = nil
-      self.LastGameTime = nil
-    end
-  end,
-
-  Initialize = function(self)
-    self.Frame = CreateFrame("Frame")
-    self.Frame:SetScript("OnUpdate", function() self:OnUpdate() end)
-  end
-}
-HighResTimer:Initialize()
-
-function EminentDKP:GetTime()
-  return HighResTimer:Get()
-end
-
 -- All the meter windows
 local windows = {}
 
@@ -1722,7 +1684,8 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
       self:InformPlayer("auction",{ 
         guid=self.bidItem.srcGUID, 
         slot=self.bidItem.slotNum, 
-        start=self.bidItem.start
+        timeleft=(self.bidItem.ending - GetTime()),
+        window=self.db.profile.auctionlength,
       },sender)
     end
   end
@@ -2470,17 +2433,21 @@ function EminentDKP:CheckGroupPlayers()
   if GetNumRaidMembers() > 0 then
     for d = 1, GetNumRaidMembers() do
       local name = UnitName("raid"..d)
-      if name and not self:PlayerExistsInPool(name) then
+      if name and UnitExists(name) and not self:PlayerExistsInPool(name) then
         local classname = select(2,UnitClass(name))
-        self:CreateAddPlayerSyncEvent(name,classname)
+        if classname then
+          self:CreateAddPlayerSyncEvent(name,classname)
+        end
       end
     end
   elseif GetNumPartyMembers() > 0 then
     for d = 1, GetNumPartyMembers() do
       local name = UnitName("party"..d)
-      if name and not self:PlayerExistsInPool(name) then
+      if name and UnitExists(name) and not self:PlayerExistsInPool(name) then
         local classname = select(2,UnitClass(name))
-        self:CreateAddPlayerSyncEvent(name,classname)
+        if classname then
+          self:CreateAddPlayerSyncEvent(name,classname)
+        end
       end
     end
   end
@@ -2775,10 +2742,15 @@ function EminentDKP:AdminStartAuction()
           bids={}, 
           slotNum=slot,
           srcGUID=guid,
-          start=self:GetTime(),
+          ending=(GetTime() + self.db.profile.auctionlength),
         }
         self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
-        self:InformPlayer("auction",{ guid = self.bidItem.srcGUID, slot = gui_slot, start = self.bidItem.start })
+        self:InformPlayer("auction",{
+          guid = self.bidItem.srcGUID,
+          slot = gui_slot,
+          timeleft = self.db.profile.auctionlength,
+          window = self.db.profile.auctionlength,
+        })
         
         if not is_in_party() then
           sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
@@ -3155,7 +3127,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
     -- Start an auction
     if not self:AmMasterLooter() then auction_active = true end
     self:ShowAuctionItems(data.guid)
-    self:StartAuction(data.slot,data.start)
+    self:StartAuction(data.slot,data.timeleft,data.window)
   elseif notifyType == "auctioncancel" then
     -- Cancel an auction
     if not self:AmMasterLooter() then auction_active = false end

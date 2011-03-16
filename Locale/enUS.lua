@@ -85,9 +85,10 @@ L["Maximum Mode Events"] = "Maximum Mode Events"
 L["The maximum number of events to include for certain modes."] = "The maximum number of events to include for certain modes."
 L["Maximum Player Events"] = "Maximum Player Events"
 L["The maximum number of events to show for a specific player."] = "The maximum number of events to show for a specific player."
-
 L["Hide Raid Messages"] = "Hide Raid Messages"
 L["Prevents raid messages sent by EminentDKP from being shown."] = "Prevents raid messages sent by EminentDKP from being shown."
+L["Auction Length"] = "Auction Length"
+L["The number of seconds an auction will run."] = "The number of seconds an auction will run."
 
 L["Officer Options"] = "Officer Options"
 L["Disenchanter"] = "Disenchanter"

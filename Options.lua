@@ -65,6 +65,7 @@ EminentDKP.defaults = {
     disenchanter = "",
     itemrarity = 3,
     expiretime = 30,
+    auctionlength = 30,
     hidesolo = false,
     hideparty = false,
     hidepvp = true,
@@ -656,6 +657,17 @@ EminentDKP.options = {
 					set= function(self, val) EminentDKP.db.profile.expiretime = val end,
 					order= 3,
       	},
+      	auctionlength = {
+      	  type= "range",
+					name= L["Auction Length"],
+					desc= L["The number of seconds an auction will run."],
+					min= 15,
+          max= 45,
+          step= 5,
+					get= function() return EminentDKP.db.profile.auctionlength end,
+					set= function(self, val) EminentDKP.db.profile.auctionlength = val end,
+					order= 4,
+      	},
       	guildgroup = {
       	  type= "toggle",
 					name= L["Guild Group"],
@@ -664,7 +676,7 @@ EminentDKP.options = {
 					set= function(self, val)
 					  EminentDKP.db.profile.guildgroup = not EminentDKP.db.profile.guildgroup
 					end,
-					order= 4,
+					order= 5,
       	},
       	disablepvp = {
       	  type= "toggle",
@@ -674,7 +686,7 @@ EminentDKP.options = {
 					set= function(self, val)
 					  EminentDKP.db.profile.disablepvp = not EminentDKP.db.profile.disablepvp
 					end,
-					order= 5,
+					order= 6,
       	},
       	disableparty = {
       	  type= "toggle",
@@ -684,7 +696,7 @@ EminentDKP.options = {
 					set= function(self, val)
 					  EminentDKP.db.profile.disableparty = not EminentDKP.db.profile.disableparty
 					end,
-					order= 6,
+					order= 7,
       	},
       },
     },

@@ -212,9 +212,10 @@ end
 
 -- This updates the timer bar on an item auction
 local function TimerUpdate(frame)
-  local left = math.min(30,frame:GetParent().endtime - EminentDKP:GetTime())
+  local left = frame:GetParent().endtime - GetTime()
   if left > 0 then
-    frame.spark:SetPoint("CENTER", frame, "LEFT", (left / 30) * frame:GetWidth(), 0)
+    local max = select(2,frame:GetMinMaxValues())
+    frame.spark:SetPoint("CENTER", frame, "LEFT", (left / max) * frame:GetWidth(), 0)
     frame:SetValue(left)
   else
     frame.spark:Hide()
@@ -310,7 +311,6 @@ local function CreateNewItemFrame()
   status:SetScript("OnUpdate", TimerUpdate)
   status:SetFrameLevel(status:GetFrameLevel()-1)
   status:SetStatusBarColor(.8, .8, .8, .9)
-  status:SetMinMaxValues(0, 30)
   status:Hide()
   itemframe.status = status
   
@@ -489,13 +489,14 @@ function EminentDKP:CancelAuction(slot)
 end
 
 -- Start the timer and show bid box/button for an item
-function EminentDKP:StartAuction(slot,start)
+function EminentDKP:StartAuction(slot,timeleft,window)
   local frame = GetItemFrameBySlot(slot)
   frame.bid:Show()
   frame.bid.bidamt:SetBackdropBorderColor(0.5,0.5,0.5,1)
   frame.bid.bidamt:Show()
-  frame.endtime = start + 30
-  frame.status:SetValue(30)
+  frame.endtime = GetTime() + timeleft
+  frame.status:SetMinMaxValues(0, window)
+  frame.status:SetValue(timeleft)
   frame.status:Show()
   frame.status.spark:Show()
   frame.winner:Hide()
