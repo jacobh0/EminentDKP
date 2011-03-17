@@ -203,6 +203,7 @@ local function VerifyBid(frame)
   else
     frame:SetText(string.format("%d",value))
   end
+  frame:SetBackdropBorderColor(0.5,0.5,0.5,1)
 end
 
 -- This clears the focus of a frame (editbox)

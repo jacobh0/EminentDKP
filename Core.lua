@@ -3219,6 +3219,8 @@ function EminentDKP:ProcessSlashCmd(input)
     self:AdminStartAuction()
   elseif command == 'options' then
     InterfaceOptionsFrame_OpenToCategory("EminentDKP")
+  elseif command == 'action' then
+    self:CreateActionPanel()
   elseif command == 'version' then
     local say_what = "Current version is "..self:GetVersion()
     if self:GetNewestVersion() ~= self:GetVersion() then
