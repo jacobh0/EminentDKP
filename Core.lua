@@ -2483,14 +2483,14 @@ function EminentDKP:DisableCheck()
   return false
 end
 
--- Tracking for hide when solo option and hide in party option
+-- Tracking for parties
 function EminentDKP:PARTY_MEMBERS_CHANGED()
   self:HideMeterCheck()
   self:DisableCheck()
   self:ScheduleGroupCheck()
 end
 
--- Tracking for hide when solo option
+-- Tracking for raids
 function EminentDKP:RAID_ROSTER_UPDATE()
   self:HideMeterCheck()
   self:ScheduleGroupCheck()
@@ -2500,10 +2500,14 @@ end
 function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self.lootMethod, self.masterLooterPartyID, self.masterLooterRaidID = GetLootMethod()
   self.amMasterLooter = (self.lootMethod == 'master' and self.masterLooterPartyID == 0)
-  if is_in_party() then 
-    self.masterLooterName = UnitName("party"..tostring(self.masterLooterPartyID))
+  if not self.amMasterLooter then
+    if is_in_party() then 
+      self.masterLooterName = UnitName("party"..tostring(self.masterLooterPartyID))
+    else
+      self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
+    end
   else
-    self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
+    self.masterLooterName = self.myName
   end
   
   self:ScheduleGroupCheck()
