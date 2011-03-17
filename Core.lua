@@ -2453,6 +2453,16 @@ function EminentDKP:CheckGroupPlayers()
   end
 end
 
+-- Player names aren't always immediately available, so we have to schedule
+-- the group check so it gives time for the UI to update
+function EminentDKP:ScheduleGroupCheck()
+  -- This only needs to be run by the masterlooter
+  if not self:AmMasterLooter() or not self:IsEnabled() then return end
+  
+  self:CancelTimer(self.groupCheckTimer,true)
+  self.groupCheckTimer = self:ScheduleTimer("CheckGroupPlayers",2)
+end
+
 -- Tracking for hide when solo option and hide in party option
 function EminentDKP:PARTY_MEMBERS_CHANGED()
   if is_in_party() then
@@ -2466,7 +2476,7 @@ function EminentDKP:PARTY_MEMBERS_CHANGED()
     enabled = not is_in_party()
   end
   
-  self:CheckGroupPlayers()
+  self:ScheduleGroupCheck()
 end
 
 -- Tracking for hide when solo option
@@ -2475,7 +2485,7 @@ function EminentDKP:RAID_ROSTER_UPDATE()
     self:ToggleMeters(not is_solo())
   end
   
-  self:CheckGroupPlayers()
+  self:ScheduleGroupCheck()
 end
 
 -- Keep track of the loot method
@@ -2488,7 +2498,7 @@ function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
     self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
   end
   
-  self:CheckGroupPlayers()
+  self:ScheduleGroupCheck()
 end
 
 -- Keep track of the last container we opened
@@ -2769,10 +2779,10 @@ function EminentDKP:AdminStartAuction()
 end
 
 function EminentDKP:AuctionBidTimer()
-  -- Add 5 seconds to the elapsed time
+  -- Subtract 5 seconds from the remaining time
   self.bidItem.remaining = self.bidItem.remaining - 5
   
-  -- If time is up, then close it
+  -- If no more time remaining: close it
   if self.bidItem.remaining == 0 then
     auction_active = false
     self:CancelTimer(self.bidTimer)
