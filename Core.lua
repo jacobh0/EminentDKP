@@ -3096,9 +3096,15 @@ function EminentDKP:ProcessInformation(prefix, message, distribution, sender)
   self:ActuateNotification(notifyType,data)
 end
 
+local cache_start
+
 function EminentDKP:RunCachedNotifications()
   while #(cached_notifications) > 0 do
     local n = tremove(cached_notifications)
+    if n.d.timeleft then
+      -- Adjust timeleft to account for the delay in processing
+      n.d.timeleft = n.d.timeleft - (GetTime() - cache_start)
+    end
     self:ActuateNotification(n.t,n.d)
   end
 end
@@ -3107,6 +3113,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
   -- We don't have a lootlist, so request it before we run this
   if notifyType ~= "lootlist" and data.guid then
     if not self.auctionItems[data.guid] then
+      cache_start = GetTime()
       table.insert(cached_notifications,1,{t=notifyType,d=data})
       self:SendCommand("lootlist",data.guid)
       return
