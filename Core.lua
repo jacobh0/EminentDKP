@@ -48,6 +48,8 @@ local syncing = false
 
 local lastContainerName = nil
 
+local in_combat = false
+
 -- Whether or not officer functionality is allowed to run
 local enabled = true
 
@@ -753,7 +755,8 @@ function EminentDKP:ApplySettings(win)
   -- Don't show window in a PvP instance, option.
   if (self.db.profile.hidesolo and is_solo()) or 
      (self.db.profile.hidepvp and is_in_pvp()) or 
-     (self.db.profile.hideparty and is_in_party()) then
+     (self.db.profile.hideparty and is_in_party()) or 
+     (self.db.profile.hidecombat and in_combat) then
     win:Hide()
   else
     win:Show()
@@ -2338,10 +2341,8 @@ function EminentDKP:IsEnabled()
 end
 
 function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, guild)
-  -- if disable in party, and in a party, ignore
-  if self.db.profile.disableparty and is_in_party() then return end
-  -- if disable in pvp, and in pvp, ignore
-  if self.db.profile.disablepvp and is_in_pvp() then return end
+  -- if disabled for another reason, ignore
+  if self:DisableCheck() then return end
   
   enabled = (self.db.profile.guildgroup and guild or true)
 end
@@ -2370,19 +2371,16 @@ end
 -- Keep track of being in PVP
 function EminentDKP:PLAYER_ENTERING_WORLD()
   -- Hide the meters if we're PVPing and we want it hidden
-  if self.db.profile.hidepvp then
-    self:ToggleMeters(not is_in_pvp())
-  end
-  if self.db.profile.disablepvp then
-    enabled = not is_in_pvp()
-  end
+  self:HideMeterCheck()
+  self:DisableCheck()
 end
 
 -- Check if we're not dead and group is not in combat, then we're out of combat
 function EminentDKP:CheckCombatStatus()
   if not UnitIsDead("player") and not IsGroupInCombat() then
     self:CancelTimer(self.combatCheckTimer,true)
-    self:ToggleMeters(true)
+    in_combat = false
+    self:HideMeterCheck()
   end
 end
 
@@ -2397,8 +2395,9 @@ end
 function EminentDKP:PLAYER_REGEN_DISABLED()
   -- Hide meters if we're in combat and want it hidden
   if self.db.profile.hidecombat then
+    in_combat = true
     self:CancelTimer(self.combatCheckTimer,true)
-    self:ToggleMeters(false)
+    self:HideMeterCheck()
   end
   if not self:AmMasterLooter() or not self:IsEnabled() then return end
   
@@ -2463,28 +2462,37 @@ function EminentDKP:ScheduleGroupCheck()
   self.groupCheckTimer = self:ScheduleTimer("CheckGroupPlayers",2)
 end
 
+function EminentDKP:HideMeterCheck()
+  if (self.db.profile.hideparty and is_in_party()) or 
+     (self.db.profile.hidepvp and is_in_pvp()) or 
+     (self.db.profile.hidesolo and is_solo()) or 
+     (self.db.profile.hidecombat and in_combat) then
+    self:ToggleMeters(false)
+    return
+  end
+  self:ToggleMeters(true)
+end
+
+function EminentDKP:DisableCheck()
+  if (self.db.profile.disableparty and is_in_party()) or
+     (self.db.profile.disablepvp and is_in_pvp()) then
+    enabled = false
+    return true
+  end
+  enabled = true
+  return false
+end
+
 -- Tracking for hide when solo option and hide in party option
 function EminentDKP:PARTY_MEMBERS_CHANGED()
-  if is_in_party() then
-    if self.db.profile.hideparty then
-      self:ToggleMeters(not is_in_party())
-    end
-  elseif self.db.profile.hidesolo then
-    self:ToggleMeters(not is_solo())
-  end
-  if self.db.profile.disableparty then
-    enabled = not is_in_party()
-  end
-  
+  self:HideMeterCheck()
+  self:DisableCheck()
   self:ScheduleGroupCheck()
 end
 
 -- Tracking for hide when solo option
 function EminentDKP:RAID_ROSTER_UPDATE()
-  if self.db.profile.hidesolo then
-    self:ToggleMeters(not is_solo())
-  end
-  
+  self:HideMeterCheck()
   self:ScheduleGroupCheck()
 end
 
