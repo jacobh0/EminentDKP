@@ -607,33 +607,7 @@ function EminentDKP:ReloadWindows()
   if not next(sets) then
     self:ReloadSets(false)
   else
-    -- Verify the "Today" set is actually today
-    local today = GetTodayDate()
-    if sets.today.date ~= today then
-      -- Has the Today set even been used yet?
-      if #(sets.today.players) > 0 then
-        local oldtoday = {}
-        self:tcopy(oldtoday, sets.today)
-        oldtoday.name = oldtoday.date
-        oldtoday.sortnum = 3
-        sets[oldtoday.date] = oldtoday
-        sets.today = createSet(L["Today"])
-        sets.today.date = today
-        sets.today.sortnum = 2
-      
-        self:VerifySet(sets.today)
-      else
-        sets.today.date = date
-      end
-    end
-    -- Prune any sets that extend beyond our given timeframe
-    for name, set in pairs(sets) do
-      if set.sortnum == 3 then
-        if GetDaysSince(set.starttime) > self.db.profile.daystoshow then
-          sets[name] = nil
-        end
-      end
-    end
+    self:VerifyTodaySet()
   end
 
   -- Re-create windows
@@ -689,8 +663,41 @@ function EminentDKP:ReloadSets(updatedisplays)
   end
 end
 
+function EminentDKP:VerifyTodaySet()
+  -- Verify the "Today" set is actually today
+  local today = GetTodayDate()
+  if sets.today.date ~= today then
+    -- Has the Today set even been used yet?
+    if #(sets.today.players) > 0 then
+      local oldtoday = {}
+      self:tcopy(oldtoday, sets.today)
+      oldtoday.name = oldtoday.date
+      oldtoday.sortnum = 3
+      sets[oldtoday.date] = oldtoday
+      sets.today = createSet(L["Today"])
+      sets.today.date = today
+      sets.today.sortnum = 2
+    
+      self:VerifySet(sets.today)
+    else
+      sets.today.date = date
+    end
+  end
+  -- Prune any sets that extend beyond our given timeframe
+  for name, set in pairs(sets) do
+    if set.sortnum == 3 then
+      if GetDaysSince(set.starttime) > self.db.profile.daystoshow then
+        sets[name] = nil
+      end
+    end
+  end
+end
+
 -- Only update the sets that have changed in the last sync
 function EminentDKP:UpdateSyncedDays()
+  -- Ensure the today set is proper
+  self:VerifyTodaySet()
+  
   local seen = {}
   for date,events in pairs(synced_dates) do
     local set
