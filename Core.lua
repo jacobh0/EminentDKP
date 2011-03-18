@@ -723,6 +723,7 @@ function EminentDKP:UpdateSyncedDays()
       set.changed = true
     end
   end
+  wipe(sets.alltime.events)
   sets.alltime.changed = true
   wipe(synced_dates)
   self:VerifyAllSets()
