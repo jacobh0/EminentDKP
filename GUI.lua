@@ -72,7 +72,7 @@ function EminentDKP:CreateAuctionFrame()
   auction_frame.title:SetScript("OnMouseDown", move)
   auction_frame.title:SetScript("OnMouseUp", stopMove)
   auction_frame.title:SetPoint("TOPLEFT", auction_frame, "TOPLEFT")
-  auction_frame.title:SetPoint("BOTTOMLEFT", auction_frame, "BOTTOMLEFT")
+  auction_frame.title:SetPoint("BOTTOMRIGHT", auction_frame, "BOTTOMRIGHT")
   
   -- Register with LibWindow-1.1
   libwindow.RegisterConfig(auction_frame, settings)
@@ -110,8 +110,6 @@ function EminentDKP:ApplyAuctionFrameSettings()
   auction_frame.title:SetBackdrop(auction_titlebackdrop)
   local color = p.title.color
   auction_frame.title:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
-  auction_frame.title:SetWidth(p.itemwidth)
-  auction_frame.title:SetHeight(p.itemheight * .75)
   
   -- Auction frame background
   if p.enablebackground then
@@ -1332,8 +1330,8 @@ function meter:Update(window)
       local bar = window.bargroup:GetBar(barid)
       
       if bar then
-        bar:SetMaxValue(window.metadata.maxvalue or 1)
         bar:SetValue(data.value)
+        bar:SetMaxValue(window.metadata.maxvalue or 1)
       else
         -- Initialization of bars.
         bar = meter:CreateBar(window, barid, barlabel, data.value, window.metadata.maxvalue or 1, data.icon, false)
