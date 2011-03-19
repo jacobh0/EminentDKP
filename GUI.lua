@@ -417,6 +417,10 @@ function EminentDKP:ReApplyItemFrameSettings()
     ApplyItemFrameSettings(frame)
     frame:SetPoint("TOPLEFT", i > 1 and item_frames[i-1] or auction_frame.title, "BOTTOMLEFT", 0, -(self.db.profile.auctionframe.itemspacing))
   end
+  -- Don't forget about recycled frames
+  for i, frame in ipairs(recycled_item_frames) do
+    ApplyItemFrameSettings(frame)
+  end
 end
 
 -- Display all the available loot for a given GUID
