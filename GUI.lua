@@ -440,26 +440,39 @@ function EminentDKP:ShowAuctionItems(guid)
     auction_frame.title:Show()
   end
   auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(self.auctionItems[guid].name))
+  local need_reshow = false
   for i, item in ipairs(self.auctionItems[guid].items) do
     local f = GetItemFrame()
     local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(item.info)
     f.item = item.info
     f.slot = item.slot
     
-    f.button:SetNormalTexture(iTexture)
-    f.button.link = iLink
+    local color
     
-    local color = ITEM_QUALITY_COLORS[iQuality]
+    if not iName then
+      f.button:SetNormalTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+      f.button.link = nil
+      
+      color = ITEM_QUALITY_COLORS[1]
+      f.loot:SetText("(Querying Item)")
+      
+      need_reshow = true
+    else
+      f.button:SetNormalTexture(iTexture)
+      f.button.link = iLink
+      
+      color = ITEM_QUALITY_COLORS[iQuality]
+      f.loot:SetText(iName)
+    end
+    
     f.loot:SetVertexColor(color.r, color.g, color.b)
-    f.loot:SetText(iName)
-    
     f:SetBackdropBorderColor(color.r, color.g, color.b, 1)
     f.buttonborder:SetBackdropBorderColor(color.r, color.g, color.b, 1)
-    
     f.status:SetStatusBarColor(color.r, color.g, color.b, .7)
     
     f:Show()
   end
+  if need_reshow then self:ScheduleTimer("ReShowAuctionItems",1,guid) end
   auction_guid = guid
   self:AdjustAuctionFrameBackgroundHeight()
 end
@@ -511,6 +524,11 @@ function EminentDKP:ShowAuctionDisenchant(slot)
   HideBidApparatus(frame)
   frame.winner:SetText(L["Disenchanted"])
   frame.winner:Show()
+end
+
+function EminentDKP:ReShowAuctionItems(guid)
+  self:RecycleAuctionItems(false)
+  self:ShowAuctionItems(guid)
 end
 
 -- Label an item with a winner
