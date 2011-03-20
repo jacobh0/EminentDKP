@@ -3140,8 +3140,8 @@ function EminentDKP:ActuateNotification(notifyType,data)
     for i,item in ipairs(data.items) do
       GetItemInfo(item.info)
     end
-    -- Wait 1.5s to ensure the items are in the itemcache
-    self:ScheduleTimer("RunCachedNotifications",1.5)
+    -- Wait a second to ensure the items are in the itemcache
+    self:ScheduleTimer("RunCachedNotifications",1)
   elseif notifyType == "adjustment" then
     if data.receiver == self.myName then
       -- We received an adjustment
