@@ -568,7 +568,7 @@ function itemMode:PopulateData(win, set)
 		d.label = select(2, GetItemInfo(event.extraInfo)) or "(Querying Item)"
 		d.value = event.value
 		d.valuetext = FormatValueText(EminentDKP:FormatNumber(event.value), self.metadata.columns.DKP)
-		d.icon = select(10, GetItemInfo(event.extraInfo))
+		d.icon = select(10, GetItemInfo(event.extraInfo)) or "Interface\\Icons\\INV_Misc_QuestionMark"
 		
 		if d.value > max then
 			max = d.value

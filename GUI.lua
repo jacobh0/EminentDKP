@@ -468,17 +468,17 @@ function EminentDKP:ShowAuctionItems(guid)
     auction_frame.title:Show()
   end
   auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(self.auctionItems[guid].name))
-  local need_reshow = false
+  local refill = false
   for i, item in ipairs(self.auctionItems[guid].items) do
     local f = GetItemFrame()
     f.item = item.info
     f.slot = item.slot
     
-    if not self:FillOutItemFrame(f) then need_reshow = true end
+    if not self:FillOutItemFrame(f) then refill = true end
     
     f:Show()
   end
-  if need_reshow then self:ScheduleTimer("ReFillItemFrames",1) end
+  if refill then self:ScheduleTimer("ReFillItemFrames",1) end
   auction_guid = guid
   self:AdjustAuctionFrameBackgroundHeight()
 end
@@ -534,11 +534,11 @@ end
 
 -- Attempts to fill out the item frames with item data
 function EminentDKP:ReFillItemFrames()
-  local need_reshow = false
+  local refill = false
   for i, frame in ipairs(item_frames) do
-    if not self:FillOutItemFrame(frame) then need_reshow = true end
+    if not self:FillOutItemFrame(frame) then refill = true end
   end
-  if need_reshow then self:ScheduleTimer("ReFillItemFrames",1) end
+  if refill then self:ScheduleTimer("ReFillItemFrames",1) end
 end
 
 -- Label an item with a winner
