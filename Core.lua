@@ -680,7 +680,7 @@ function EminentDKP:VerifyTodaySet()
     
       self:VerifySet(sets.today)
     else
-      sets.today.date = date
+      sets.today.date = today
     end
   end
   -- Prune any sets that extend beyond our given timeframe
