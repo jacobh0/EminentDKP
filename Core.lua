@@ -35,6 +35,7 @@ local syncing = false
 local lastContainerName = nil
 
 local in_combat = false
+local in_guild_group = false
 
 -- Whether or not officer functionality is allowed to run
 local enabled = true
@@ -2334,11 +2335,9 @@ function EminentDKP:IsEnabled()
   return enabled and not self:NeedSync() and not tempdisabled
 end
 
-function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, guild)
-  -- if disabled for another reason, ignore
-  if self:DisableCheck() then return end
-  
-  enabled = (self.db.profile.guildgroup and guild or true)
+function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, is_guild)
+  in_guild_group = is_guild
+  self:DisableCheck()
 end
 
 -- Keep track of any creature deaths
@@ -2469,12 +2468,11 @@ end
 
 function EminentDKP:DisableCheck()
   if (self.db.profile.disableparty and is_in_party()) or
-     (self.db.profile.disablepvp and is_in_pvp()) then
+     (self.db.profile.disablepvp and is_in_pvp()) or 
+     (self.db.profile.guildgroup and not in_guild_group) then
     enabled = false
-    return true
   end
   enabled = true
-  return false
 end
 
 -- Tracking for parties
