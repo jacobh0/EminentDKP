@@ -423,8 +423,8 @@ function EminentDKP:ReApplyItemFrameSettings()
   end
 end
 
-function EminentDKP:FillOutItemFrame(frame)
-  local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(frame.item)
+function EminentDKP:FillOutItemFrame(f)
+  local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(f.item)
   local color
   local success = true
   
