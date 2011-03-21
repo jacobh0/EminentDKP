@@ -614,8 +614,8 @@ EminentDKP.options = {
 				},
 				hideraidmessages = {
           type= "toggle",
-          name= L["Hide Raid Messages"],
-          desc= L["Prevents raid messages sent by EminentDKP from being shown."],
+          name= L["Hide Chat Messages"],
+          desc= L["Prevents chat messages sent by EminentDKP from being shown."],
           get= function() return EminentDKP.db.profile.hideraidmessages end,
           set= function()
             EminentDKP.db.profile.hideraidmessages = not EminentDKP.db.profile.hideraidmessages

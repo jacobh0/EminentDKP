@@ -1912,7 +1912,7 @@ function EminentDKP:PlayerExistsInPool(name)
 end
 
 -- Update a player's last raid day
-function EminentDKP:UpdateLastPlayerRaid(pid,datetime)
+function EminentDKP:UpdatePlayerLastRaid(pid,datetime)
   local player = self:GetPlayerByID(pid)
   player.lastRaid = datetime
   player.active = true
@@ -2143,7 +2143,7 @@ function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
   local dividend = (amount/#(players))
   for i,pid in ipairs(players) do
     self:CreatePlayerEarning(pid,cid,dividend,true)
-    self:UpdateLastPlayerRaid(pid,dtime)
+    self:UpdatePlayerLastRaid(pid,dtime)
   end
   
   return cid
@@ -2162,13 +2162,13 @@ function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
   self:CreatePlayerDeduction(pid,cid,amount)
   
   -- Update receiver's last raid
-  self:UpdateLastPlayerRaid(pid,dtime)
+  self:UpdatePlayerLastRaid(pid,dtime)
   
   -- Then create all the necessary earnings for players
   local dividend = (amount/#(players))
   for i,rpid in ipairs(players) do
     self:CreatePlayerEarning(rpid,cid,dividend,true)
-    self:UpdateLastPlayerRaid(rpid,dtime)
+    self:UpdatePlayerLastRaid(rpid,dtime)
   end
   
   return cid
@@ -2190,7 +2190,7 @@ function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
   self:CreatePlayerEarning(ptid,cid,amount,false)
   
   -- Update sender's last raid
-  self:UpdateLastPlayerRaid(pfid,dtime)
+  self:UpdatePlayerLastRaid(pfid,dtime)
   
   return cid
 end
@@ -2274,7 +2274,7 @@ function EminentDKP:CreateVanityResetEvent(name,dtime)
   local cid = self:CreateEvent(pid,"vanityreset","","","",amount,dtime)
   
   -- Update player's last raid
-  self:UpdateLastPlayerRaid(pid,dtime)
+  self:UpdatePlayerLastRaid(pid,dtime)
   
   -- Then create the necessary deduction for the player
   self:CreatePlayerVanityDeduction(pid,cid,amount)
@@ -2730,7 +2730,7 @@ function EminentDKP:WhisperCheck(who, to)
     sendchat(L["Current DKP:"].. ' '..self:StdNumber(data.currentDKP), to, 'whisper')
     sendchat(L["Lifetime DKP:"].. ' '..self:StdNumber(data.earnedDKP), to, 'whisper')
     sendchat(L["Vanity DKP:"].. ' '..self:StdNumber(data.currentVanityDKP), to, 'whisper')
-    sendchat(L["Last Raid: %d day(s) ago."]:format(GetDaysSince(data.lastRaid)), to, 'whisper')
+    sendchat(L["Last Seen: %d day(s) ago."]:format(GetDaysSince(data.lastRaid)), to, 'whisper')
   else
     sendchat(L["%s does not exist in the DKP pool."]:format(who), to, 'whisper')
   end
@@ -3274,7 +3274,7 @@ function EminentDKP:CHAT_MSG_WHISPER(message, from)
     sendchat("$ lifetime -- " .. L["Display the lifetime earned dkp standings"], from, 'whisper')
     sendchat("$ bid X -- " .. L["Place a bid of X DKP on the active auction"] .. " **", from, 'whisper')
     sendchat("$ transfer X Y -- " .. L["Transfer X DKP to player Y"] .. " **", from, 'whisper')           
-    sendchat("** " .. L["These commands can only be sent to the master looter and only during a raid"], from, 'whisper')
+    sendchat("** " .. L["These commands can only be sent to the master looter while in a group"], from, 'whisper')
   else
     sendchat(L["Unrecognized command. Whisper %s for a list of valid commands."]:format("'$ help'"), from, 'whisper')
   end
