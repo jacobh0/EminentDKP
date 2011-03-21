@@ -1686,7 +1686,8 @@ function barPrototype:SetValue(val)
 	else
 		displayMax = self.maxValue
 	end
-	local amt = min(1, val / displayMax)
+	-- Modified, allows for 0/0 == 100%
+	local amt = (val == displayMax and 1 or min(1, val / displayMax))
 	if amt == 1 or amt == 0 then
 		self.spark:Hide()
 	else

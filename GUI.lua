@@ -1362,14 +1362,12 @@ function meter:Update(window)
       local bar = window.bargroup:GetBar(barid)
       
       if bar then
-        bar:SetValue(data.value)
         bar:SetMaxValue(window.metadata.maxvalue or 1)
+        bar:SetValue(data.value)
       else
         -- Initialization of bars.
         bar = meter:CreateBar(window, barid, barlabel, data.value, window.metadata.maxvalue or 1, data.icon, false)
-        if data.icon then
-          bar:ShowIcon()
-        end
+        
         bar:EnableMouse()
         bar.id = data.id
         bar:SetScript("OnEnter", function(bar) BarEnter(window, barid, barlabel) end)
@@ -1478,6 +1476,11 @@ function meter:OnMouseWheel(window, frame, direction)
 end
 
 function meter:CreateBar(window, name, label, value, maxvalue, icon, o)
+  if icon then 
+    if not window.bargroup:IsIconShown() then
+      window.bargroup:ShowIcon()
+    end
+  elseif window.bargroup:IsIconShown() then window.bargroup:HideIcon() end
   local bar = window.bargroup:NewCounterBar(name, label, value, maxvalue, icon, o)
   bar:EnableMouseWheel(true)
   bar:SetScript("OnMouseWheel", function(f, d) meter:OnMouseWheel(window, f, d) end)
