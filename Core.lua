@@ -2471,6 +2471,7 @@ function EminentDKP:DisableCheck()
      (self.db.profile.disablepvp and is_in_pvp()) or 
      (self.db.profile.guildgroup and not in_guild_group) then
     enabled = false
+    return
   end
   enabled = true
 end
