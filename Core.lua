@@ -7,23 +7,9 @@ local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 
-VERSION = '2.1.0'
+local VERSION = '2.1.0'
 local newest_version = ''
 local needs_update = false
-
-local function Debug(message)
-  if true then
-    EminentDKP:Print(message)
-  end
-end
-
---[[
-
-TODO:
-
-1. Organize meter display code and move to GUI.lua
-
-]]
 
 -- All the meter windows
 local windows = {}
