@@ -2336,11 +2336,6 @@ function EminentDKP:IsEnabled()
 end
 
 function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, is_guild)
-  if is_guild then
-    print("am in guild group")
-  else
-    print("am NOT in guild group")
-  end
   in_guild_group = is_guild
   self:DisableCheck()
 end
