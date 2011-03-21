@@ -675,6 +675,7 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.guildgroup end,
 					set= function(self, val)
 					  EminentDKP.db.profile.guildgroup = not EminentDKP.db.profile.guildgroup
+					  EminentDKP:DisableCheck()
 					end,
 					order= 5,
       	},
@@ -685,6 +686,7 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.disablepvp end,
 					set= function(self, val)
 					  EminentDKP.db.profile.disablepvp = not EminentDKP.db.profile.disablepvp
+					  EminentDKP:DisableCheck()
 					end,
 					order= 6,
       	},
@@ -695,6 +697,7 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.disableparty end,
 					set= function(self, val)
 					  EminentDKP.db.profile.disableparty = not EminentDKP.db.profile.disableparty
+					  EminentDKP:DisableCheck()
 					end,
 					order= 7,
       	},
