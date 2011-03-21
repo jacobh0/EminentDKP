@@ -454,8 +454,8 @@ end
 -- Display all the available loot for a given GUID
 function EminentDKP:ShowAuctionItems(guid)
   if auction_guid == guid then
-    -- If the # of items has decreased, re-draw the lootlist
-    if #(self.auctionItems[guid].items) < #(item_frames) then
+    -- If the lootlist has changed, re-list the items
+    if self.auctionItems[guid].changed then
       self:RecycleAuctionItems(false)
     else
       return
@@ -479,6 +479,7 @@ function EminentDKP:ShowAuctionItems(guid)
     f:Show()
   end
   if refill then self:ScheduleTimer("ReFillItemFrames",1) end
+  self.auctionItems[guid].changed = false
   auction_guid = guid
   self:AdjustAuctionFrameBackgroundHeight()
 end
@@ -492,6 +493,7 @@ local function GetItemFrameBySlot(slot)
   return nil
 end
 
+-- Hide bidbox and button for an item frame
 local function HideBidApparatus(frame)
   frame.bid:Hide()
   frame.bid.bidamt:Hide()
@@ -499,7 +501,7 @@ local function HideBidApparatus(frame)
   frame.status.spark:Hide()
 end
 
--- Cancel the auction for a specified slots
+-- Cancel the auction for a specified slot
 function EminentDKP:CancelAuction(slot)
   local frame = GetItemFrameBySlot(slot)
   HideBidApparatus(frame)
@@ -523,6 +525,7 @@ function EminentDKP:StartAuction(slot,timeleft,window)
   PlaySound("AuctionWindowOpen")
 end
 
+-- Label an item disenchanted
 function EminentDKP:ShowAuctionDisenchant(slot)
   local frame = GetItemFrameBySlot(slot)
   HideBidApparatus(frame)

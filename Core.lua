@@ -3122,6 +3122,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
     local guid = data.guid
     data.guid = nil
     self.auctionItems[guid] = data
+    self.auctionItems[guid].changed = true
     -- Ensures the items showup properly when reported in the auction frame
     for i,item in ipairs(data.items) do
       GetItemInfo(item.info)
