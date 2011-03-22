@@ -2352,7 +2352,7 @@ end
 
 -- Keep track of any creature deaths
 function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
-  if not self:AmOfficer() or not self:IsEnabled() then return end
+  if not self:AmOfficer() then return end
   if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
     table.insert(recent_deaths,1,dstName)
     if #(recent_deaths) > 10 then
@@ -2363,7 +2363,7 @@ end
 
 -- Keep track of any earned achievements
 function EminentDKP:ACHIEVEMENT_EARNED(event, achievementID)
-  if not self:AmOfficer() or not self:IsEnabled() then return end
+  if not self:AmOfficer() then return end
   local achiev_id, achiev_name = GetAchievementInfo(tonumber(achievementID))
   table.insert(recent_achievements,1,achiev_name)
   if #(recent_achievements) > 10 then
@@ -2816,7 +2816,11 @@ function EminentDKP:AuctionBidTimer()
       if self.db.profile.disenchanter ~= "" and eligible_looters[self.db.profile.disenchanter] then
         looter = self.db.profile.disenchanter
       else
-        self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter))
+        if self.db.profile.disenchanter ~= "" then
+          self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter))
+        else
+          self:Print(L["There is no disenchanter assigned."])
+        end
       end
       self:InformPlayer("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = gui_slot })
     else

@@ -238,6 +238,7 @@ L["The DKP amount must not exceed your current DKP."] = "The DKP amount must not
 L["Auction has closed. Determining winner..."] = "Auction has closed. Determining winner..."
 L["No bids received. Disenchanting."] = "No bids received. Disenchanting."
 L["%s was not eligible to receive loot to disenchant."] = "%s was not eligible to receive loot to disenchant."
+L["There is no disenchanter assigned."] = "There is no disenchanter assigned."
 L["A tie was broken with a random roll."] = "A tie was broken with a random roll."
 
 L["%s has won %s for %d DKP!"] = "%s has won %s for %d DKP!"
