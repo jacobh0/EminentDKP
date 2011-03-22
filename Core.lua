@@ -1533,7 +1533,7 @@ end
 
 -- Determine if we are the proposal winner, and if so do the syncing
 function EminentDKP:ProcessRequestProposals(who)
-  if not self:AmOfficer() or self:NeedSync() then return end
+  if not self:AmOfficer() then return end
   if not self.syncProposals[who] then return end
   
   -- First determine who has the latest event version
@@ -1595,8 +1595,7 @@ end
 
 -- Record a proposal to somebody's event request
 function EminentDKP:ProcessSyncProposal(prefix, message, distribution, sender)
-  if not self:AmOfficer() or self:NeedSync() then return end
-  if not self:IsAnOfficer(sender) then return end
+  if not self:AmOfficer() or not self:IsAnOfficer(sender) then return end
   
   local version, person, numbers = strsplit('_',message)
   if not CheckVersionCompatability(version) then return end
@@ -1614,8 +1613,7 @@ end
 -- Acknowledge an event request fulfillment for a person
 function EminentDKP:ProcessSyncFulfill(prefix, message, distribution, sender)
   if sender == self.myName then return end
-  if not self:AmOfficer() or self:NeedSync() then return end
-  if not self:IsAnOfficer(sender) then return end
+  if not self:AmOfficer() or not self:IsAnOfficer(sender) then return end
   local version, person = strsplit('_',message)
   if not CheckVersionCompatability(version) then return end
   
@@ -1627,6 +1625,19 @@ function EminentDKP:ProcessSyncFulfill(prefix, message, distribution, sender)
   end
 end
 
+-- Determine if we can fulfill the needed ranges of events
+function EminentDKP:CanFulfillRanges(range_list)
+  local can = true
+  for i,range in ipairs(range_list) do
+    local start, finish = GetRange(range)
+    if finish > self:GetEventCount() then
+      can = false
+      break
+    end
+  end
+  return can
+end
+
 -- Process an incoming request for missing events
 function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   if sender == self.myName then return end
@@ -1634,20 +1645,19 @@ function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   if not CheckVersionCompatability(version) then return end
   local needed_ranges = { strsplit(',',ranges) }
   
-  if self:AmOfficer() then
-    if not self:NeedSync() then
-      -- If an officer, create a proposal to fulfill this request
-      local numbers = { math.random(1000), math.random(1000), math.random(1000) }
-      self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
-      self.syncProposals[sender] = { }
-    
-      self:SendCommMessage("EminentDKP-SPP",self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
-    end
-  else
-    -- If not an officer, remember which ranges were requested
-    for i,range in ipairs(needed_ranges) do
-      self:LogRequestedEventRange(range)
-    end
+  -- If an officer and can fulfill the needed ranges...
+  if self:AmOfficer() and self:CanFulfillRanges(needed_ranges) then
+    -- Create a proposal to fulfill this request
+    local numbers = { math.random(1000), math.random(1000), math.random(1000) }
+    self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
+    self.syncProposals[sender] = { }
+  
+    self:SendCommMessage("EminentDKP-SPP",self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
+  end
+  
+  -- Remember which ranges were requested
+  for i,range in ipairs(needed_ranges) do
+    self:LogRequestedEventRange(range)
   end
 end
 
@@ -2532,7 +2542,7 @@ end
 function EminentDKP:LOOT_CLOSED()
   if self:AmMasterLooter() and auction_active then
     auction_active = false
-    self:CancelTimer(self.bidTimer)
+    self:CancelTimer(self.bidTimer,true)
     self:MessageGroup(L["Auction cancelled. All bids have been voided."])
     self:InformPlayer("auctioncancel",{
       guid = self.bidItem.srcGUID,
@@ -2803,7 +2813,7 @@ function EminentDKP:AuctionBidTimer()
     if next(self.bidItem.bids) == nil then
       -- No bids received, so disenchant
       self:MessageGroup(L["No bids received. Disenchanting."])
-      if eligible_looters[self.db.profile.disenchanter] then
+      if self.db.profile.disenchanter ~= "" and eligible_looters[self.db.profile.disenchanter] then
         looter = self.db.profile.disenchanter
       else
         self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter))
