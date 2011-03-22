@@ -1533,7 +1533,7 @@ end
 
 -- Determine if we are the proposal winner, and if so do the syncing
 function EminentDKP:ProcessRequestProposals(who)
-  if not self:AmOfficer() or not self:IsEnabled() then return end
+  if not self:AmOfficer() or self:NeedSync() then return end
   if not self.syncProposals[who] then return end
   
   -- First determine who has the latest event version
@@ -1595,7 +1595,7 @@ end
 
 -- Record a proposal to somebody's event request
 function EminentDKP:ProcessSyncProposal(prefix, message, distribution, sender)
-  if not self:AmOfficer() or not self:IsEnabled() then return end
+  if not self:AmOfficer() or self:NeedSync() then return end
   if not self:IsAnOfficer(sender) then return end
   
   local version, person, numbers = strsplit('_',message)
@@ -1614,7 +1614,7 @@ end
 -- Acknowledge an event request fulfillment for a person
 function EminentDKP:ProcessSyncFulfill(prefix, message, distribution, sender)
   if sender == self.myName then return end
-  if not self:AmOfficer() or not self:IsEnabled() then return end
+  if not self:AmOfficer() or self:NeedSync() then return end
   if not self:IsAnOfficer(sender) then return end
   local version, person = strsplit('_',message)
   if not CheckVersionCompatability(version) then return end
@@ -1635,7 +1635,7 @@ function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   local needed_ranges = { strsplit(',',ranges) }
   
   if self:AmOfficer() then
-    if self:IsEnabled() then
+    if not self:NeedSync() then
       -- If an officer, create a proposal to fulfill this request
       local numbers = { math.random(1000), math.random(1000), math.random(1000) }
       self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
@@ -2508,7 +2508,7 @@ end
 
 -- Keep track of the last container we opened
 function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
-  if not self:AmMasterLooter() or not self:IsEnabled() then return end
+  if not self:AmMasterLooter() then return end
   if spell == "Opening" and unit == "player" then
     lastContainerName = target
   end
