@@ -2813,14 +2813,14 @@ function EminentDKP:AuctionBidTimer()
     if next(self.bidItem.bids) == nil then
       -- No bids received, so disenchant
       self:MessageGroup(L["No bids received. Disenchanting."])
-      if self.db.profile.disenchanter ~= "" and eligible_looters[self.db.profile.disenchanter] then
-        looter = self.db.profile.disenchanter
-      else
-        if self.db.profile.disenchanter ~= "" then
-          self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter))
+      if self.db.profile.disenchanter ~= "" then
+        if eligible_looters[self.db.profile.disenchanter] then
+          looter = self.db.profile.disenchanter
         else
-          self:Print(L["There is no disenchanter assigned."])
+          self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter))
         end
+      else
+        self:Print(L["There is no disenchanter assigned."])
       end
       self:InformPlayer("auctiondisenchant",{ guid = self.bidItem.srcGUID, slot = gui_slot })
     else
