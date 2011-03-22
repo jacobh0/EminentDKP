@@ -35,7 +35,7 @@ local syncing = false
 local lastContainerName = nil
 
 local in_combat = false
-local in_guild_group = false
+--local in_guild_group = false
 
 -- Whether or not officer functionality is allowed to run
 local enabled = true
@@ -1031,8 +1031,8 @@ function EminentDKP:OnInitialize()
   -- the settings again to ensure everything is how it should be, an unfortunate work-around...
   self:ScheduleTimer("GlobalApplySettings", 2)
   
-  -- Temporarily disable officer functionality for the first 10seconds, ensures no accidental database recreation
-  self:ScheduleTimer("UndoTempDisable", 10)
+  -- Temporarily disable officer functionality for the first 8 seconds, ensures no accidental database recreation
+  self:ScheduleTimer("UndoTempDisable", 8)
   
   DEFAULT_CHAT_FRAME:AddMessage("|rYou are using |cFFEBAA32EminentDKP |cFFAAEB32v"..VERSION.."|r")
   DEFAULT_CHAT_FRAME:AddMessage("|rVisit |cFFD2691Ehttp://eminent.enjin.com|r for feedback and support.")
@@ -1104,7 +1104,8 @@ function EminentDKP:OnEnable()
   self:RegisterEvent("PLAYER_REGEN_DISABLED") -- addon announcements
   self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
   self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
-  self:RegisterEvent("GUILD_PARTY_STATE_UPDATED") -- guild group tracking
+  self:RegisterEvent("UNIT_SPELLCAST_SENT") -- loot container tracking
+  --self:RegisterEvent("GUILD_PARTY_STATE_UPDATED") -- guild group tracking
   self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
   -- 4.1 insurance (until AceComm is updated)
   if RegisterAddonMessagePrefix ~= nil then
@@ -2345,10 +2346,12 @@ function EminentDKP:IsEnabled()
   return enabled and not self:NeedSync() and not tempdisabled
 end
 
+--[[
 function EminentDKP:GUILD_PARTY_STATE_UPDATED(event, is_guild)
   in_guild_group = is_guild
   self:DisableCheck()
 end
+]]
 
 -- Keep track of any creature deaths
 function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
@@ -2477,9 +2480,11 @@ function EminentDKP:HideMeterCheck()
 end
 
 function EminentDKP:DisableCheck()
+  --[[
+  (self.db.profile.guildgroup and not in_guild_group)
+  ]]
   if (self.db.profile.disableparty and is_in_party()) or
-     (self.db.profile.disablepvp and is_in_pvp()) or 
-     (self.db.profile.guildgroup and not in_guild_group) then
+     (self.db.profile.disablepvp and is_in_pvp()) then
     enabled = false
     return
   end

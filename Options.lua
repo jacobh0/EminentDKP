@@ -668,6 +668,7 @@ EminentDKP.options = {
 					set= function(self, val) EminentDKP.db.profile.auctionlength = val end,
 					order= 4,
       	},
+      	--[[
       	guildgroup = {
       	  type= "toggle",
 					name= L["Guild Group"],
@@ -679,6 +680,7 @@ EminentDKP.options = {
 					end,
 					order= 5,
       	},
+      	]]
       	disablepvp = {
       	  type= "toggle",
 					name= L["Disable PVP"],
