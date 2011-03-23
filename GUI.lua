@@ -602,8 +602,17 @@ end
           }
   StaticPopup_Show("ResetSkadaDialog")
 ]]
+
+-- Truncate a number to 2 decimals (without rounding)
 local function TNum(number)
-  return tonumber(string.format("%.02f",number))
+  decimal = string.find(number, ".", 1, 1)
+  if decimal == nil then
+    return n
+  elseif string.find(number, "e-", 1, 1) ~= nil then
+    return 0
+  else
+    return tonumber(string.sub(number, 1, decimal+2))
+  end
 end
 
 local function ConfirmAction(name,msg,accept)
