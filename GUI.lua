@@ -607,7 +607,7 @@ end
 local function TNum(number)
   decimal = string.find(number, ".", 1, 1)
   if decimal == nil then
-    return n
+    return number
   elseif string.find(number, "e-", 1, 1) ~= nil then
     return 0
   else
