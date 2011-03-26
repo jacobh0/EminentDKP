@@ -1096,14 +1096,17 @@ function StatusEnter(win, button)
     t:AddDoubleLine(L["Size:"], EminentDKP:FormatNumber(EminentDKP:GetBountySize()), 1,1,1)
     t:AddLine(" ")
     t:AddLine(L["Version Info"], 1,1,1)
+    local color_one = color_green
+    
+    if EminentDKP:GetVersion() ~= EminentDKP:GetNewestVersion() then
+      color_one = color_red
+    end
+    t:AddDoubleLine(L["Current:"], EminentDKP:GetVersion(), 1,1,1,unpack(color_one))
+    t:AddDoubleLine(L["Newest:"], EminentDKP:GetNewestVersion(), 1,1,1,unpack(color_green))
+    
     if EminentDKP:NeedUpgrade() then
-      t:AddDoubleLine(L["Current:"], EminentDKP:GetVersion(), 1,1,1,unpack(color_red))
-      t:AddDoubleLine(L["Newest:"], EminentDKP:GetNewestVersion(), 1,1,1,unpack(color_green))
       t:AddLine(" ")
       t:AddLine(L["Please upgrade to the newest version."], unpack(color_red))
-    else
-      t:AddDoubleLine(L["Current:"], EminentDKP:GetVersion(), 1,1,1,unpack(color_green))
-      t:AddDoubleLine(L["Newest:"], EminentDKP:GetNewestVersion(), 1,1,1,unpack(color_green))
     end
     
     t:Show()
