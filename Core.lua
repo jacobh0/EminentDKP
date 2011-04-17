@@ -2293,8 +2293,7 @@ function EminentDKP:CreateRenameEvent(from,to,dtime)
   local cid = self:CreateEvent(pfid,"rename",from,"","",to,dtime)
   
   -- Delete the "to" person
-  local player = self:GetPlayerByID(ptid)
-  player = nil
+  self:GetActivePool().players[ptid] = nil
   -- Delete the name for the "from" person
   self:GetActivePool().playerIDs[from] = nil
   -- Re-route the "to" person to the "from" person
