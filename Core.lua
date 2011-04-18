@@ -1004,8 +1004,6 @@ function EminentDKP:OnInitialize()
   self.db.RegisterCallback(self, "OnProfileCopied", "ReloadWindows")
   self.db.RegisterCallback(self, "OnProfileReset", "ReloadWindows")
   
-  self:DatabaseUpdate()
-  
   -- Modes
   for name, mode in EminentDKP:IterateModules() do
     if mode.OnEnable then
@@ -1048,6 +1046,7 @@ function EminentDKP:GlobalApplySettings()
   self:ApplySettingsAll()
   self:ApplyAuctionFrameSettings()
   self:PARTY_LOOT_METHOD_CHANGED()
+  self:DatabaseUpdate()
   
   -- Broadcast version
   self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
@@ -1084,6 +1083,7 @@ function EminentDKP:DatabaseUpdate()
       pool.revision = 1
     end
     if pool.revision < 2 then
+      self:Print("Applying database revision 2 to pool: "..name)
       -- Rebuild database to fix rename bug found in 2.1.0
       self:RebuildDatabase()
       pool.revision = 2
@@ -3238,6 +3238,7 @@ function EminentDKP:RebuildDatabase()
   end
   
   -- Restore the database to default
+  newest_version = self:GetVersion()
   local db = self:GetActivePool()
   local rev = db.revision
   wipe(db)
