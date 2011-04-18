@@ -1112,16 +1112,6 @@ function EminentDKP:OnEnable()
   self:RegisterEvent("UNIT_SPELLCAST_SENT") -- loot container tracking
   --self:RegisterEvent("GUILD_PARTY_STATE_UPDATED") -- guild group tracking
   self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
-  -- 4.1 insurance (until AceComm is updated)
-  if RegisterAddonMessagePrefix ~= nil then
-    RegisterAddonMessagePrefix("EminentDKP-SPP")
-    RegisterAddonMessagePrefix("EminentDKP-SFF")
-    RegisterAddonMessagePrefix("EminentDKP-SRQ")
-    RegisterAddonMessagePrefix("EminentDKP-SV")
-    RegisterAddonMessagePrefix("EminentDKP-SE")
-    RegisterAddonMessagePrefix("EminentDKP-CMD")
-    RegisterAddonMessagePrefix("EminentDKP-INF")
-  end
   -- Addon messages
   self:RegisterComm("EminentDKP-SPP", "ProcessSyncProposal")
   self:RegisterComm("EminentDKP-SFF", "ProcessSyncFulfill")
@@ -3259,6 +3249,8 @@ function EminentDKP:RebuildDatabase()
   
   -- Force reload the meter display
   self:ReloadSets(true)
+  
+  self:Print(L["Database has been rebuilt."])
 end
 
 -- Handle slash commands

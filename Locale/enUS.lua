@@ -291,6 +291,7 @@ L["Unrecognized command. Whisper %s for a list of valid commands."] = "Unrecogni
 
 L["Performing database scan..."] = "Performing database scan..."
 L["There is more than 50% of the bounty available. You should distribute some."] = "There is more than 50% of the bounty available. You should distribute some."
+L["Database has been rebuilt."] = "Database has been rebuilt."
 
 -- Statusbar
 L["Syncing..."] = "Syncing..."
