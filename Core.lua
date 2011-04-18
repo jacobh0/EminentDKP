@@ -1083,6 +1083,11 @@ function EminentDKP:DatabaseUpdate()
       end
       pool.revision = 1
     end
+    if pool.revision < 2 then
+      -- Rebuild database to fix rename bug found in 2.1.0
+      self:RebuildDatabase()
+      pool.revision = 2
+    end
   end
 end
 
@@ -3230,12 +3235,40 @@ function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
   end
 end
 
+-- This function will reprocess all events and re-build the database
+-- This is useful when computations need to be re-done (due to a bug, etc)
+-- So the user won't be forced to re-sync, they can just do a rebuild
+function EminentDKP:RebuildDatabase()
+  -- Copy all events into the cache
+  wipe(events_cache)
+  for eid,event in pairs(self:GetEventPool()) do
+    local temp = {}
+    self:tcopy(temp,event)
+    events_cache[eid] = temp
+  end
+  
+  -- Restore the database to default
+  local db = self:GetActivePool()
+  local rev = db.revision
+  wipe(db)
+  self:tcopy(db,self.defaults.factionrealm.pools["Default"])
+  db.revision = rev
+  
+  -- Start replicating cached events
+  self:ReplicateSyncEvent("1",events_cache["1"])
+  
+  -- Force reload the meter display
+  self:ReloadSets(true)
+end
+
 -- Handle slash commands
 function EminentDKP:ProcessSlashCmd(input)
   local command, arg1, arg2, e = self:GetArgs(input, 3)
   
   if command == 'auction' then
     self:AdminStartAuction()
+  elseif command == 'rebuild' then
+    self:RebuildDatabase()
   elseif command == 'options' then
     InterfaceOptionsFrame_OpenToCategory("EminentDKP")
   elseif command == 'action' then
