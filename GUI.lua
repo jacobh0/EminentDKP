@@ -206,6 +206,7 @@ end
 
 -- Send a bid for the auction
 local function SubmitBid(frame)
+  PlaySound("LOOTWINDOWCOINSOUND")
   last_bid_frame = frame:GetParent()
   frame.bidamt:ClearFocus()
   EminentDKP:ScheduleBidTimeout()
