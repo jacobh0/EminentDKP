@@ -3242,6 +3242,7 @@ function EminentDKP:RebuildDatabase()
   end
   
   -- Restore the database to default
+  newest_version = self:GetVersion()
   self:ResetDatabase()
   
   -- Start replicating cached events
