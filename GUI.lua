@@ -627,7 +627,7 @@ local function TNum(number)
   end
 end
 
-local function ConfirmAction(name,msg,accept)
+function EminentDKP:ConfirmAction(name,msg,accept)
   StaticPopupDialogs[name] = {
     text = msg, 
     button1 = ACCEPT, 
@@ -665,7 +665,7 @@ local function CreateTransferTab(container)
   send:SetText(L["Send"])
   send:SetWidth(200)
   send:SetCallback("OnClick",function(what)
-    ConfirmAction("EminentDKPTransfer",
+    EminentDKP:ConfirmAction("EminentDKPTransfer",
                   L["Are you sure you want to transfer %.02f DKP to %s?"]:format(amount:GetValue(),recip:GetValue()),
                   function() EminentDKP:SendCommand('transfer',amount:GetValue(),recip:GetValue()) end)
   end)

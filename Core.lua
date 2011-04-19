@@ -3242,20 +3242,26 @@ function EminentDKP:RebuildDatabase()
   end
   
   -- Restore the database to default
-  newest_version = self:GetVersion()
+  self:ResetDatabase()
+  
+  -- Start replicating cached events
+  self:ReplicateSyncEvent("1",events_cache["1"])
+  
+  self:Print(L["Database has been rebuilt."])
+end
+
+-- This function resets the database to default
+function EminentDKP:ResetDatabase()
   local db = self:GetActivePool()
   local rev = db.revision
   wipe(db)
   self:tcopy(db,self.defaults.factionrealm.pools["Default"])
   db.revision = rev
   
-  -- Start replicating cached events
-  self:ReplicateSyncEvent("1",events_cache["1"])
-  
   -- Force reload the meter display
   self:ReloadSets(true)
   
-  self:Print(L["Database has been rebuilt."])
+  self:Print(L["Database has been reset."])
 end
 
 -- Handle slash commands
@@ -3266,6 +3272,8 @@ function EminentDKP:ProcessSlashCmd(input)
     self:AdminStartAuction()
   elseif command == 'rebuild' then
     self:RebuildDatabase()
+  elseif command == 'reset' then
+    EminentDKP:ConfirmAction("EminentDKPReset",L["Are you sure you want to reset the database? This cannot be undone."],function() EminentDKP:ResetDatabase end)
   elseif command == 'options' then
     InterfaceOptionsFrame_OpenToCategory("EminentDKP")
   elseif command == 'action' then
