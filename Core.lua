@@ -3274,7 +3274,7 @@ function EminentDKP:ProcessSlashCmd(input)
   elseif command == 'rebuild' then
     self:RebuildDatabase()
   elseif command == 'reset' then
-    EminentDKP:ConfirmAction("EminentDKPReset",L["Are you sure you want to reset the database? This cannot be undone."],function() EminentDKP:ResetDatabase end)
+    EminentDKP:ConfirmAction("EminentDKPReset",L["Are you sure you want to reset the database? This cannot be undone."],function() EminentDKP:ResetDatabase() end)
   elseif command == 'options' then
     InterfaceOptionsFrame_OpenToCategory("EminentDKP")
   elseif command == 'action' then
