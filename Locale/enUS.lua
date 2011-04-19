@@ -89,6 +89,8 @@ L["Hide Chat Messages"] = "Hide Chat Messages"
 L["Prevents chat messages sent by EminentDKP from being shown."] = "Prevents chat messages sent by EminentDKP from being shown."
 L["Auction Length"] = "Auction Length"
 L["The number of seconds an auction will run."] = "The number of seconds an auction will run."
+L["Bid on Enter"] = "Bid on Enter"
+L["Send bid for an auction when pressing enter in the bid amount box."] = "Send bid for an auction when pressing enter in the bid amount box."
 
 L["Officer Options"] = "Officer Options"
 L["Disenchanter"] = "Disenchanter"

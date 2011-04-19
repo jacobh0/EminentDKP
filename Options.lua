@@ -70,6 +70,7 @@ EminentDKP.defaults = {
     hideparty = false,
     hidepvp = true,
     hidecombat = true,
+    bidonenter = false,
     maxplayerevents = 30,
     maxmodeevents = 80,
     numberformat = 2,
@@ -622,6 +623,16 @@ EminentDKP.options = {
           end,
           order= 12,
 				},
+        bidonenter = {
+          type= "toggle",
+          name= L["Bid on Enter"],
+          desc= L["Send bid for an auction when pressing enter in the bid amount box."],
+          order= 13,
+          get= function() return EminentDKP.db.profile.bidonenter end,
+          set= function(win)
+            EminentDKP.db.profile.bidonenter = not EminentDKP.db.profile.bidonenter
+          end,
+        },
       },
     },
     officer = {

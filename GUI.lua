@@ -204,9 +204,26 @@ local function VerifyBid(frame)
   frame:SetBackdropBorderColor(0.5,0.5,0.5,1)
 end
 
+-- Send a bid for the auction
+local function SubmitBid(frame)
+  last_bid_frame = frame:GetParent()
+  frame.bidamt:ClearFocus()
+  EminentDKP:ScheduleBidTimeout()
+  EminentDKP:SendCommand("bid",frame.bidamt:GetText())
+end
+
 -- This clears the focus of a frame (editbox)
 local function ClearFocus(frame)
   frame:ClearFocus()
+end
+
+-- Either submit a bid or clear focus (depending on option)
+local function DecideAction(frame)
+  if EminentDKP.db.profile.bidonenter then
+    SubmitBid(frame)
+  else
+    ClearFocus(frame)
+  end
 end
 
 -- This updates the timer bar on an item auction
@@ -326,12 +343,7 @@ local function CreateNewItemFrame()
   bid:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Up")
   bid:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Down")
   bid:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Coin-Highlight")
-  bid:SetScript("OnClick", function(f)
-    last_bid_frame = f:GetParent()
-    f.bidamt:ClearFocus()
-    EminentDKP:ScheduleBidTimeout()
-    EminentDKP:SendCommand("bid",f.bidamt:GetText())
-  end)
+  bid:SetScript("OnClick", SubmitBid)
   bid:SetMotionScriptsWhileDisabled(true)
   SetDesaturation(bid:GetNormalTexture(), true)
   bid:Disable()
@@ -350,7 +362,7 @@ local function CreateNewItemFrame()
   bidamt:SetAutoFocus(false)
   bidamt:SetFontObject(ChatFontNormal)
   bidamt:SetScript("OnTextChanged", VerifyBid)
-  bidamt:SetScript("OnEnterPressed", ClearFocus)
+  bidamt:SetScript("OnEnterPressed", DecideAction)
   bidamt:SetScript("OnEscapePressed", ClearFocus)
   bidamt:Hide()
   
