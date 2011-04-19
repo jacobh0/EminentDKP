@@ -10,6 +10,7 @@ local libCE = libC:GetAddonEncodeTable()
 local VERSION = '2.1.1'
 local newest_version = ''
 local needs_update = false
+local player_versions = {}
 
 -- All the meter windows
 local windows = {}
@@ -1662,6 +1663,9 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   if sender == self.myName then return end
   local version, welcome = strsplit(':',message,2)
   local compare = CompareVersions(self:GetVersion(),version)
+  
+  -- Keep track of their version
+  player_versions[sender] = version
   
   UpdateNewestVersion(version)
   self:UpdateStatusBar()

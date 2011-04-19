@@ -218,13 +218,12 @@ local function ClearFocus(frame)
   frame:ClearFocus()
 end
 
--- Either submit a bid or clear focus (depending on option)
+-- Submit a bid and/or clear focus (depending on option)
 local function DecideAction(frame)
   if EminentDKP.db.profile.bidonenter then
     SubmitBid(frame)
-  else
-    ClearFocus(frame)
   end
+  ClearFocus(frame)
 end
 
 -- This updates the timer bar on an item auction
@@ -883,6 +882,15 @@ local function CreateAdjustmentTab(container)
   container:AddChild(adjustgrp)
 end
 
+local function CreateVersionsTab(container)
+  local scroll = AceGUI:Create("ScrollFrame")
+  scroll:SetLayout("Flow")
+  
+  
+  
+  container:AddChild(scroll)
+end
+
 -- Callback function for OnGroupSelected
 local function SelectGroup(container, event, group)
   container:ReleaseChildren()
@@ -896,6 +904,8 @@ local function SelectGroup(container, event, group)
     CreateBountyTab(container)
   elseif group == "adjustment" then
     CreateAdjustmentTab(container)
+  elseif group == "version" then
+    CreateVersionsTab(container)
   end
   EminentDKP.actionpanel:SetStatusText("")
 end
@@ -925,6 +935,7 @@ function EminentDKP:CreateActionPanel()
     {text=L["Rename"], value="rename", disabled=(not EminentDKP:AmOfficer())},
     {text=L["Adjustment"], value="adjustment", disabled=(not EminentDKP:AmOfficer())},
     {text=L["Bounty"], value="bounty", disabled=(not EminentDKP:AmOfficer())},
+    {text=L["Versions"], value="versions"},
   })
   -- Register callback
   tab:SetCallback("OnGroupSelected", SelectGroup)
