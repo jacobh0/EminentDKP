@@ -942,7 +942,7 @@ local function CreateVersionsTab(container)
   local note = AceGUI:Create("Label")
   note:SetWidth(330)
   note:SetFontObject(GameFontNormal)
-  note:SetText("Please note that it can take up to 5 minutes to record the versions of all other EminentDKP users.")
+  note:SetText(L["Please note that it can take up to 5 minutes to record the versions of all other EminentDKP users."])
   scroll:AddChild(note)
   
   local versions = EminentDKP:GetAddonVersions()

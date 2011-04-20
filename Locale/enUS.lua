@@ -296,6 +296,7 @@ L["There is more than 50% of the bounty available. You should distribute some."]
 L["Database has been rebuilt."] = "Database has been rebuilt."
 L["Are you sure you want to reset the database? This cannot be undone."] = "Are you sure you want to reset the database? This cannot be undone."
 L["Database has been reset."] = "Database has been reset."
+L["Please note that it can take up to 5 minutes to record the versions of all other EminentDKP users."] = "Please note that it can take up to 5 minutes to record the versions of all other EminentDKP users."
 
 -- Statusbar
 L["Syncing..."] = "Syncing..."
