@@ -158,6 +158,7 @@ end
 
 local item_frames = {}
 local recycled_item_frames = {}
+local scan_tip
 
 local function SetItemTip(frame)
   if not frame.link then return end
@@ -234,6 +235,7 @@ local function TimerUpdate(frame)
     frame.spark:SetPoint("CENTER", frame, "LEFT", (left / max) * frame:GetWidth(), 0)
     frame:SetValue(left)
   else
+    frame:SetValue(0)
     frame.spark:Hide()
     frame:Hide()
     frame:GetParent().bid.bidamt:Hide()
@@ -243,6 +245,40 @@ end
 
 local auction_guid = ""
 local last_bid_frame
+
+local function RGBPercToHex(r, g, b)
+	r = r <= 1 and r >= 0 and r or 0
+	g = g <= 1 and g >= 0 and g or 0
+	b = b <= 1 and b >= 0 and b or 0
+	return string.format("%02x%02x%02x", r*255, g*255, b*255)
+end
+
+function EminentDKP:CanUseItem(link)
+  if not scan_tip then
+    scan_tip = CreateFrame('GameTooltip', 'EminentDKPST', UIParent, 'GameTooltipTemplate')
+    scan_tip:SetOwner(UIParent, 'ANCHOR_NONE')
+    scan_tip:AddFontStrings(
+      scan_tip:CreateFontString("$parentTextLeft1", nil, "GameTooltipText"),
+      scan_tip:CreateFontString("$parentTextRight1", nil, "GameTooltipText"))
+  end
+  EminentDKPST:ClearLines()
+  EminentDKPST:SetHyperlink(link)
+  
+  for i = 1, math.min(5,EminentDKPST:NumLines()) do
+    -- Check left+right text in the tooltip
+    local texts = { getglobal("EminentDKPSTTextLeft" .. i), getglobal("EminentDKPSTTextRight" .. i) }
+    for i, text in ipairs(texts) do
+      if text:GetText() then
+        local r,g,b,a = text:GetTextColor()
+        -- If red text, then we can't use
+        if RGBPercToHex(r,g,b) == "fe1f1f" then
+          return false
+        end
+      end
+    end
+  end
+  return true
+end
 
 function EminentDKP:AdjustAuctionFrameBackgroundHeight()
   if auction_frame.bgframe then
@@ -398,6 +434,19 @@ local function GetItemFrame()
   return frame
 end
 
+-- Hide bidbox and button for an item frame
+local function HideBidApparatus(frame)
+  frame.bid:Hide()
+  frame.bid.bidamt:SetBackdropBorderColor(0.5,0.5,0.5,1)
+  frame.bid.bidamt:Hide()
+end
+
+-- Show bidbox and button for an item frame
+local function ShowBidApparatus(frame)
+  frame.bid:Show()
+  frame.bid.bidamt:Show()
+end
+
 function EminentDKP:CancelBidTimeout()
   if self.bidTimeout then
     self:CancelTimer(self.bidTimeout,true)
@@ -454,6 +503,11 @@ function EminentDKP:FillOutItemFrame(f)
     
     color = ITEM_QUALITY_COLORS[iQuality]
     f.loot:SetText(iName)
+    
+    -- This frame has a live auction
+    if f.status:GetValue() > 0 and self:CanUseItem(iLink) then
+      ShowBidApparatus(f)
+    end
   end
   
   f.loot:SetVertexColor(color.r, color.g, color.b)
@@ -505,29 +559,24 @@ local function GetItemFrameBySlot(slot)
   return nil
 end
 
--- Hide bidbox and button for an item frame
-local function HideBidApparatus(frame)
-  frame.bid:Hide()
-  frame.bid.bidamt:Hide()
-  frame.status:Hide()
-  frame.status.spark:Hide()
-end
-
 -- Cancel the auction for a specified slot
 function EminentDKP:CancelAuction(slot)
   local frame = GetItemFrameBySlot(slot)
   HideBidApparatus(frame)
+  frame.status:Hide()
+  frame.status.spark:Hide()
   frame.winner:SetText(L["Auction cancelled"])
   frame.winner:Show()
   PlaySound("AuctionWindowClose")
 end
 
 -- Start the timer and show bid box/button for an item
-function EminentDKP:StartAuction(slot,timeleft,window)
+function EminentDKP:StartAuction(slot,timeleft,window)  
   local frame = GetItemFrameBySlot(slot)
-  frame.bid:Show()
-  frame.bid.bidamt:SetBackdropBorderColor(0.5,0.5,0.5,1)
-  frame.bid.bidamt:Show()
+  -- If itemframe is filled out properly, and we can use the item, show the bid apparatus
+  if frame.button.link and self:CanUseItem(frame.button.link) then
+    ShowBidApparatus(frame)
+  end
   frame.endtime = GetTime() + timeleft
   frame.status:SetMinMaxValues(0, window)
   frame.status:SetValue(timeleft)
