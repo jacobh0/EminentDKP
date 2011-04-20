@@ -12,6 +12,9 @@ EminentDKP.displays = {}
 
 EminentDKP.classColors = RAID_CLASS_COLORS
 
+local color_red = { .9, .10, .10 }
+local color_green = { .10, .9, .10 }
+
 -- Add to EminentDKP's enormous list of display providers.
 meter.name = "Meter display"
 EminentDKP.displays["meter"] = meter
@@ -932,10 +935,60 @@ local function CreateAdjustmentTab(container)
 end
 
 local function CreateVersionsTab(container)
+  container:SetLayout("Fill")
   local scroll = AceGUI:Create("ScrollFrame")
   scroll:SetLayout("Flow")
   
+  local note = AceGUI:Create("Label")
+  note:SetWidth(330)
+  note:SetFontObject(GameFontNormal)
+  note:SetText("Please note that it can take up to 5 minutes to record the versions of all other EminentDKP users.")
+  scroll:AddChild(note)
   
+  local versions = EminentDKP:GetAddonVersions()
+  local grp_names = EminentDKP:GetCurrentGroupMembersNames()
+  local versioned_names = { }
+  
+  -- Either compile list of group members with versions, or just all known users with versions
+  if #(grp_names) > 0 then
+    for i, name in ipairs(grp_names) do
+      table.insert(versioned_names, { name = name, version = (versions[name] or "Unknown") })
+    end
+  else
+    for name, version in pairs(versions) do
+      table.insert(versioned_names, { name = name, version = version })
+    end
+  end
+  table.sort(versioned_names, function(a,b) return a.name < b.name end)
+  
+  for i = 1, #(versioned_names) do
+    local data
+    -- Have to remap sorted linear list into two columns
+    if i % 2 == 0 then
+      -- Even
+      data = versioned_names[(i + math.ceil((#(versioned_names) - i)/2))]
+    else
+      -- Odd
+      data = versioned_names[(i - math.floor(i/2))]
+    end
+    local lbl_name = AceGUI:Create("Label")
+    local lbl_version = AceGUI:Create("Label")
+    lbl_name:SetText(data.name)
+    lbl_name:SetWidth(85)
+    lbl_version:SetText(data.version)
+    lbl_version:SetWidth(70)
+    if data.version ~= EminentDKP:GetNewestVersion() then
+      lbl_version:SetColor(unpack(color_red))
+    else
+      lbl_version:SetColor(unpack(color_green))
+    end
+    local grp = AceGUI:Create("SimpleGroup")
+    grp:SetLayout("Flow")
+    grp:SetWidth(160)
+    grp:AddChild(lbl_name)
+    grp:AddChild(lbl_version)
+    scroll:AddChild(grp)
+  end
   
   container:AddChild(scroll)
 end
@@ -943,6 +996,7 @@ end
 -- Callback function for OnGroupSelected
 local function SelectGroup(container, event, group)
   container:ReleaseChildren()
+  container:SetLayout("Flow")
   if group == "transfer" then
     CreateTransferTab(container)
   elseif group == "vanity" then
@@ -953,7 +1007,7 @@ local function SelectGroup(container, event, group)
     CreateBountyTab(container)
   elseif group == "adjustment" then
     CreateAdjustmentTab(container)
-  elseif group == "version" then
+  elseif group == "versions" then
     CreateVersionsTab(container)
   end
   EminentDKP.actionpanel:SetStatusText("")
@@ -1003,9 +1057,6 @@ end
 local function lerp(a, b, delta)
   return (a + (b - a) * delta)
 end
-
-local color_red = { .9, .10, .10 }
-local color_green = { .10, .9, .10 }
 
 local function ColorLerp(color1, color2, delta)
   return lerp(color1[1], color2[1], delta), 

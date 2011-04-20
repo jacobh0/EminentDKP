@@ -10,7 +10,7 @@ local libCE = libC:GetAddonEncodeTable()
 local VERSION = '2.1.1'
 local newest_version = ''
 local needs_update = false
-local player_versions = {}
+local addon_versions = {}
 
 -- All the meter windows
 local windows = {}
@@ -1327,6 +1327,10 @@ function EminentDKP:GetNewestVersion()
   return (newest_version ~= '' and newest_version or self:GetVersion())
 end
 
+function EminentDKP:GetAddonVersions()
+  return addon_versions
+end
+
 function EminentDKP:NeedUpgrade()
   return needs_update
 end
@@ -1665,7 +1669,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   local compare = CompareVersions(self:GetVersion(),version)
   
   -- Keep track of their version
-  player_versions[sender] = version
+  addon_versions[sender] = version
   
   UpdateNewestVersion(version)
   self:UpdateStatusBar()
@@ -1979,6 +1983,27 @@ end
 
 function EminentDKP:GetAvailableBountyPercent()
   return (self:GetAvailableBounty()/self:GetBountySize())*100
+end
+
+-- Construct list of names for players currently in the group
+function EminentDKP:GetCurrentGroupMembersNames()
+  local players = {}
+  if is_in_party() then
+    for spot = 1, 5 do
+      local name = UnitName("party"..spot)
+      if name then
+        table.insert(players,name)
+      end
+    end
+  else
+    for spot = 1, 40 do
+      local name = UnitName("raid"..spot)
+      if name then
+        table.insert(players,name)
+      end
+    end
+  end
+  return players
 end
 
 -- Construct list of IDs for players currently in the group
