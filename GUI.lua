@@ -684,9 +684,9 @@ function EminentDKP:ConfirmAction(name,msg,accept)
     text = msg, 
     button1 = ACCEPT, 
     button2 = CANCEL,
-    timeout = 15, 
-    whileDead = 0, 
-    hideOnEscape = 1, 
+    timeout = 45, 
+    whileDead = 1, 
+    hideOnEscape = 0, 
     OnAccept = accept,
   }
   StaticPopup_Show(name)

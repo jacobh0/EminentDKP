@@ -3088,11 +3088,14 @@ function EminentDKP:CHAT_MSG_WHISPER_CONTROLLER(eventController, message, from, 
 end
 
 function EminentDKP:InformPlayer(...)
-  local notifyType, rawdata, target = ...
+  local notifyType, rawdata, target, channel = ...
   local data = notifyType .. "_" .. libS:Serialize(rawdata)
   local tosync = libCE:Encode(libC:CompressHuffman(data))
   if not target then
-    self:SendCommMessage('EminentDKP-INF',tosync,(is_in_party() and "PARTY" or "RAID"))
+    if not channel then
+      channel = (is_in_party() and "PARTY" or "RAID")
+    end
+    self:SendCommMessage('EminentDKP-INF',tosync,channel)
   else
     self:SendCommMessage('EminentDKP-INF',tosync,'WHISPER',target)
   end
@@ -3149,6 +3152,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
   end
   
   if notifyType == "accept" or notifyType == "reject" then
+    -- A transfer or bid was made, and a response was given
     if data.from == "transfer" then
       self:DisplayActionResult(data.message)
     elseif data.from == "bid" then
@@ -3216,7 +3220,23 @@ function EminentDKP:ActuateNotification(notifyType,data)
     -- Hide the auction frame
     self.auctionRecycleTimer = self:ScheduleTimer("RecycleAuctionItems",6,true)
   elseif notifyType == "scan" then
+    -- A scan was done, so update the last scan time
     self:GetActivePool().lastScan = data.time
+  elseif notifyType == "reset" then
+    -- A reset notification was given, so we must reset as well
+    if self:AmOfficer() then
+      -- If an officer, give the option of complying, for security purposes
+      -- todo: freeze any syncing or version broadcasting until the decision has been made
+      EminentDKP:ConfirmAction("EminentDKPReset",
+                               L["%s has requested a database reset. Do you wish to comply? This cannot be undone."]:format(data.sender),
+                               function()
+                                 EminentDKP:ResetDatabase()
+                               end)
+    else
+      -- If a regular user, just go ahead and reset
+      self:Print(L["%s has requested a database reset."]:format(data.sender))
+      EminentDKP:ResetDatabase()
+    end
   end
 end
 
@@ -3224,6 +3244,7 @@ function EminentDKP:InQualifiedRaid()
   return (self:GetMasterLooterName() and self:IsAnOfficer(self:GetMasterLooterName()))
 end
 
+-- Send a command to the ML
 function EminentDKP:SendCommand(...)
   if not self:GetMasterLooterName() then return end
   local cmd, arg1, arg2 = ...
@@ -3234,6 +3255,7 @@ function EminentDKP:SendCommand(...)
   self:SendCommMessage("EminentDKP-CMD",implode(",",tbl),'WHISPER',self:GetMasterLooterName())
 end
 
+-- Process a command sent to the ML
 function EminentDKP:ProcessCommand(prefix, message, distribution, sender)
   if not self:AmMasterLooter() then return end
   local command, arg1, arg2 = strsplit(",", message, 3)
@@ -3267,8 +3289,9 @@ function EminentDKP:RebuildDatabase()
   end
   
   -- Restore the database to default
-  newest_version = self:GetVersion()
+  local old_ver = self:GetVersion()
   self:ResetDatabase()
+  newest_version = old_ver
   
   -- Start replicating cached events
   self:ReplicateSyncEvent("1",events_cache["1"])
@@ -3284,8 +3307,11 @@ function EminentDKP:ResetDatabase()
   self:tcopy(db,self.defaults.factionrealm.pools["Default"])
   db.revision = rev
   
+  newest_version = ""
+  
   -- Force reload the meter display
   self:ReloadSets(true)
+  self:UpdateStatusBar()
   
   self:Print(L["Database has been reset."])
 end
@@ -3299,7 +3325,22 @@ function EminentDKP:ProcessSlashCmd(input)
   elseif command == 'rebuild' then
     self:RebuildDatabase()
   elseif command == 'reset' then
-    EminentDKP:ConfirmAction("EminentDKPReset",L["Are you sure you want to reset the database? This cannot be undone."],function() EminentDKP:ResetDatabase() end)
+    if arg1 == "all" then
+      -- Reset the database for everybody online
+      EminentDKP:ConfirmAction("EminentDKPReset",
+                               L["Are you sure you want to reset the database for ALL users? This cannot be undone."],
+                               function()
+                                 EminentDKP:InformPlayer("reset",{ sender = EminentDKP.myName },"","GUILD")
+                                 EminentDKP:ResetDatabase()
+                               end)
+    else
+      -- Reset the database just for yourself
+      EminentDKP:ConfirmAction("EminentDKPReset",
+                               L["Are you sure you want to reset the database? This cannot be undone."],
+                               function()
+                                 EminentDKP:ResetDatabase()
+                               end)
+    end
   elseif command == 'options' then
     InterfaceOptionsFrame_OpenToCategory("EminentDKP")
   elseif command == 'action' then
