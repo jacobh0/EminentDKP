@@ -3326,6 +3326,8 @@ function EminentDKP:ProcessSlashCmd(input)
     self:RebuildDatabase()
   elseif command == 'reset' then
     if arg1 == "all" then
+      -- Only allow officers to execute this command
+      if not self:AmOfficer() then return end
       -- Reset the database for everybody online
       EminentDKP:ConfirmAction("EminentDKPReset",
                                L["Are you sure you want to reset the database for ALL users? This cannot be undone."],
