@@ -7,7 +7,7 @@ local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 
-local VERSION = '2.1.1'
+local VERSION = '2.1.2'
 local newest_version = ''
 local needs_update = false
 
@@ -2348,7 +2348,7 @@ end
 ]]
 
 -- Keep track of any creature deaths
-function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
+function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, hideCaster, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
   if not self:AmOfficer() then return end
   if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
     table.insert(recent_deaths,1,dstName)
