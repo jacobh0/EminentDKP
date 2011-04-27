@@ -2318,6 +2318,7 @@ function EminentDKP:CreateEvent(src,etype,extra,t,b,val,dtime)
   if newest_version ~= "" then
     local old_newest_version = self:GetNewestVersion()
     newest_version = ""
+    needs_update = false
     UpdateNewestVersion(old_newest_version)
   end
   
