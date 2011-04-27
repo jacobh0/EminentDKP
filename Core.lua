@@ -135,14 +135,14 @@ local function UpdateNewestVersion(newer)
   local compare = CompareVersions(EminentDKP:GetNewestVersion(),newer_version)
   
   if compare.major < 0 or compare.minor < 0 then
-    -- There is a new addon version
+    -- There is a new major/minor addon version
     newest_version = newer_version
     needs_update = true
   elseif compare.major == 0 and compare.minor == 0 then
     if compare.event < 0 or compare.bug < 0 then
       newest_version = newer_version
       if compare.bug < 0 then
-        -- There is a new addon version
+        -- There is a new bug addon version
         needs_update = true
       end
     end
