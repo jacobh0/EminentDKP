@@ -7,7 +7,7 @@ local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 
-local VERSION = '2.1.3'
+local VERSION = '2.1.4'
 local newest_version = ''
 local needs_update = false
 
@@ -1048,15 +1048,6 @@ function EminentDKP:GlobalApplySettings()
   self:PARTY_LOOT_METHOD_CHANGED()
   self:DatabaseUpdate()
   
-  -- Addon messages
-  self:RegisterComm("EminentDKP-SPP", "ProcessSyncProposal")
-  self:RegisterComm("EminentDKP-SFF", "ProcessSyncFulfill")
-  self:RegisterComm("EminentDKP-SRQ", "ProcessSyncRequest")
-  self:RegisterComm("EminentDKP-SV", "ProcessSyncVersion")
-  self:RegisterComm("EminentDKP-SE", "ProcessSyncEvent")
-  self:RegisterComm("EminentDKP-CMD", "ProcessCommand")
-  self:RegisterComm("EminentDKP-INF", "ProcessInformation")
-  
   -- Broadcast version
   self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
 end
@@ -1121,6 +1112,14 @@ function EminentDKP:OnEnable()
   self:RegisterEvent("UNIT_SPELLCAST_SENT") -- loot container tracking
   --self:RegisterEvent("GUILD_PARTY_STATE_UPDATED") -- guild group tracking
   self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
+  -- Addon messages
+  self:RegisterComm("EminentDKP-SPP", "ProcessSyncProposal")
+  self:RegisterComm("EminentDKP-SFF", "ProcessSyncFulfill")
+  self:RegisterComm("EminentDKP-SRQ", "ProcessSyncRequest")
+  self:RegisterComm("EminentDKP-SV", "ProcessSyncVersion")
+  self:RegisterComm("EminentDKP-SE", "ProcessSyncEvent")
+  self:RegisterComm("EminentDKP-CMD", "ProcessCommand")
+  self:RegisterComm("EminentDKP-INF", "ProcessInformation")
   -- Custom event notifications
   self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
   self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
@@ -3239,16 +3238,19 @@ function EminentDKP:RebuildDatabase()
     events_cache[eid] = temp
   end
   
-  -- Restore the database to default
-  newest_version = self:GetVersion()
-  local db = self:GetActivePool()
-  local rev = db.revision
-  wipe(db)
-  self:tcopy(db,self.defaults.factionrealm.pools["Default"])
-  db.revision = rev
+  -- Only if the database is not already empty
+  if next(events_cache) then
+    -- Restore the database to default
+    newest_version = self:GetVersion()
+    local db = self:GetActivePool()
+    local rev = db.revision
+    wipe(db)
+    self:tcopy(db,self.defaults.factionrealm.pools["Default"])
+    db.revision = rev
   
-  -- Start replicating cached events
-  self:ReplicateSyncEvent("1",events_cache["1"])
+    -- Start replicating cached events
+    self:ReplicateSyncEvent("1",events_cache["1"])
+  end
   
   -- Force reload the meter display
   self:ReloadSets(true)
