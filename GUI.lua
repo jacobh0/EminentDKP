@@ -6,7 +6,7 @@ local EminentDKP = EminentDKP
 local meter = EminentDKP:NewModule("MeterDisplay", "SpecializedLibBars-1.1")
 local libwindow = LibStub("LibWindow-1.1")
 local media = LibStub("LibSharedMedia-3.0")
-local canuse = LibStub("LibCanUse-1.0")
+local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
 -- Our display providers.
 EminentDKP.displays = {}

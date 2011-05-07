@@ -256,6 +256,7 @@ L["There is no loot available to auction."] = "There is no loot available to auc
 L["There is currently no auction active."] = "There is currently no auction active."
 L["You are not eligible to receive loot."] = "You are not eligible to receive loot."
 L["Your bid of %d has been accepted."] = "Your bid of %d has been accepted."
+L["You cannot utilize this item."] = "You cannot utilize this item."
 L["Vanity item rolls weighted by current vanity DKP:"] = "Vanity item rolls weighted by current vanity DKP:"
 
 L["%s has transferred %.02f DKP to %s."] = "%s has transferred %.02f DKP to %s."

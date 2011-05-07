@@ -6,6 +6,7 @@ libCH:Embed(EminentDKP)
 local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
+local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
 local VERSION = '2.1.1'
 local newest_version = ''
@@ -2659,8 +2660,12 @@ function EminentDKP:Bid(addon,from,amount)
       local bid = math.floor(tonumber(amount) or 0)
       if bid >= 1 then
         if self:PlayerHasDKP(from,bid) then
-          self.bidItem.bids[from] = bid
-          self:WhisperPlayer(addon,"bid",L["Your bid of %d has been accepted."]:format(bid), from, true)
+          if canuse:CanUseItem(self:GetPlayerClassByName(from),self.bidItem.itemLink) then
+            self.bidItem.bids[from] = bid
+            self:WhisperPlayer(addon,"bid",L["Your bid of %d has been accepted."]:format(bid), from, true)
+          else
+            self:WhisperPlayer(addon,"bid",L["You cannot utilize this item."], from)
+          end
         else
           self:WhisperPlayer(addon,"bid",L["The DKP amount must not exceed your current DKP."], from)
         end
@@ -2799,6 +2804,7 @@ function EminentDKP:AdminStartAuction()
         
         auction_active = true
         self.bidItem = {
+          itemLink=itemLink,
           itemString=string.match(itemLink, "item[%-?%d:]+"), 
           remaining=self.db.profile.auctionlength, 
           bids={}, 
