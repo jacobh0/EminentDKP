@@ -1907,6 +1907,10 @@ function EminentDKP:GetPlayerClassByID(pid)
   return nil
 end
 
+function EminentDKP:GetPlayerClassByName(name)
+  return self:GetPlayerClassByID(self:GetPlayerIDByName(name))
+end
+
 -- Check whether or not a player exists in the currently active pool
 function EminentDKP:PlayerExistsInPool(name)
   return (self:GetPlayerIDByName(name) ~= nil)
@@ -1934,6 +1938,11 @@ end
 -- Get the your current DKP
 function EminentDKP:GetMyCurrentDKP()
   return self:GetCurrentDKP(self.myName)
+end
+
+-- Get the your class name
+function EminentDKP:GetMyClass()
+  return self:GetPlayerClassByName(self.myName)
 end
 
 -- Get the names of everybody in the pool

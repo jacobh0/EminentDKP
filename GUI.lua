@@ -6,6 +6,7 @@ local EminentDKP = EminentDKP
 local meter = EminentDKP:NewModule("MeterDisplay", "SpecializedLibBars-1.1")
 local libwindow = LibStub("LibWindow-1.1")
 local media = LibStub("LibSharedMedia-3.0")
+local canuse = LibStub("LibCanUse-1.0")
 
 -- Our display providers.
 EminentDKP.displays = {}
@@ -161,7 +162,6 @@ end
 
 local item_frames = {}
 local recycled_item_frames = {}
-local scan_tip
 
 local function SetItemTip(frame)
   if not frame.link then return end
@@ -248,40 +248,6 @@ end
 
 local auction_guid = ""
 local last_bid_frame
-
-local function RGBPercToHex(r, g, b)
-	r = r <= 1 and r >= 0 and r or 0
-	g = g <= 1 and g >= 0 and g or 0
-	b = b <= 1 and b >= 0 and b or 0
-	return string.format("%02x%02x%02x", r*255, g*255, b*255)
-end
-
-function EminentDKP:CanUseItem(link)
-  if not scan_tip then
-    scan_tip = CreateFrame('GameTooltip', 'EminentDKPST', UIParent, 'GameTooltipTemplate')
-    scan_tip:SetOwner(UIParent, 'ANCHOR_NONE')
-    scan_tip:AddFontStrings(
-      scan_tip:CreateFontString("$parentTextLeft1", nil, "GameTooltipText"),
-      scan_tip:CreateFontString("$parentTextRight1", nil, "GameTooltipText"))
-  end
-  EminentDKPST:ClearLines()
-  EminentDKPST:SetHyperlink(link)
-  
-  for i = 1, math.min(5,EminentDKPST:NumLines()) do
-    -- Check left+right text in the tooltip
-    local texts = { getglobal("EminentDKPSTTextLeft" .. i), getglobal("EminentDKPSTTextRight" .. i) }
-    for i, text in ipairs(texts) do
-      if text:GetText() then
-        local r,g,b,a = text:GetTextColor()
-        -- If red text, then we can't use
-        if RGBPercToHex(r,g,b) == "fe1f1f" then
-          return false
-        end
-      end
-    end
-  end
-  return true
-end
 
 function EminentDKP:AdjustAuctionFrameBackgroundHeight()
   if auction_frame.bgframe then
@@ -487,6 +453,11 @@ function EminentDKP:ReApplyItemFrameSettings()
   end
 end
 
+-- Check if you can use an item
+function EminentDKP:CanIUseItem(link)
+  return canuse:CanUseItem(self:GetMyClass(),link)
+end
+
 function EminentDKP:FillOutItemFrame(f)
   local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(f.item)
   local color
@@ -508,7 +479,7 @@ function EminentDKP:FillOutItemFrame(f)
     f.loot:SetText(iName)
     
     -- This frame has a live auction
-    if f.status:GetValue() > 0 and self:CanUseItem(iLink) then
+    if f.status:GetValue() > 0 and self:CanIUseItem(iLink) then
       ShowBidApparatus(f)
     end
   end
@@ -577,7 +548,7 @@ end
 function EminentDKP:StartAuction(slot,timeleft,window)  
   local frame = GetItemFrameBySlot(slot)
   -- If itemframe is filled out properly, and we can use the item, show the bid apparatus
-  if frame.button.link and self:CanUseItem(frame.button.link) then
+  if frame.button.link and self:CanIUseItem(frame.button.link) then
     ShowBidApparatus(frame)
   end
   frame.endtime = GetTime() + timeleft
