@@ -644,8 +644,8 @@ EminentDKP.options = {
       		type= "input",
       		name= L["Disenchanter"],
       		desc= L["The name of the person who will disenchant."],
-      		get= function() return EminentDKP.db.profile.disenchanter end,
-      		set= function(self, val) EminentDKP.db.profile.disenchanter = val end,
+      		get= function() return EminentDKP.db.profile.officer.disenchanter end,
+      		set= function(self, val) EminentDKP.db.profile.officer.disenchanter = val end,
       		order= 1,
       	},
       	itemrarity = {
@@ -653,8 +653,8 @@ EminentDKP.options = {
 					name= L["Auction Threshold"],
 					desc= L["The minimum rarity an item must be in order to be auctioned off."],
 					values=	{ [2] = "Uncommon", [3] = "Rare", [4] = "Epic" },
-					get= function() return EminentDKP.db.profile.itemrarity end,
-					set= function(self, val) EminentDKP.db.profile.itemrarity = val end,
+					get= function() return EminentDKP.db.profile.officer.itemrarity end,
+					set= function(self, val) EminentDKP.db.profile.officer.itemrarity = val end,
 					order= 2,
       	},
       	expiretime = {
@@ -664,8 +664,8 @@ EminentDKP.options = {
 					min= 10,
           max= 60,
           step= 10,
-					get= function() return EminentDKP.db.profile.expiretime end,
-					set= function(self, val) EminentDKP.db.profile.expiretime = val end,
+					get= function() return EminentDKP.db.profile.officer.expiretime end,
+					set= function(self, val) EminentDKP.db.profile.officer.expiretime = val end,
 					order= 3,
       	},
       	auctionlength = {
@@ -675,8 +675,8 @@ EminentDKP.options = {
 					min= 15,
           max= 45,
           step= 5,
-					get= function() return EminentDKP.db.profile.auctionlength end,
-					set= function(self, val) EminentDKP.db.profile.auctionlength = val end,
+					get= function() return EminentDKP.db.profile.officer.auctionlength end,
+					set= function(self, val) EminentDKP.db.profile.officer.auctionlength = val end,
 					order= 4,
       	},
       	--[[
@@ -696,9 +696,9 @@ EminentDKP.options = {
       	  type= "toggle",
 					name= L["Disable PVP"],
 					desc= L["Do not allow EminentDKP to function during PVP."],
-					get= function() return EminentDKP.db.profile.disablepvp end,
+					get= function() return EminentDKP.db.profile.officer.disablepvp end,
 					set= function(self, val)
-					  EminentDKP.db.profile.disablepvp = not EminentDKP.db.profile.disablepvp
+					  EminentDKP.db.profile.officer.disablepvp = not EminentDKP.db.profile.officer.disablepvp
 					  EminentDKP:DisableCheck()
 					end,
 					order= 6,
@@ -707,9 +707,9 @@ EminentDKP.options = {
       	  type= "toggle",
 					name= L["Disable Party"],
 					desc= L["Do not allow EminentDKP to function in a party."],
-					get= function() return EminentDKP.db.profile.disableparty end,
+					get= function() return EminentDKP.db.profile.officer.disableparty end,
 					set= function(self, val)
-					  EminentDKP.db.profile.disableparty = not EminentDKP.db.profile.disableparty
+					  EminentDKP.db.profile.officer.disableparty = not EminentDKP.db.profile.officer.disableparty
 					  EminentDKP:DisableCheck()
 					end,
 					order= 7,

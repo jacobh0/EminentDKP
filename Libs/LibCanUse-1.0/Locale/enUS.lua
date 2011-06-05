@@ -3,6 +3,7 @@ local L = LibStub("AceLocale-3.0"):NewLocale("LibCanUse-1.0", "enUS", true)
 if not L then return end
 
 -- PLEASE NOTE: These translations are READ OFF TOOLTIPS
+-- Translations must match EXACTLY as seen on the tooltips
 
 -- Classes
 L["Death Knight"] = "Death Knight"
@@ -63,8 +64,8 @@ L["Relic"] = "Relic"
 L["Wand"] = "Wand"
 L["Two-Hand"] = "Two-Hand"
 L["One-Hand"] = "One-Hand"
-L["Main-Hand"] = "Main-Hand"
-L["Held in Off-Hand"] = "Held in Off-Hand"
+L["Main Hand"] = "Main Hand"
+L["Held In Off-hand"] = "Held In Off-hand"
 
 -- Other
 

@@ -5,21 +5,20 @@
   
   The library checks basic things like if the class can use the armor type or weapon type,
   however it goes one step further and also attempts to match up primary stats with what
-  the class ideally should be using. There are some exceptions in this, mainly being
-  that all tank classes (DK, Paladin, Druid, Warrior) can potentially have overlap into
-  agility or strength based items, since they sometimes (rarely) are usable when itemization
-  from Blizzard is very poor in a tier.
+  the class ideally should be using.
   
-  Since this Library is tooltip scanning library, it is obviously based on the locale of the
+  Since this Library is a tooltip scanning library, it is obviously based on the locale of the
   client. Also note this library is not perfect and should not be assumed it will always be 100%
   accurate, so use at your own discretion.
   
   Created by Grioja of Crushridge-US
 ]]
 
-local MAJOR, MINOR = "LibCanUse", 0
+local MAJOR, MINOR = "LibCanUse-1.0", 0
 local LibCanUse, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 local L = LibStub("AceLocale-3.0"):GetLocale("LibCanUse-1.0", false)
+
+if not LibCanUse then return end
 
 -- Check if a class can use an item
 -- Three steps to check:
@@ -41,54 +40,56 @@ local ENGLISH_CLASSES = {
 }
 
 local CLASS_REQUIREMENTS = {
-  ["DEATHKNIGHT"] = { [1] => L["Plate"], 
-                      [2] => { L["Strength"], L["Agility"] }, 
-                      [3] => { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"], L["Relic"] },
-                      [4] => false },
-  ["DRUID"] = { [1] => L["Leather"], 
-                [2] => { L["Agility"], L["Intellect"] }, 
-                [3] => { L["Dagger"], L["Staff"], L["Mace"], L["Pole Arm"], L["Fist"], L["Relic"] }, 
-                [4] => false },
-  ["HUNTER"] = { [1] => L["Mail"], 
-                 [2] => { L["Agility"] }, 
-                 [3] => { L["Axe"], L["Sword"], L["Staff"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"] },
-                 [4] => false },
-  ["MAGE"] = { [1] => L["Cloth"], 
-               [2] => { L["Intellect"] }, 
-               [3] => { L["Sword"], L["Staff"], L["Dagger"], L["Wand"] },
-               [4] => true },
-  ["PALADIN"] = { [1] => L["Plate"], 
-                  [2] => { L["Strength"], L["Intellect"], L["Agility"] }, 
-                  [3] => { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"], L["Relic"] },
-                  [4] => false },
-  ["PRIEST"] = { [1] => L["Cloth"], 
-                 [2] => { L["Intellect"] }, 
-                 [3] => { L["Mace"], L["Staff"], L["Dagger"], L["Wand"] },
-                 [4] => true },
-  ["ROGUE"] = { [1] => L["Leather"], 
-                [2] => { L["Agility"] }, 
-                [3] => { L["Axe"], L["Sword"], L["Mace"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"], L["Thrown"] },
-                [4] => false },
-  ["SHAMAN"] = { [1] => L["Mail"], 
-                 [2] => { L["Agility"], L["Intellect"] }, 
-                 [3] => { L["Axe"], L["Staff"], L["Mace"], L["Pole Arm"], L["Relic"], L["Dagger"], L["Fist"] },
-                 [4] => false },
-  ["WARLOCK"] = { [1] => L["Cloth"], 
-                  [2] => { L["Intellect"] }, 
-                  [3] => { L["Sword"], L["Staff"], L["Dagger"], L["Wand"] },
-                  [4] => true },
-  ["WARRIOR"] = { [1] => L["Plate"], 
-                  [2] => { L["Strength"], L["Agility"] }, 
-                  [3] => { L["Axe"], L["Sword"], L["Mace"], L["Staff"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"], L["Thrown"] },
-                  [4] => false },
+  ["DEATHKNIGHT"] = { [1] = L["Plate"], 
+                      [2] = { L["Strength"] }, 
+                      [3] = { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"], L["Relic"] },
+                      [4] = false },
+  ["DRUID"] = { [1] = L["Leather"], 
+                [2] = { L["Agility"], L["Intellect"] }, 
+                [3] = { L["Dagger"], L["Staff"], L["Mace"], L["Pole Arm"], L["Fist"], L["Relic"] }, 
+                [4] = false },
+  ["HUNTER"] = { [1] = L["Mail"], 
+                 [2] = { L["Agility"] }, 
+                 [3] = { L["Axe"], L["Sword"], L["Staff"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"] },
+                 [4] = false },
+  ["MAGE"] = { [1] = L["Cloth"], 
+               [2] = { L["Intellect"] }, 
+               [3] = { L["Sword"], L["Staff"], L["Dagger"], L["Wand"] },
+               [4] = true },
+  ["PALADIN"] = { [1] = L["Plate"], 
+                  [2] = { L["Strength"], L["Intellect"] }, 
+                  [3] = { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"], L["Relic"] },
+                  [4] = false },
+  ["PRIEST"] = { [1] = L["Cloth"], 
+                 [2] = { L["Intellect"] }, 
+                 [3] = { L["Mace"], L["Staff"], L["Dagger"], L["Wand"] },
+                 [4] = true },
+  ["ROGUE"] = { [1] = L["Leather"], 
+                [2] = { L["Agility"] }, 
+                [3] = { L["Axe"], L["Sword"], L["Mace"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"], L["Thrown"] },
+                [4] = false },
+  ["SHAMAN"] = { [1] = L["Mail"], 
+                 [2] = { L["Agility"], L["Intellect"] }, 
+                 [3] = { L["Axe"], L["Staff"], L["Mace"], L["Pole Arm"], L["Relic"], L["Dagger"], L["Fist"] },
+                 [4] = false },
+  ["WARLOCK"] = { [1] = L["Cloth"], 
+                  [2] = { L["Intellect"] }, 
+                  [3] = { L["Sword"], L["Staff"], L["Dagger"], L["Wand"] },
+                  [4] = true },
+  ["WARRIOR"] = { [1] = L["Plate"], 
+                  [2] = { L["Strength"] }, 
+                  [3] = { L["Axe"], L["Sword"], L["Mace"], L["Staff"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"], L["Thrown"] },
+                  [4] = false },
 }
+
+local PRIMARY_STATS = { L["Agility"], L["Strength"], L["Intellect"] }
 
 local ITEM_SLOTS = { L["Head"], L["Neck"], L["Shoulder"], L["Back"],
                      L["Chest"], L["Shirt"], L["Tabard"], L["Wrists"],
                      L["Hands"], L["Waist"], L["Legs"], L["Feet"],
                      L["Finger"], L["Trinket"], L["Relic"], L["Wand"],
-                     L["Two-Hand"], L["One-Hand"], L["Main-Hand"],
-                     L["Held in Off-Hand"] }
+                     L["Two-Hand"], L["One-Hand"], L["Main Hand"],
+                     L["Held In Off-hand"] }
 
 local scan_tip
 local enable_stat_check = true
@@ -129,7 +130,7 @@ function LibCanUse:CanUseItem(classname,link)
   local primary_attrib
   local class_restrictions
   
-  for i = 1, math.min(6,EminentDKPST:NumLines()) do
+  for i = 1, math.min(8,LibCanUseScanTip:NumLines()) do
     -- Right text is only ever the item type
     local right_text = getglobal("LibCanUseScanTipTextRight" .. i)
     if right_text:GetText() then
@@ -145,7 +146,7 @@ function LibCanUse:CanUseItem(classname,link)
     local left_text = getglobal("LibCanUseScanTipTextLeft" .. i)
     if string.find(left_text:GetText(), L["Classes"], 1, true) then
       -- There is a class restriction line (this is a token)
-      class_restrictions = { strsplit(", ",string.sub(left_text:GetText(), strlen(L["Classes"]) + 1)) }
+      class_restrictions = { strsplit(",",string.gsub(string.sub(left_text:GetText(), strlen(L["Classes"]) + 2),'%s*','')) }
       -- Convert the localized class names into general english class names
       for i,name in ipairs(class_restrictions) do
         class_restrictions[i] = self:GetEnglishClass(name)
@@ -155,8 +156,8 @@ function LibCanUse:CanUseItem(classname,link)
       item_slot = left_text:GetText()
     else
       -- Search for a primary stat
-      local stat = string.match(left_text:GetText(), "["..L["Intellect"].."|"..L["Agility"].."|"..L["Strength"].."]+") then
-      if stat then
+      local stat = string.gsub(left_text:GetText(),"%s*+%d*%s*","")
+      if tContains(PRIMARY_STATS,stat) then
         primary_attrib = stat
       end
     end  
@@ -171,22 +172,26 @@ function LibCanUse:CanUseItem(classname,link)
     if is_weapon then
       if tContains(CLASS_REQUIREMENTS[classname][3],item_type) then
         -- Can we use only 1h?
-        if CLASS_REQUIREMENTS[classname][4] and item_type ~= L["Staff"] and item_slot ~= L["One-Hand"] then
-          -- If not a Staff (which are always 2h), and is not a 1h, can't use
+        if item_slot == L["Two-Hand"] and CLASS_REQUIREMENTS[classname][4] and item_type ~= L["Staff"] then
+          -- If not a Staff (which are always 2h), can't use
+          print('1')
           return false
         end
       else
         -- Cannot equip this weapon
+        print('2')
         return false
       end
     elseif item_slot ~= L["Back"] and item_type ~= CLASS_REQUIREMENTS[classname][1] then
       -- Should not (or cannot) equip this armor type
+      print('3')
       return false
     end
   end
   
   -- If primary stats don't match, shouldn't use the item
-  if enable_stat_check and primary_attrib and not tContains(CLASS_REQUIREMENTS[classname][2],primary_attrib) then
+  if enable_stat_check and primary_attrib ~= nil and not tContains(CLASS_REQUIREMENTS[classname][2],primary_attrib) then
+    print('failed primary stat check: ' .. primary_attrib)
     return false
   end
   

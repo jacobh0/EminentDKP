@@ -1052,8 +1052,59 @@ function EminentDKP:GlobalApplySettings()
   
   -- Broadcast version
   self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
+  
+  -- Broadcast officer version
+  --self:BroadcastOfficerTimestamp()
 end
 
+--[[
+function EminentDKP:BroadcastOfficerTimestamp()
+  if self:AmOfficer() then
+    self:SendCommMessage("EminentDKP-SOV",self:GetVersion()..":Hello",'OFFICER')
+  end
+end
+
+function EminentDKP:ProcessOfficerSyncVersion(prefix, message, distribution, sender)
+  if sender == self.myName then return end
+  if not self:AmOfficer() then return end
+  if not self:IsAnOfficer(sender) then return end
+  
+  -- check timestamp vs our own
+  
+  -- if ours is newer >, broadcast settings in next 2-6 seconds
+  -- if ours is older <, broadcast our version
+end
+
+
+function EminentDKP:ProcessOfficerSyncSettings(prefix, message, distribution, sender)
+  if sender == self.myName then return end
+  if not self:AmOfficer() then return end
+  if not self:IsAnOfficer(sender) then return end
+  
+  -- if our timestamp <= timestamp of these settings, cancel any pending broadcast
+  
+  -- Decode the compressed data
+  local one = libCE:Decode(message)
+
+  -- Decompress the decoded data
+  local two, message = libC:Decompress(one)
+  if not two then
+    self:Print("Error occured while decoding a sync event:" .. message)
+    return
+  end
+  
+  local version, lastModified, data = strsplit('_',two,3)
+  -- Ignore sync from incompatible versions
+  if not CheckVersionCompatability(version) then return end
+  
+  -- Deserialize the decompressed data
+  local success, event = libS:Deserialize(data)
+  if not success then
+    self:Print("Error occured while deserializing a sync event.")
+    return
+  end
+end
+]]
 -- DATABASE UPDATES
 function EminentDKP:DatabaseUpdate()
   for name, pool in pairs(self.db.factionrealm.pools) do
@@ -1122,6 +1173,8 @@ function EminentDKP:OnEnable()
   self:RegisterComm("EminentDKP-SE", "ProcessSyncEvent")
   self:RegisterComm("EminentDKP-CMD", "ProcessCommand")
   self:RegisterComm("EminentDKP-INF", "ProcessInformation")
+  --self:RegisterComm("EminentDKP-SOV", "ProcessOfficerSyncVersion")
+  --self:RegisterComm("EminentDKP-SOS", "ProcessOfficerSyncSettings")
   -- Custom event notifications
   self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
   self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
@@ -3335,6 +3388,12 @@ end
 function EminentDKP:ProcessSlashCmd(input)
   local command, arg1, arg2, e = self:GetArgs(input, 3)
   
+  if command == 'test' then
+    local itemlink = select(2,GetItemInfo(67423))
+    self:Print("warrior can use item: " .. (canuse:CanUseItem('Warrior',itemlink) and 'yes' or 'no'))
+    self:Print("priest can use item: " .. (canuse:CanUseItem('Priest',itemlink) and 'yes' or 'no'))
+  end
+
   if command == 'auction' then
     self:AdminStartAuction()
   elseif command == 'rebuild' then
