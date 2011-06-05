@@ -174,24 +174,20 @@ function LibCanUse:CanUseItem(classname,link)
         -- Can we use only 1h?
         if item_slot == L["Two-Hand"] and CLASS_REQUIREMENTS[classname][4] and item_type ~= L["Staff"] then
           -- If not a Staff (which are always 2h), can't use
-          print('1')
           return false
         end
       else
         -- Cannot equip this weapon
-        print('2')
         return false
       end
     elseif item_slot ~= L["Back"] and item_type ~= CLASS_REQUIREMENTS[classname][1] then
       -- Should not (or cannot) equip this armor type
-      print('3')
       return false
     end
   end
   
   -- If primary stats don't match, shouldn't use the item
   if enable_stat_check and primary_attrib ~= nil and not tContains(CLASS_REQUIREMENTS[classname][2],primary_attrib) then
-    print('failed primary stat check: ' .. primary_attrib)
     return false
   end
   

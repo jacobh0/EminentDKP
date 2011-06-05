@@ -3387,12 +3387,6 @@ end
 -- Handle slash commands
 function EminentDKP:ProcessSlashCmd(input)
   local command, arg1, arg2, e = self:GetArgs(input, 3)
-  
-  if command == 'test' then
-    local itemlink = select(2,GetItemInfo(67423))
-    self:Print("warrior can use item: " .. (canuse:CanUseItem('Warrior',itemlink) and 'yes' or 'no'))
-    self:Print("priest can use item: " .. (canuse:CanUseItem('Priest',itemlink) and 'yes' or 'no'))
-  end
 
   if command == 'auction' then
     self:AdminStartAuction()
