@@ -55,7 +55,7 @@ EminentDKP.defaults = {
           size = 1000000,
           available = 1000000
         },
-        sets = {},
+        modes = {},
         revision = 0,
       }
     }
@@ -72,7 +72,7 @@ EminentDKP.defaults = {
     hidecombat = true,
     bidonenter = false,
     maxplayerevents = 30,
-    maxmodeevents = 80,
+    maxmodeevents = 30,
     numberformat = 2,
     showranks = true,
     daystoshow = 14,
@@ -579,7 +579,7 @@ EminentDKP.options = {
           set= function(self, val)
             EminentDKP.db.profile.daystoshow = val
             EminentDKP:CancelTimer(EminentDKP.setHistoryTimer, true)
-            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("ReloadSets",1,true)
+            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("UpdateModes",1,true)
           end,
           order= 9,
 				},
@@ -594,7 +594,7 @@ EminentDKP.options = {
           set= function(self, val)
             EminentDKP.db.profile.maxplayerevents = val
             EminentDKP:CancelTimer(EminentDKP.setHistoryTimer, true)
-            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("ReloadSets",1,true)
+            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("UpdateModes",1,true)
           end,
           order= 10,
 				},
@@ -602,14 +602,14 @@ EminentDKP.options = {
           type= "range",
           name= L["Maximum Mode Events"],
           desc= L["The maximum number of events to include for certain modes."],
-          min= 40,
-          max= 120,
-          step= 1,
+          min= 15,
+          max= 50,
+          step= 5,
           get= function() return EminentDKP.db.profile.maxmodeevents end,
           set= function(self, val)
             EminentDKP.db.profile.maxmodeevents = val
             EminentDKP:CancelTimer(EminentDKP.setHistoryTimer, true)
-            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("ReloadSets",1,true)
+            EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("UpdateModes",1,true)
           end,
           order= 11,
 				},

@@ -6,7 +6,6 @@ local EminentDKP = EminentDKP
 local meter = EminentDKP:NewModule("MeterDisplay", "SpecializedLibBars-1.1")
 local libwindow = LibStub("LibWindow-1.1")
 local media = LibStub("LibSharedMedia-3.0")
-local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
 -- Our display providers.
 EminentDKP.displays = {}
@@ -16,7 +15,7 @@ EminentDKP.classColors = RAID_CLASS_COLORS
 local color_red = { .9, .10, .10 }
 local color_green = { .10, .9, .10 }
 
--- Add to EminentDKP's enormous list of display providers.
+-- Add to EminentDKP's list of display providers.
 meter.name = "Meter display"
 EminentDKP.displays["meter"] = meter
 
@@ -453,11 +452,6 @@ function EminentDKP:ReApplyItemFrameSettings()
   end
 end
 
--- Check if you can use an item
-function EminentDKP:CanIUseItem(link)
-  return canuse:CanUseItem(self:GetMyClass(),link)
-end
-
 function EminentDKP:FillOutItemFrame(f)
   local iName, iLink, iQuality, iLevel, iMinLevel, iType, iSubType, iStackCount, iEquipLoc, iTexture, iSellPrice = GetItemInfo(f.item)
   local color
@@ -650,7 +644,7 @@ local function TNum(number)
   end
 end
 
-function EminentDKP:ConfirmAction(name,msg,accept)
+function EminentDKP:ConfirmAction(name,msg,accept,cancel)
   StaticPopupDialogs[name] = {
     text = msg, 
     button1 = ACCEPT, 
@@ -659,6 +653,8 @@ function EminentDKP:ConfirmAction(name,msg,accept)
     whileDead = 1, 
     hideOnEscape = 0, 
     OnAccept = accept,
+    OnCancel = cancel,
+    OnHide = cancel,
   }
   StaticPopup_Show(name)
 end

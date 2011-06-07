@@ -24,11 +24,28 @@ local classFilter = {
                          "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" },
 }
 
+--[[
+  modes to create:
+  
+  1. attendance (variable date range in options?)
+
+  bugs:
+
+  - going to item view on a player then back up to
+    the mode view causes the bars to not be flush
+]]
+
+local function GetDaysBetween(this,that)
+  return math.floor((this - that) / 86400)
+end
+
+local function GetDaysSince(timestamp)
+  return GetDaysBetween(time(),timestamp)
+end
+
+
 local green = {r = 0, g = 255, b = 0, a = 1}
 local red = {r = 255, g = 0, b = 0, a = 1}
-
-local balanceMode = EminentDKP:NewModule(L["Earnings & Deductions"])
-local itemMode = EminentDKP:NewModule(L["Items Won"])
 
 local function item_tooltip(win, id, label, tooltip)
   tooltip:SetHyperlink(label)
@@ -62,92 +79,85 @@ local function FormatValueText(...)
   end
 end
 
-local function FindPlayer(set, playerid)
-  if set.sortnum == 1 then
-    -- This is the "all-time" set, so use the actual pool
-    return EminentDKP:GetPlayerByID(playerid)
+-- Filter players by class from the player pool
+local function FilterPlayers(list)
+  local filtered = {}
+  for pid, pdata in pairs(EminentDKP:GetPlayerPool()) do
+     if tContains(list,pdata.class) and pdata.active then
+       filtered[pid] = pdata
+     end
   end
-	for i, p in ipairs(set.players) do
-		if p.id == playerid then
-			return p
-		end
-	end
-	return nil
+  return filtered
 end
 
-local function GetPlayers(set)
-  if set.sortnum == 1 then
-	  -- This is the "all-time" set, so use the actual pool
-	  return EminentDKP:GetPlayerPool()
+-- Filter events from the event pool
+local function FilterEvents(typefilter)
+  local filtered = {}
+  local eventcount = 0
+  local eventid = EminentDKP:GetEventCount()
+  while eventid > 0 and eventcount < EminentDKP.db.profile.maxmodeevents do
+    local eid = tostring(eventid)
+    local e = EminentDKP:GetEvent(eid)
+    if typefilter(e,eid) then
+      eventcount = eventcount + 1
+      table.insert(filtered,eid)
+    end
+    eventid = eventid - 1
   end
-  return set.players
+  return filtered
 end
 
--- Get relevant events from a set
-local function GetEvents(set, typefilter)
-  local event_list = {}
-  if set.sortnum == 1 then
-    -- This is the "all-time" set, so use the actual pool
-    local eventcount = 0
-    local eventid = EminentDKP:GetEventCount()
-    while eventid > 0 and eventcount < EminentDKP.db.profile.maxmodeevents do
-      local eid = tostring(eventid)
-      local e = EminentDKP:GetEvent(eid)
-      if typefilter(e,eid) then
-        eventcount = eventcount + 1
-        table.insert(event_list,eid)
+-- Filter grouped events from the event pool
+local function FilterGroupedEvents(groupfilter, eventfilter)
+  local filtered = {}
+  local group_list = {}
+  local groupcount = 0
+  local eventid = EminentDKP:GetEventCount()
+  while eventid > 0 and groupcount < EminentDKP.db.profile.maxmodeevents do
+    local eid = tostring(eventid)
+    local e = EminentDKP:GetEvent(eid)
+    if eventfilter(e,eid) then
+      local grp = groupfilter(e)
+      if not group_list[grp] then
+        group_list[grp] = true
+        groupcount = groupcount + 1
       end
-      eventid = eventid - 1
+      table.insert(filtered,eid)
     end
-  else
-    for i, eid in ipairs(set.events) do
-      local e = EminentDKP:GetEvent(eid)
-      if typefilter(e,eid) then
-        table.insert(event_list,eid)
-      end
-    end
+    eventid = eventid - 1
   end
-  return event_list
+  return filtered
 end
 
 -- Group events based on a given attribute
-local function GetEventGroups(events, groupby)
+local function GroupEvents(events, groupfilter)
   local group_list = {}
   for i,eid in ipairs(events) do
     local e = EminentDKP:GetEvent(eid)
-    if group_list[e[groupby]] then
-      table.insert(group_list[e[groupby]],eid)
+    local grp = groupfilter(e)
+    if group_list[grp] then
+      table.insert(group_list[grp],eid)
     else
-      group_list[e[groupby]] = { eid }
+      group_list[grp] = { eid }
     end
   end
   return group_list
 end
 
 -- Get relevant player events depending on set
-local function GetPlayerEvents(set, playerid, typefilter)
+local function GetPlayerEvents(playerid, filter)
   local player = EminentDKP:GetPlayerByID(playerid)
   local event_list = {}
-  if set.sortnum == 1 then
-    -- This is the "all-time" set, so use the actual pool
-    local eventcount = 0
-    local eventid = EminentDKP:GetEventCount()
-    while eventid > 0 and eventcount < EminentDKP.db.profile.maxplayerevents do
-      local eid = tostring(eventid)
-      local e = EminentDKP:GetEvent(eid)
-      if typefilter(e,eid,player,playerid) then
-        eventcount = eventcount + 1
-        table.insert(event_list,eid)
-      end
-      eventid = eventid - 1
+  local eventcount = 0
+  local eventid = EminentDKP:GetEventCount()
+  while eventid > 0 and eventcount < EminentDKP.db.profile.maxplayerevents do
+    local eid = tostring(eventid)
+    local e = EminentDKP:GetEvent(eid)
+    if filter(e,eid,player,playerid) then
+      eventcount = eventcount + 1
+      table.insert(event_list,eid)
     end
-  else
-    for i, eid in ipairs(set.events) do
-      local e = EminentDKP:GetEvent(eid)
-      if typefilter(e,eid,player,playerid) then
-        table.insert(event_list,eid)
-      end
-    end
+    eventid = eventid - 1
   end
   return event_list
 end
@@ -169,12 +179,16 @@ local function event_filter_auction(event,eventid)
   return (event.eventType == "auction")
 end
 
+local function event_filter_transfer(event,eventid)
+  return (event.eventType == "transfer")
+end
+
 local function event_filter_bounty(event,eventid)
   return (event.eventType == "bounty")
 end
 
-local function custom_filter_auction_source(event,source)
-  return (event.eventType == "auction" and event.source == source)
+local function group_filter_source_day(event)
+  return event.source .. ":" .. date("%x",event.datetime)
 end
 
 local function MergeTables(source,other)
@@ -183,111 +197,79 @@ local function MergeTables(source,other)
   end
 end
 
-local function label_sort(a,b)
-  return a.label < b.label
+local function time_sort(a,b)
+  return a.time > b.time
 end
 
+local function label_sort(a,b)
+  return b.label > a.label
+end
+
+local function getModeData(what)
+  return EminentDKP:GetModeData()[what]
+end
+
+local function setModeData(mode,data)
+  EminentDKP:GetModeData()[what] = data
+end
+
+local balanceMode = EminentDKP:NewModule(L["Earnings & Deductions"])
+local itemMode = EminentDKP:NewModule(L["Items Won"])
+
 local classModePrototype = {
-  OnEnable = function(self) 
+  OnEnable = function(self)
     self.metadata	        = {showspots = true, ordersort = true, click1 = itemMode, click2 = balanceMode, columns = { DKP = true, Percent = true }}
   	balanceMode.metadata	= {showspots = false, ordersort = true, columns = { DKP = true, Source = true, Time = true }}
+  	balanceMode.parent    = self
   	itemMode.metadata   	= {showspots = false, ordersort = true, tooltip = item_tooltip, click = linkitem, columns = { DKP = true }}
+    itemMode.parent       = self
     
   	EminentDKP:AddMode(self)
   end,
   OnDisable = function(self)
   	EminentDKP:RemoveMode(self)
   end,
-  GetSetSummary = function(self, set) 
-    return EminentDKP:FormatNumber(set.modedata[self:GetName()].currentDKP)
+  GetSetSummary = function(self) 
+    return EminentDKP:FormatNumber(getModeData(self:GetName()).currentDKP)
   end,
-  CalculateData = function(self, set)
-    -- Ensure these calculations are only done once
-    if not set.changed then return end
+  CalculateData = function(self)
     -- Reset the totals
-    set.modedata[self:GetName()].currentDKP = 0
-    set.modedata[self:GetName()].earnedDKP = 0
-    if set.sortnum == 1 then
-  	  -- This is the "all-time" set, so use the actual pool
-  	  for pid, player in pairs(EminentDKP:GetPlayerPool()) do
-        -- Iterate through the player's relevant events and calculate data!
-        if player.active and tContains(classFilter[self:GetName()],player.class) then
-          set.modedata[self:GetName()].currentDKP = set.modedata[self:GetName()].currentDKP + player.currentDKP
-          set.modedata[self:GetName()].earnedDKP = set.modedata[self:GetName()].earnedDKP + player.earnedDKP
-        end
-      end
-      return
-    end
-    
-    for i, p in pairs(set.players) do
-      -- Iterate through the player's relevant events and calculate data!
-      local player = EminentDKP:GetPlayerByID(p.id)
-      if tContains(classFilter[self:GetName()],player.class) then
-        if p.modedata.earnedDKP == 0 then
-          for j, eid in ipairs(set.events) do
-            local event = EminentDKP:GetEvent(eid)
-            -- Vanity resets are of no concern
-            if event.eventType ~= 'vanityreset' then
-              -- Was there an earning?
-              if player.earnings[eid] then
-                p.modedata.currentDKP = p.modedata.currentDKP + player.earnings[eid]
-                p.modedata.earnedDKP = p.modedata.earnedDKP + player.earnings[eid]
-              end
-              -- Was there a deduction?
-              if player.deductions[eid] then 
-                p.modedata.currentDKP = p.modedata.currentDKP - player.deductions[eid]
-              end
-            end
-          end
-        end
-        set.modedata[self:GetName()].currentDKP = set.modedata[self:GetName()].currentDKP + p.modedata.currentDKP
-        set.modedata[self:GetName()].earnedDKP = set.modedata[self:GetName()].earnedDKP + p.modedata.earnedDKP
-      end
+    getModeData(self:GetName()).currentDKP = 0
+    getModeData(self:GetName()).earnedDKP = 0
+	  
+	  for pid, player in pairs(FilterPlayers(classFilter[self:GetName()])) do
+      -- Iterate through the player's relevant events and sum DKP
+      getModeData(self:GetName()).currentDKP = getModeData(self:GetName()).currentDKP + player.currentDKP
+      getModeData(self:GetName()).earnedDKP = getModeData(self:GetName()).earnedDKP + player.earnedDKP
     end
   end,
-  PopulateData = function(self, win, set)
+  PopulateData = function(self, win)
   	local max = 0
   	local nr = 1
     
-  	for pid, player in pairs(GetPlayers(set)) do
-  	  local hasmodedata = (player.modedata ~= nil)
-  	  local pdata = (hasmodedata and EminentDKP:GetPlayerByID(player.id) or player)
-  		if tContains(classFilter[self:GetName()],pdata.class) and pdata.active then
-  		  -- Only show people who have had any activity in the system...
-  		  if not EminentDKP:IsPlayerFresh(pdata) then
-  			  local d = win.dataset[nr] or {}
-    			win.dataset[nr] = d
-    			d.id = (hasmodedata and player.id or pid)
-    			d.label = EminentDKP:GetPlayerNameByID(d.id)
-    			d.value = (hasmodedata and player.modedata.currentDKP or pdata.currentDKP)
-    			d.class = pdata.class
-    			-- Never show percent unless it is the alltime set, the percents are meaningless on individual days
-    			local showpercent = false
-    			if set.sortnum == 1 then
-    			  showpercent = self.metadata.columns.Percent
-  			  end
-    			d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
-    			                              EminentDKP:StdNumber((d.value / set.modedata[self:GetName()].currentDKP) * 100).."%", showpercent)
-    			if d.value > max then
-    				max = d.value
-    			end
-    			nr = nr + 1
+  	for pid, pdata in pairs(FilterPlayers(classFilter[self:GetName()])) do
+		  -- Only show people who have had any activity in the system...
+		  if not EminentDKP:IsPlayerFresh(pdata) then
+			  local d = win.dataset[nr] or {}
+  			win.dataset[nr] = d
+  			d.id = pid
+  			d.label = EminentDKP:GetPlayerNameByID(d.id)
+  			d.value = pdata.currentDKP
+  			d.class = pdata.class
+  			d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
+  			                              EminentDKP:StdNumber((d.value / getModeData(self:GetName()).currentDKP) * 100).."%", self.metadata.columns.Percent)
+  			if d.value > max then
+  				max = d.value
   			end
+  			nr = nr + 1
   		end
   	end
   	win.metadata.maxvalue = max
   end,
-  AddPlayerAttributes = function(self, player)
-    -- Called when a new player is added to a set.
-    if not player.modedata.currentDKP then
-      player.modedata.earnedDKP = 0
-      player.modedata.currentDKP = 0
-  	end
-  end,
-  AddSetAttributes = function(self, set)
-    -- Called when a new set is created.
-    if not set.modedata[self:GetName()] then
-      set.modedata[self:GetName()] = { earnedDKP = 0, currentDKP = 0 }
+  AddAttributes = function(self)
+    -- Called when mode is added
+    if not getModeData(self:GetName()) then
+      setModeData(self:GetName(),{ earnedDKP = 0, currentDKP = 0 })
   	end
   end
 }
@@ -334,19 +316,31 @@ auctionMode.sortnum = 2
 
 local bountyMode = EminentDKP:NewModule(L["Bounties"])
 local awardeeMode = EminentDKP:NewModule(L["Awardees"])
-bountyMode.sortnum = 3
+bountyMode.sortnum = 2
 
-function bountyMode:PopulateData(win, set)
+local activityMode = EminentDKP:NewModule(L["Activity"])
+activityMode.sortnum = 2
+
+local vanityMode = EminentDKP:NewModule(L["Vanity"])
+vanityMode.sortnum = 2
+local vanityRollMode = EminentDKP:NewModule(L["Vanity Rolls"])
+vanityRollMode.sortnum = 2
+
+local transferMode = EminentDKP:NewModule(L["Transfers"])
+transferMode.sortnum = 2
+
+function bountyMode:PopulateData(win)
   local nr = 1
   local max = 0
   
-  for i, eid in ipairs(GetEvents(set,event_filter_bounty)) do
+  for i, eid in ipairs(getModeData(self:GetName()).events) do
     local event = EminentDKP:GetEvent(eid)
     local d = win.dataset[nr] or {}
 		win.dataset[nr] = d
 		d.id = eid
 		d.label = event.source
 		d.value = event.value
+		d.time = event.datetime
 		d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
 		                              date("%x",event.datetime), self.metadata.columns.Date)
 	
@@ -358,37 +352,27 @@ function bountyMode:PopulateData(win, set)
   win.metadata.maxvalue = max
 end
 
-function bountyMode:CalculateData(set)
-  -- Ensure these calculations are only done once
-  if not set.changed then return end
-  if set.sortnum == 1 then
-    -- This is the alltime set, so go find events that are bountys
-    local filtered_events = GetEvents(set,event_filter_bounty)
-    MergeTables(set.events,filtered_events)
-    set.modedata[self:GetName()].bountyCount = #(filtered_events)
-  else
-    set.modedata[self:GetName()].bountyCount = #(GetEvents(set,event_filter_bounty))
-  end
+function bountyMode:CalculateData()
+  wipe(getModeData(self:GetName()).events)
+  MergeTables(getModeData(self:GetName()).events,FilterEvents(event_filter_bounty))
 end
 
-function bountyMode:GetSetSummary(set) 
-  return set.modedata[self:GetName()].bountyCount
+function bountyMode:GetSetSummary() 
+  return #(getModeData(self:GetName()).events)
 end
 
 function bountyMode:OnEnable()
-  self.metadata	       = {showspots = false, ordersort = true, click1 = awardeeMode, columns = { DKP = true, Date = true }}
+  self.metadata	       = {showspots = false, ordersort = true, sortfunc = time_sort, click1 = awardeeMode, columns = { DKP = true, Date = true }}
   awardeeMode.metadata = {showspots = true, ordersort = true, sortfunc = label_sort, columns = { DKP = true }}
+  awardeeMode.parent   = self
   
 	EminentDKP:AddMode(self)
 end
 
-function bountyMode:AddPlayerAttributes(player)
-end
-
-function bountyMode:AddSetAttributes(set)
+function bountyMode:AddAttributes()
   -- Called when a new set is created.
-  if not set.modedata[self:GetName()] then
-    set.modedata[self:GetName()] = { bountyCount = 0 }
+  if not getModeData(self:GetName()) then
+    setModeData(self:GetName(),{ events = {} })
 	end
 end
 
@@ -397,7 +381,7 @@ function awardeeMode:Enter(win, id, label)
 	self.title = label.." "..L["Awardees"]
 end
 
-function awardeeMode:PopulateData(win, set)
+function awardeeMode:PopulateData(win)
   local event = EminentDKP:GetEvent(self.eventid)
   local nr = 1
   
@@ -416,18 +400,20 @@ function awardeeMode:PopulateData(win, set)
   end
 end
 
-function auctionMode:PopulateData(win, set)
+function auctionMode:PopulateData(win)
   local nr = 1
   local max = 0
-  local eligible_events = GetEvents(set,event_filter_auction)
   
-  for source, eventlist in pairs(GetEventGroups(eligible_events,"source")) do
+  for source, eventlist in pairs(GroupEvents(getModeData(self:GetName()).events,group_filter_source_day)) do
+    local event = EminentDKP:GetEvent(eventlist[1])
     local d = win.dataset[nr] or {}
 		win.dataset[nr] = d
 		d.id = source
-		d.label = source
+		d.label = event.source
 		d.value = #(eventlist)
-		d.valuetext = FormatValueText(d.value, self.metadata.columns.Count)
+		d.time = event.datetime
+		d.valuetext = FormatValueText(d.value, self.metadata.columns.Count,
+		                              date("%x",d.time), self.metadata.columns.Date)
 	
 		if d.value > max then
 			max = d.value
@@ -437,67 +423,55 @@ function auctionMode:PopulateData(win, set)
   win.metadata.maxvalue = max
 end
 
-function auctionMode:CalculateData(set)
-  -- Ensure these calculations are only done once
-  if not set.changed then return end
-  if set.sortnum == 1 then
-    -- This is the alltime set, so go find events that are auctions
-    local filtered_events = GetEvents(set,event_filter_auction)
-    MergeTables(set.events,filtered_events)
-    set.modedata[self:GetName()].auctionCount = #(filtered_events)
-  else
-    set.modedata[self:GetName()].auctionCount = #(GetEvents(set,event_filter_auction))
-  end
+function auctionMode:CalculateData()
+  wipe(getModeData(self:GetName()).events)
+  MergeTables(getModeData(self:GetName()).events,FilterGroupedEvents(group_filter_source_day,event_filter_auction))
 end
 
-function auctionMode:GetSetSummary(set) 
-  return set.modedata[self:GetName()].auctionCount
+function auctionMode:GetSetSummary() 
+  return #(getModeData(self:GetName()).events)
 end
 
 function auctionMode:OnEnable()
-  self.metadata	      = {showspots = false, ordersort = true, sortfunc = label_sort, click1 = winnerMode, columns = { Count = true }}
+  self.metadata	      = {showspots = false, ordersort = true, sortfunc = time_sort, click1 = winnerMode, columns = { Count = true, Date = true }}
   winnerMode.metadata = {showspots = false, ordersort = true, tooltip = item_tooltip, click = linkitem, columns = { DKP = true, Winner = true }}
+  winnerMode.parent   = self
   
 	EminentDKP:AddMode(self)
 end
 
-function auctionMode:AddPlayerAttributes(player)
-end
-
-function auctionMode:AddSetAttributes(set)
+function auctionMode:AddAttributes()
   -- Called when a new set is created.
-  if not set.modedata[self:GetName()] then
-    set.modedata[self:GetName()] = { auctionCount = 0 }
+  if not getModeData(self:GetName()) then
+    setModeData(self:GetName(),{ events = {} })
 	end
 end
 
 function winnerMode:Enter(win, id, label)
-  self.creaturesource = id
+  self.events = GroupEvents(modedata()[self.parent:GetName()].events,group_filter_source_day)[id]
 	self.title = label..L["'s Auctions"]
 end
 
-function winnerMode:PopulateData(win, set)
+function winnerMode:PopulateData(win)
   local nr = 1
   local max = 0
   
-  for i, eid in ipairs(set.events) do
+  for i, eid in ipairs(self.events) do
     local event = EminentDKP:GetEvent(eid)
-    if custom_filter_auction_source(event,self.creaturesource) then
-      local d = win.dataset[nr] or {}
-  		win.dataset[nr] = d
-  		d.id = eid
-  		-- Because Blizzard is slow and doesn't always return the itemlink in time
-  		d.label = select(2, GetItemInfo(event.extraInfo)) or "(Querying Item)"
-  		d.value = event.value
-  		d.valuetext = FormatValueText(EminentDKP:FormatNumber(event.value), self.metadata.columns.DKP,
-  		                              EminentDKP:GetPlayerNameByID(event.target), self.metadata.columns.Winner)
-  		d.icon = select(10, GetItemInfo(event.extraInfo))
-		
-  		if d.value > max then
-  			max = d.value
-  		end
-  		nr = nr + 1
+    local d = win.dataset[nr] or {}
+		win.dataset[nr] = d
+		d.id = eid
+		-- Because Blizzard is slow and doesn't always return the itemlink in time
+		d.label = select(2, GetItemInfo(event.extraInfo)) or "(Querying Item)"
+		d.value = event.value
+		d.valuetext = FormatValueText(EminentDKP:FormatNumber(event.value), self.metadata.columns.DKP,
+		                              EminentDKP:GetPlayerNameByID(event.target), self.metadata.columns.Winner)
+		d.icon = select(10, GetItemInfo(event.extraInfo))
+	
+		if d.value > max then
+			max = d.value
 		end
+		nr = nr + 1
   end
   win.metadata.maxvalue = max
 end
@@ -507,17 +481,16 @@ function balanceMode:Enter(win, id, label)
 	self.title = label..L["'s Earnings & Deductions"]
 end
 
-function balanceMode:PopulateData(win, set) 
-  local player = FindPlayer(set,self.playerid)
-  local playerData = (player.currentDKP and player or EminentDKP:GetPlayerByID(self.playerid))
+function balanceMode:PopulateData(win)
+  local pdata = EminentDKP:GetPlayerByID(self.playerid)
   local nr = 1
   local max = 0
   
-  for i, eid in ipairs(GetPlayerEvents(set,self.playerid,player_event_filter_balance)) do
+  for i, eid in ipairs(GetPlayerEvents(self.playerid,player_event_filter_balance)) do
     local event = EminentDKP:GetEvent(eid)
     local debits = {}
-    debits.e = playerData.earnings[eid]
-    debits.d = playerData.deductions[eid]
+    debits.e = pdata.earnings[eid]
+    debits.d = pdata.deductions[eid]
     for debitType, amount in pairs(debits) do
       local d = win.dataset[nr] or {}
 			win.dataset[nr] = d
@@ -554,12 +527,11 @@ function itemMode:Enter(win, id, label)
 	self.title = L["Items won by"].." "..label
 end
 
-function itemMode:PopulateData(win, set) 
-  local player = FindPlayer(set,self.playerid)
+function itemMode:PopulateData(win)
   local nr = 1
   local max = 0
   
-  for i, eid in ipairs(GetPlayerEvents(set,self.playerid,player_event_filter_auction_target)) do
+  for i, eid in ipairs(GetPlayerEvents(self.playerid,player_event_filter_auction_target)) do
     local event = EminentDKP:GetEvent(eid)
     local d = win.dataset[nr] or {}
 		win.dataset[nr] = d
@@ -576,4 +548,189 @@ function itemMode:PopulateData(win, set)
 		nr = nr + 1
   end
   win.metadata.maxvalue = max
+end
+
+function activityMode:PopulateData(win)
+  local nr = 1
+  local max = 0
+  
+  for pid, pdata in pairs(FilterPlayers(classFilter[L["All Classes"]])) do
+    -- Only show people who have had any activity in the system...
+    if not EminentDKP:IsPlayerFresh(pdata) then
+      local d = win.dataset[nr] or {}
+      win.dataset[nr] = d
+      d.id = pid
+      d.label = EminentDKP:GetPlayerNameByID(d.id)
+      d.value = GetDaysSince(pdata.lastRaid)
+      d.class = pdata.class
+      d.valuetext = FormatValueText(d.value, self.metadata.columns.Count,
+                                    date("%x",pdata.lastRaid), self.metadata.columns.Date)
+    
+      if d.value > max then
+        max = d.value
+      end
+      nr = nr + 1
+    end
+  end
+  win.metadata.maxvalue = max
+end
+
+function activityMode:CalculateData()
+end
+
+function activityMode:GetSetSummary() 
+  return ""
+end
+
+function activityMode:OnEnable()
+  self.metadata       = {showspots = true, ordersort = true, columns = { Count = true, Date = true }}
+  
+  EminentDKP:AddMode(self)
+end
+
+function activityMode:AddAttributes()
+end
+
+function vanityMode:PopulateData(win)
+  local nr = 1
+  local max = 0
+  
+  for pid, pdata in pairs(FilterPlayers(classFilter[L["All Classes"]])) do
+    -- Only show people who have had any activity in the system...
+    if not EminentDKP:IsPlayerFresh(pdata) then
+      local d = win.dataset[nr] or {}
+      win.dataset[nr] = d
+      d.id = pid
+      d.label = EminentDKP:GetPlayerNameByID(d.id)
+      d.value = pdata.currentVanityDKP
+      d.class = pdata.class
+      d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
+                                    EminentDKP:StdNumber((d.value / getModeData(self:GetName()).currentVanityDKP) * 100).."%", self.metadata.columns.Percent)
+
+      if d.value > max then
+        max = d.value
+      end
+      nr = nr + 1
+    end
+  end
+  win.metadata.maxvalue = max
+end
+
+function vanityMode:CalculateData()
+  -- Reset the totals
+  getModeData(self:GetName()).currentVanityDKP = 0
+
+  for pid, player in pairs(FilterPlayers(classFilter[L["All Classes"]])) do
+    -- Iterate through the player's relevant events and sum DKP
+    getModeData(self:GetName()).currentVanityDKP = getModeData(self:GetName()).currentVanityDKP + player.currentVanityDKP
+  end
+end
+
+function vanityMode:GetSetSummary() 
+  return EminentDKP:FormatNumber(getModeData(self:GetName()).currentVanityDKP)
+end
+
+function vanityMode:OnEnable()
+  self.metadata       = {showspots = true, ordersort = true, columns = { DKP = true, Percent = true }}
+  
+  EminentDKP:AddMode(self)
+end
+
+function vanityMode:AddAttributes()
+  -- Called when mode is added
+  if not getModeData(self:GetName()) then
+    setModeData(self:GetName(),{ currentVanityDKP = 0 })
+  end
+end
+
+function vanityRollMode:PopulateData(win)
+  local nr = 1
+  local max = 0
+  
+  for pid, roll in pairs(getModeData(self:GetName()).rolls) do
+    local pdata = EminentDKP:GetPlayerById(pid)
+    local d = win.dataset[nr] or {}
+    win.dataset[nr] = d
+    d.id = pid
+    d.label = EminentDKP:GetPlayerNameByID(d.id)
+    d.value = roll
+    d.class = pdata.class
+    d.valuetext = FormatValueText(d.value, self.metadata.columns.Roll)
+
+    if d.value > max then
+      max = d.value
+    end
+    nr = nr + 1
+  end
+  win.metadata.maxvalue = max
+end
+
+function vanityRollMode:CalculateData()
+end
+
+function vanityRollMode:InjectData(data)
+  getModeData(self:GetName()).rolls = data
+end
+
+function vanityRollMode:GetSetSummary() 
+  return ""
+end
+
+function vanityRollMode:OnEnable()
+  self.metadata       = {showspots = true, ordersort = true, columns = { Roll = true }}
+  
+  EminentDKP:AddMode(self)
+end
+
+function vanityRollMode:AddAttributes()
+  -- Called when mode is added
+  if not getModeData(self:GetName()) then
+    setModeData(self:GetName(),{ rolls = {} })
+  end
+end
+
+function transferMode:PopulateData(win)
+  local nr = 1
+  local max = 0
+  
+  for i, eid in ipairs(getModeData(self:GetName()).events) do
+    local event = EminentDKP:GetEvent(eid)
+    local d = win.dataset[nr] or {}
+    win.dataset[nr] = d
+    d.id = eid
+    d.label = EminentDKP:GetPlayerNameByID(event.target)
+    d.value = event.value
+    d.time = event.datetime
+    d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.DKP,
+                                  EminentDKP:GetPlayerNameByID(event.source), self.metadata.columns.Source,
+                                  date("%x",event.datetime), self.metadata.columns.Date)
+  
+    if d.value > max then
+      max = d.value
+    end
+    nr = nr + 1
+  end
+  win.metadata.maxvalue = max
+end
+
+function transferMode:CalculateData()
+  wipe(getModeData(self:GetName()).events)
+  MergeTables(getModeData(self:GetName()).events,FilterEvents(event_filter_transfer))
+end
+
+function transferMode:GetSetSummary() 
+  return #(getModeData(self:GetName()).events)
+end
+
+function transferMode:OnEnable()
+  self.metadata        = {showspots = false, ordersort = true, sortfunc = time_sort, columns = { Source = true, DKP = true, Date = true }}
+  
+  EminentDKP:AddMode(self)
+end
+
+function transferMode:AddAttributes()
+  -- Called when a new set is created.
+  if not getModeData(self:GetName()) then
+    setModeData(self:GetName(),{ events = {} })
+  end
 end

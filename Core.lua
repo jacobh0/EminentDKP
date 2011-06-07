@@ -16,9 +16,6 @@ local addon_versions = {}
 -- All the meter windows
 local windows = {}
 
--- All saved sets
-local sets = {}
-
 -- Modes (see Modes.lua)
 local modes = {}
 
@@ -362,26 +359,19 @@ local function click_on_mode(win, id, label, button)
 end
 
 -- Sets up the mode list.
-function Window:DisplayModes(setid)
+function Window:DisplayModes()
   self.history = {}
   self:Wipe()
 
-  self.selectedplayer = nil
+  self.selectedsubmode = nil
   self.selectedmode = nil
 
   self.metadata = {}
   self.metadata.title = L["EminentDKP: Modes"]
-
-  -- Verify the selected set
-  if sets[setid] then
-    self.selectedset = setid
-  else
-    self.selectedset = "alltime"
-  end
   
   -- Save for remembrance
   self.settings.mode = nil
-  self.settings.set = self.selectedset
+  self.settings.submode = nil
   
   self.metadata.click = click_on_mode
   self.metadata.maxvalue = 1
@@ -400,20 +390,15 @@ end
 -- Default "right-click" behaviour in case no special click function is defined:
 -- 1) If there is a mode traversal history entry, go to the last mode.
 -- 2) Go to modes list if we are in a mode.
--- 3) Go to set list.
 function Window:RightClick(group, button)
-  if self.selectedmode then
-    -- If mode traversal history exists, go to last entry, else mode list.
-    if #(self.history) > 0 then
-      self:DisplayMode(tremove(self.history))
-    else
-      self:DisplayModes(self.selectedset)
-    end
-  elseif self.selectedset then
-    self:DisplaySets()
+  -- If mode traversal history exists, go to last entry, else mode list.
+  if #(self.history) > 0 then
+    self:DisplayMode(tremove(self.history))
+  else
+    self:DisplayModes()
   end
 end
-
+--[[
 -- Sets up the set list.
 function Window:DisplaySets()
   self.history = {}
@@ -422,10 +407,12 @@ function Window:DisplaySets()
   self.metadata = {}
   
   self.selectedmode = nil
-  self.selectedset = nil
+  self.selectedsubmode = nil
+  --self.selectedset = nil
   
   self.settings.mode = nil
-  self.settings.set = nil
+  self.settings.submode = nil
+  --self.settings.set = nil
 
   self.metadata.title = L["EminentDKP: Days"]
 
@@ -440,37 +427,7 @@ function Window:DisplaySets()
   EminentDKP:UpdateDisplay(self)
 end
 
-function Window:get_selected_set()
-  if sets[self.selectedset] then
-    return sets[self.selectedset]
-  end
-  return sets.alltime
-end
-
--- Ask a mode to verify the contents of a set.
-local function verify_set(mode, set)
-  for j, player in ipairs(set.players) do
-    if mode.AddPlayerAttributes then
-      mode:AddPlayerAttributes(player)
-    end
-  end
-  mode:CalculateData(set)
-end
-
--- Create a set with default attributes and have the modes apply their attributes
-local function createSet(setname)
-  local set = {players = {}, events = {}, name = setname, sortnum = 3,
-               starttime = 0, endtime = 0, changed = true, modedata = {}}
-  
-  -- Tell each mode to apply its needed attributes.
-  for i, mode in ipairs(modes) do 
-    if mode.AddSetAttributes then
-      mode:AddSetAttributes(set)
-    end
-  end
-
-  return set
-end
+]]
 
 function EminentDKP:GetWindows()
   return windows
@@ -499,8 +456,8 @@ function EminentDKP:tcopy(to, from)
   end
 end
 
-function EminentDKP:GetMeterSets()
-  return self:GetActivePool().sets
+function EminentDKP:GetModeData()
+  return self:GetActivePool().modes
 end
 
 -- Create a window and its db settings
@@ -515,7 +472,8 @@ function EminentDKP:CreateWindow(name, settings)
   window.settings = settings
   window.settings.name = name
   
-  window.selectedset = window.settings.set
+  --window.selectedset = window.settings.set
+  window.selectedsubmode = window.settings.submode
   if window.settings.mode then
     window.selectedmode = find_mode(window.settings.mode)
   end
@@ -532,10 +490,8 @@ function EminentDKP:CreateWindow(name, settings)
   -- Display initial view depending on settings
   if window.selectedmode then
     window:DisplayMode(window.selectedmode)
-  elseif window.selectedset then
-    window:DisplayModes(window.selectedset)
   else
-    window:DisplaySets()
+    window:DisplayModes()
   end
 end
 
@@ -555,34 +511,6 @@ function EminentDKP:DeleteWindow(name)
   self.options.args.windows.args[name] = nil
 end
 
--- Builds a unique list of players for a set
-local function MarkPlayersSeen(seen, set, event)
-  local playerids = { }
-  
-  local source_id = tostring(tonumber(event.source) or 0)
-  local target_id = tostring(tonumber(event.target) or 0)
-  if source_id ~= "0" then table.insert(playerids,source_id) end
-  if target_id ~= "0" then table.insert(playerids,target_id) end
-  if event.beneficiary ~= "" then
-    MergeTables(playerids,{ strsplit(",",event.beneficiary) })
-  end
-  
-  if not seen[set.name] then
-    seen[set.name] = {}
-  end
-  
-  for i, pid in ipairs(playerids) do
-    -- Seen this player in this set?
-    if not seen[set.name][pid] then
-      local player = EminentDKP:GetPlayerByID(pid)
-      if player and player.active then
-        table.insert(set.players, {id=pid,modedata={}})
-        seen[set.name][pid] = true
-      end
-    end
-  end
-end
-
 -- Reload
 function EminentDKP:ReloadWindows()
   -- Delete all existing windows in case of a profile change.
@@ -591,13 +519,8 @@ function EminentDKP:ReloadWindows()
   end
   wipe(windows)
   
-  -- Re-create sets
-  sets = self:GetMeterSets()
-  if not next(sets) then
-    self:ReloadSets(false)
-  else
-    self:VerifyTodaySet()
-  end
+  -- Calculate mode data
+  self:UpdateModes(false)
 
   -- Re-create windows
   for i, win in ipairs(self.db.profile.windows) do
@@ -605,132 +528,13 @@ function EminentDKP:ReloadWindows()
   end
 end
 
--- Reload all the "days" on the meter display
-function EminentDKP:ReloadSets(updatedisplays)
-  sets = self:GetMeterSets()
-  wipe(sets)
-  
-  local today = GetTodayDate()
-  sets.alltime = createSet(L["All-time"])
-  sets.alltime.sortnum = 1
-  sets.today = createSet(L["Today"])
-  sets.today.date = today
-  sets.today.sortnum = 2
-  
-  local eventHash = {}
-  -- Start from most recent event and work backwards
-  for eventid = self:GetEventCount(), 1, -1 do
-    local eid = tostring(eventid)
-    local event = self:GetEvent(eid)
-    local diff = GetDaysSince(event.datetime)
-    if eventid > 0 and diff <= self.db.profile.daystoshow then
-      local date = GetDate(event.datetime)
-      if sets.today.date == date then
-        table.insert(sets.today.events,eid)
-        sets.today.starttime = event.datetime
-        MarkPlayersSeen(eventHash, sets.today, event)
-      elseif sets[date] then
-        table.insert(sets[date].events,eid)
-        sets[date].starttime = event.datetime
-        MarkPlayersSeen(eventHash, sets[date], event)
-      else
-        local set = createSet(date)
-        set.endtime = event.datetime
-        table.insert(set.events, eid)
-        sets[date] = set
-        MarkPlayersSeen(eventHash, set, event)
-      end
-    else
-      -- Stop when we extend beyond our boundary
-      break
-    end
+-- For all modes, have them re-calculate data
+function EminentDKP:UpdateModes(updatedisplays)
+  for j, mode in ipairs(modes) do
+    mode:CalculateData()
   end
-  
-  self:VerifyAllSets()
   if updatedisplays then
     self:UpdateAllDisplays()
-  end
-end
-
-function EminentDKP:VerifyTodaySet()
-  -- Verify the "Today" set is actually today
-  local today = GetTodayDate()
-  if sets.today.date ~= today then
-    -- Has the Today set even been used yet?
-    if #(sets.today.players) > 0 then
-      local oldtoday = {}
-      self:tcopy(oldtoday, sets.today)
-      oldtoday.name = oldtoday.date
-      oldtoday.sortnum = 3
-      sets[oldtoday.date] = oldtoday
-      sets.today = createSet(L["Today"])
-      sets.today.date = today
-      sets.today.sortnum = 2
-    
-      self:VerifySet(sets.today)
-    else
-      sets.today.date = today
-    end
-  end
-  -- Prune any sets that extend beyond our given timeframe
-  for name, set in pairs(sets) do
-    if set.sortnum == 3 then
-      if GetDaysSince(set.starttime) > self.db.profile.daystoshow then
-        sets[name] = nil
-      end
-    end
-  end
-end
-
--- Only update the sets that have changed in the last sync
-function EminentDKP:UpdateSyncedDays()
-  -- Ensure the today set is proper
-  self:VerifyTodaySet()
-  
-  local seen = {}
-  for date,events in pairs(synced_dates) do
-    local set
-    if sets[date] then
-      set = sets[date]
-    elseif sets.today.date == date then
-      set = sets.today
-    else
-      -- Set doesn't exist, so make it
-      if GetDaysSince(self:GetEvent(events[1]).datetime) <= self.db.profile.daystoshow then
-        set = createSet(date)
-        sets[date] = set
-      end
-    end
-    if set then
-      MergeTables(set.events,events,true)
-      set.endtime = self:GetEvent(set.events[1]).datetime
-      set.starttime = self:GetEvent(set.events[#(set.events)]).datetime
-      wipe(set.players)
-      for i, eid in ipairs(set.events) do
-        MarkPlayersSeen(seen, set, self:GetEvent(eid))
-      end
-      set.changed = true
-    end
-  end
-  wipe(sets.alltime.events)
-  sets.alltime.changed = true
-  wipe(synced_dates)
-  self:VerifyAllSets()
-  self:UpdateAllDisplays()
-end
-
--- For a set, give each mode a chance to calculate the data they need
-function EminentDKP:VerifySet(set)
-  for j, mode in ipairs(modes) do
-    verify_set(mode, set)
-  end
-  set.changed = false
-end
-
--- For every set, have each mode verify their data
-function EminentDKP:VerifyAllSets()
-  for setid, set in pairs(sets) do
-    self:VerifySet(set)
   end
 end
 
@@ -783,23 +587,31 @@ end
 
 -- Update a given window's display
 function EminentDKP:UpdateDisplay(win)
-  if win.selectedmode then
-    local set = win:get_selected_set()
-    
+  if win.selectedsubmode then
+    -- Inform window that a data update will take place.
+    win:UpdateInProgress()
+  
+    -- Let mode update data.
+    if win.selectedsubmode.PopulateData then
+      win.selectedsubmode:PopulateData(win)
+    else
+      self:Print("Mode "..win.selectedsubmode:GetName().." does not have a PopulateData function!")
+    end
+    -- Let window display the data.
+    win:UpdateDisplay()
+  elseif win.selectedmode then
     -- Inform window that a data update will take place.
     win:UpdateInProgress()
   
     -- Let mode update data.
     if win.selectedmode.PopulateData then
-      win.selectedmode:PopulateData(win, set)
+      win.selectedmode:PopulateData(win)
     else
       self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
     end
     -- Let window display the data.
     win:UpdateDisplay()
-  elseif win.selectedset then
-    local set = win:get_selected_set()
-    
+  else
     win:Wipe()
     
     -- View available modes.
@@ -808,13 +620,14 @@ function EminentDKP:UpdateDisplay(win)
       win.dataset[i] = d
       d.id, d.label, d.value = mode:GetName(), mode:GetName(), 1
       if mode.GetSetSummary then
-        d.valuetext = mode:GetSetSummary(set)
+        d.valuetext = mode:GetSetSummary()
       end
     end
     -- Tell window to sort by our data order.
     win.metadata.ordersort = true
     -- Let window display the data.
     win:UpdateDisplay()
+--[[
   else
     win:Wipe()
     
@@ -836,6 +649,7 @@ function EminentDKP:UpdateDisplay(win)
     win.metadata.ordersort = true
     -- Let window display the data.
     win:UpdateDisplay()
+    ]]
   end
 end
 
@@ -882,6 +696,8 @@ function EminentDKP:AddMode(mode)
     scan_for_columns(mode)
   end
   
+  mode:AddAttributes()
+  
   -- Sort modes.
   table.sort(modes, function(a, b) return a.sortnum < b.sortnum or (not (b.sortnum < a.sortnum) and a.name < b.name) end)
 end
@@ -926,7 +742,7 @@ function EminentDKP:AddSubviewToTooltip(tooltip, win, mode, id, label)
   mode:Enter(win, id, label)
   
   -- Ask mode to populate dataset in our fake window.
-  mode:PopulateData(ttwin, win:get_selected_set())
+  mode:PopulateData(ttwin)
   
   -- Sort dataset unless we are using ordersort.
   if not mode.metadata or not mode.metadata.ordersort then
@@ -1107,40 +923,8 @@ end
 ]]
 -- DATABASE UPDATES
 function EminentDKP:DatabaseUpdate()
-  for name, pool in pairs(self.db.factionrealm.pools) do
-    if not pool.revision or pool.revision < 1 then
-      self:Print("Applying database revision 1 to pool: "..name)
-      -- Convert player classes to English classes
-      -- Convert all datetimes to timestamps
-      for pid, playerdata in pairs(pool.players) do
-        self.db.factionrealm.pools[name].players[pid].class = select(2,UnitClass(self:GetPlayerNameByID(pid))) or string.upper(string.gsub(playerdata.class,"%s*",""))
-        self.db.factionrealm.pools[name].players[pid].lastRaid = convertToTimestamp(playerdata.lastRaid)
-      end
-      for eid, eventdata in pairs(pool.events) do
-        self.db.factionrealm.pools[name].events[eid].datetime = convertToTimestamp(eventdata.datetime)
-        if eventdata.eventType == 'bounty' and (not eventdata.source or eventdata.source == "") then
-          self.db.factionrealm.pools[name].events[eid].source = "Default"
-        end
-        if eventdata.eventType == 'addplayer' then
-          local ei = { strsplit(",",eventdata.extraInfo) }
-          ei[1] = select(2,UnitClass(eventdata.value)) or string.upper(string.gsub(ei[1],"%s*",""))
-          self.db.factionrealm.pools[name].events[eid].extraInfo = implode(",",ei)
-        end
-      end
-      if self.db.factionrealm.pools[name].lastScan ~= 0 then
-        self.db.factionrealm.pools[name].lastScan = convertToTimestamp(self.db.factionrealm.pools[name].lastScan)
-      end
-      if self.db.profile.raid then
-        self.db.profile.raid = nil
-      end
-      pool.revision = 1
-    end
-    if pool.revision < 2 then
-      self:Print("Applying database revision 2 to pool: "..name)
-      -- Rebuild database to fix rename bug found in 2.1.0
-      self:RebuildDatabase()
-      pool.revision = 2
-    end
+  if self:GetActivePool().sets then
+    self:GetActivePool().sets = nil
   end
 end
 
@@ -1391,9 +1175,18 @@ end
 
 ---------- START SYNC FUNCTIONS ----------
 
+-- Check if you can use an item
+function EminentDKP:CanIUseItem(link)
+  return canuse:CanUseItem(self:GetMyClass(),link)
+end
+
 function EminentDKP:GetNewestEventCount()
   local b = { strsplit(".",self:GetNewestVersion(),4) }
   return tonumber(b[4])
+end
+
+function EminentDKP:GetCurrentEventHash()
+  return self:GetEventHash(self:GetEventCount())
 end
 
 function EminentDKP:GetEventCountDifference()
@@ -1565,7 +1358,7 @@ function EminentDKP:RequestMissingEvents()
   local mlist = self:GetMissingEventList()
   if #(mlist) > 0 then
     self.requestCooldown = true
-    self:SendCommMessage("EminentDKP-SRQ",self:GetVersion() .. '_' ..implode(',',mlist),'GUILD')
+    self:SendCommMessage("EminentDKP-SRQ",self:GetVersion() .. '_' ..implode(',',mlist) .. '_'.. self:GetCurrentEventHash(),'GUILD') 
     -- 10 second cooldown on doing an event requests, gives time for stuff to start syncing
     self:ScheduleTimer("ClearRequestCooldown", 10)
   end
@@ -1693,23 +1486,32 @@ function EminentDKP:CanFulfillRanges(range_list)
   return can
 end
 
+-- Compare their event hash with our own
+function EminentDKP:MatchingEventHash(version,hash)
+  local major,minor,bug,eventID = strsplit('.',version)
+  return (hash == self:GetEventHash(eventID))
+end
+
 -- Process an incoming request for missing events
 function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   if sender == self.myName then return end
-  local version, ranges = strsplit('_',message)
+  local version, ranges, hash = strsplit('_',message,3)
   if not CheckVersionCompatability(version) then return end
   local needed_ranges = { strsplit(',',ranges) }
   
   -- If an officer and can fulfill the needed ranges...
   if self:AmOfficer() and self:CanFulfillRanges(needed_ranges) then
-    -- Create a proposal to fulfill this request
-    local numbers = { math.random(1000), math.random(1000), math.random(1000) }
-    self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
-    self.syncProposals[sender] = { }
-  
-    self:SendCommMessage("EminentDKP-SPP",self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
+    -- Ensure their database is on the same timeline as our own
+    if self:MatchingEventHash(version,hash) then
+      -- Create a proposal to fulfill this request
+      local numbers = { math.random(1000), math.random(1000), math.random(1000) }
+      self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
+      self.syncProposals[sender] = { }
+
+      self:SendCommMessage("EminentDKP-SPP",self:GetVersion() .. '_' .. sender .. '_' ..implode(',',numbers),'GUILD')
+    end
   end
-  
+
   -- Remember which ranges were requested
   for i,range in ipairs(needed_ranges) do
     self:LogRequestedEventRange(range)
@@ -1766,7 +1568,7 @@ function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   local one = libCE:Decode(message)
 
   -- Decompress the decoded data
-  local two, message = libC:Decompress(one)
+  local two, message = libC:DecompressHuffman(one)
   if not two then
     self:Print("Error occured while decoding a sync event:" .. message)
     return
@@ -1839,11 +1641,6 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
   local next_eventID = tostring(tonumber(eventID) + 1)
   events_cache[eventID] = nil
   local event_date = GetDate(event.datetime)
-  if synced_dates[event_date] then
-    table.insert(synced_dates[event_date],eventID)
-  else
-    synced_dates[event_date] = { eventID }
-  end
   
   if self:GetEventCountDifference() > 0 then
     if events_cache[next_eventID] then
@@ -1857,7 +1654,7 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     -- We're up to date!
     wipe(events_cache)
     syncing = false
-    self:UpdateSyncedDays()
+    self:UpdateModes(true)
   end
 end
 
@@ -1924,7 +1721,7 @@ function EminentDKP:IsPlayerFresh(name)
   if player then
     return (not next(player.earnings) and not next(player.deductions))
   end
-  return nil
+  error("Player '" .. name .. "' was not found.",0)
 end
 
 function EminentDKP:GetPlayerByID(pid)
@@ -1936,7 +1733,7 @@ function EminentDKP:GetPlayerByName(name)
   if pid ~= nil then
     return self:GetPlayerByID(pid), pid
   end
-  return nil
+  error("Player '" .. name .. "' was not found.",0)
 end
 
 -- Get a player's ID
@@ -1951,14 +1748,14 @@ function EminentDKP:GetPlayerNameByID(pid)
       return name
     end
   end
-  return nil
+  error("Player with ID '" .. pid .. "' was not found.",0)
 end
 
 function EminentDKP:GetPlayerClassByID(pid)
   if self:GetActivePool().players[pid] then
     return self:GetActivePool().players[pid].class
   end
-  return nil
+  error("Player with ID '" .. pid .. "' was not found.",0)
 end
 
 function EminentDKP:GetPlayerClassByName(name)
@@ -2150,6 +1947,20 @@ end
 ---------- END EARNINGS + DEDUCTIONS FUNCTIONS ----------
 
 ---------- START EVENT FUNCTIONS ----------
+
+-- Provide an FCS16 hash of the event for comparison purposes
+function EminentDKP:GetEventHash(eventID)
+  local data = self:GetEvent(eventID)
+  
+  local hash = libC:fcs16init();
+  for key, value in pairs(data) do
+    hash = libC:fcs16update(hash,value)
+  end
+  
+  hash = libC:fcs16final(hash)
+  return hash
+end
+
 function EminentDKP:SyncEvent(eventID)
   -- Serialize and compress the data
   local data = self:GetEvent(eventID)
@@ -2162,6 +1973,7 @@ end
 
 function EminentDKP:CreateAddPlayerSyncEvent(name,className)
   self:SyncEvent(self:CreateAddPlayerEvent(name,className,0,0,time()))
+  self:UpdateModes(true)
 end
 
 -- Add a player to the active pool
@@ -2215,6 +2027,7 @@ end
 
 function EminentDKP:CreateBountySyncEvent(players,amount,srcName)
   self:SyncEvent(self:CreateBountyEvent(players,amount,srcName,time()))
+  self:UpdateModes(true)
 end
 
 function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
@@ -2236,6 +2049,7 @@ end
 
 function EminentDKP:CreateAuctionSyncEvent(players,to,amount,srcName,srcExtra)
   self:SyncEvent(self:CreateAuctionEvent(players,to,amount,srcName,srcExtra,time()))
+  self:UpdateModes(true)
 end
 
 function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
@@ -2261,6 +2075,7 @@ end
 
 function EminentDKP:CreateTransferSyncEvent(from,to,amount)
   self:SyncEvent(self:CreateTransferEvent(from,to,amount,time()))
+  self:UpdateModes(true)
 end
 
 function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
@@ -2282,6 +2097,7 @@ end
 
 function EminentDKP:CreatePurgeSyncEvent(name)
   self:SyncEvent(self:CreatePurgeEvent(name,time()))
+  self:UpdateModes(true)
 end
 
 -- This assumes the player is fresh
@@ -2299,6 +2115,7 @@ end
 
 function EminentDKP:CreateAdjustmentSyncEvent(name,amount,deduction,reason)
   self:SyncEvent(self:CreateAdjustmentEvent(name,amount,deduction,reason,time()))
+  self:UpdateModes(true)
 end
 
 function EminentDKP:CreateAdjustmentEvent(name,amount,deduction,reason,dtime)
@@ -2324,6 +2141,7 @@ end
 
 function EminentDKP:CreateExpirationSyncEvent(name)
   self:SyncEvent(self:CreateExpirationEvent(name,time()))
+  self:UpdateModes(true)
 end
 
 function EminentDKP:CreateExpirationEvent(name,dtime)
@@ -2349,6 +2167,7 @@ end
 
 function EminentDKP:CreateVanityResetSyncEvent(name)
   self:SyncEvent(self:CreateVanityResetEvent(name,time()))
+  self:UpdateModes(true)
 end
 
 function EminentDKP:CreateVanityResetEvent(name,dtime)
@@ -2369,6 +2188,7 @@ end
 
 function EminentDKP:CreateRenameSyncEvent(from,to)
   self:SyncEvent(self:CreateRenameEvent(from,to,time()))
+  self:UpdateModes(true)
 end
 
 function EminentDKP:CreateRenameEvent(from,to,dtime)
@@ -2609,7 +2429,7 @@ end
 
 -- Keep track of the last container we opened
 function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
-  if not self:AmMasterLooter() then return end
+  --if not self:AmMasterLooter() then return end
   if spell == "Opening" and unit == "player" then
     lastContainerName = target
   end
@@ -3050,14 +2870,19 @@ function EminentDKP:AdminVanityRoll()
   if not self:EnsureOfficership() then return end
   if not auction_active then
     local ranks = {}
+    local syncdata = {}
     for pid, data in pairs(self:GetCurrentGroupMembers()) do
       local name = self:GetPlayerNameByID(pid)
       if data.currentVanityDKP > 0 then
         local roll = math.random(math.floor(data.currentVanityDKP))/1000
         table.insert(ranks, { n=name, v=data.currentVanityDKP, r=roll })
+        syncdata[pid] = roll
       end
     end
     table.sort(ranks, function(a,b) return a.r>b.r end)
+
+    -- Announce rolls to the other addons
+    self:InformPlayer("vanityroll",{ rolls = syncdata })
     
     self:MessageGroup(L["Vanity item rolls weighted by current vanity DKP:"])
     for rank,data in ipairs(ranks) do
@@ -3290,19 +3115,28 @@ function EminentDKP:ActuateNotification(notifyType,data)
   elseif notifyType == "scan" then
     -- A scan was done, so update the last scan time
     self:GetActivePool().lastScan = data.time
+  elseif notifyType == "vanityroll" then
+    -- Vanity rolls were done, inject them into the mode
+    local mode = find_mode(L["Vanity Rolls"])
+    mode:InjectData(data.rolls)
+    self:UpdateModes(true)
+    self:GetWindows()[1]:DisplayMode(mode)
   elseif notifyType == "reset" then
     -- A reset notification was given, so we must reset as well
     if self:AmOfficer() then
+      if data.sender == self.myName then return end
       -- If an officer, give the option of complying, for security purposes
-      -- todo: freeze any syncing or version broadcasting until the decision has been made
+      tempdisabled = true
+      -- todo: temporarily disable syncing
       EminentDKP:ConfirmAction("EminentDKPReset",
-                               L["%s has requested a database reset. Do you wish to comply? This cannot be undone."]:format(data.sender),
+                               L["%s has issued a database reset. Do you wish to comply? This cannot be undone."]:format(data.sender),
                                function()
                                  EminentDKP:ResetDatabase()
-                               end)
+                                 EminentDKP:UndoTempDisable()
+                               end,function() EminentDKP:UndoTempDisable() end)
     else
       -- If a regular user, just go ahead and reset
-      self:Print(L["%s has requested a database reset."]:format(data.sender))
+      self:Print(L["%s has issued a database reset."]:format(data.sender))
       EminentDKP:ResetDatabase()
     end
   end
@@ -3378,7 +3212,7 @@ function EminentDKP:ResetDatabase()
   newest_version = ""
   
   -- Force reload the meter display
-  self:ReloadSets(true)
+  self:UpdateModes(true)
   self:UpdateStatusBar()
   
   self:Print(L["Database has been reset."])

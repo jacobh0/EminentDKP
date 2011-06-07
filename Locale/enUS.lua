@@ -37,6 +37,10 @@ L["Mail"] = "Mail"
 L["Plate"] = "Plate"
 L["Auctions"] = "Auctions"
 L["Bounties"] = "Bounties"
+L["Activity"] = "Activity"
+L["Vanity"] = "Vanity"
+L["Vanity Rolls"] = "Vanity Rolls"
+L["Transfers"] = "Transfers"
 
 -- Mode columns
 L["Percent"] = "Percent"
@@ -298,8 +302,8 @@ L["Database has been rebuilt."] = "Database has been rebuilt."
 L["Are you sure you want to reset the database? This cannot be undone."] = "Are you sure you want to reset the database? This cannot be undone."
 L["Database has been reset."] = "Database has been reset."
 L["Please note that it can take up to 5 minutes to record the versions of all other EminentDKP users."] = "Please note that it can take up to 5 minutes to record the versions of all other EminentDKP users."
-L["%s has requested a database reset."] = "%s has requested a database reset."
-L["%s has requested a database reset. Do you wish to comply? This cannot be undone."] = "%s has requested a database reset. Do you wish to comply? This cannot be undone."
+L["%s has issued a database reset."] = "%s has issued a database reset."
+L["%s has issued a database reset. Do you wish to comply? This cannot be undone."] = "%s has issued a database reset. Do you wish to comply? This cannot be undone."
 L["Are you sure you want to reset the database for ALL users? This cannot be undone."] = "Are you sure you want to reset the database for ALL users? This cannot be undone."
 
 -- Statusbar
