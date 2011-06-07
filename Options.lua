@@ -75,7 +75,7 @@ EminentDKP.defaults = {
     maxmodeevents = 30,
     numberformat = 2,
     showranks = true,
-    daystoshow = 14,
+    attendancedays = 30,
     hideraidmessages = true,
     guildgroup = true,
     disablepvp = true,
@@ -568,16 +568,16 @@ EminentDKP.options = {
           set= function(self, opt) EminentDKP.db.profile.numberformat = opt end,
           order= 8,
 				},
-				daystoshow = {
+				attendancedays = {
           type= "range",
-          name= L["Days to show"],
-          desc= L["The number of days prior to today to show in the day listing."],
-          min= 5,
-          max= 30,
+          name= L["Attendance Period"],
+          desc= L["The number of days prior to today to use when measuring attendance."],
+          min= 7,
+          max= 90,
           step= 1,
-          get= function() return EminentDKP.db.profile.daystoshow end,
+          get= function() return EminentDKP.db.profile.attendancedays end,
           set= function(self, val)
-            EminentDKP.db.profile.daystoshow = val
+            EminentDKP.db.profile.attendancedays = val
             EminentDKP:CancelTimer(EminentDKP.setHistoryTimer, true)
             EminentDKP.setHistoryTimer = EminentDKP:ScheduleTimer("UpdateModes",1,true)
           end,

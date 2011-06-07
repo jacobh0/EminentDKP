@@ -25,15 +25,20 @@ local classFilter = {
 }
 
 --[[
-  modes to create:
-  
-  1. attendance (variable date range in options?)
-
   bugs:
 
   - going to item view on a player then back up to
     the mode view causes the bars to not be flush
+    (something to do with data wiping)
 ]]
+
+local function GetDaysAgoTimestamp(days)
+  local t = date("*t")
+  t.hour = 0
+  t.min = 0
+  t.sec = 0
+  return time(t) - (days * 86400)
+end
 
 local function GetDaysBetween(this,that)
   return math.floor((this - that) / 86400)
@@ -91,7 +96,7 @@ local function FilterPlayers(list)
 end
 
 -- Filter events from the event pool
-local function FilterEvents(typefilter)
+local function FilterEvents(typefilter,skipcounter)
   local filtered = {}
   local eventcount = 0
   local eventid = EminentDKP:GetEventCount()
@@ -99,7 +104,9 @@ local function FilterEvents(typefilter)
     local eid = tostring(eventid)
     local e = EminentDKP:GetEvent(eid)
     if typefilter(e,eid) then
-      eventcount = eventcount + 1
+      if not skipcounter then
+        eventcount = eventcount + 1
+      end
       table.insert(filtered,eid)
     end
     eventid = eventid - 1
@@ -175,6 +182,11 @@ local function player_event_filter_auction_target(event,eventid,player,playerid)
   return (event.eventType == "auction" and event.target == playerid)
 end
 
+local function event_filter_earnings_period(event,eventid)
+  return (event.datetime >= GetDaysAgoTimestamp(EminentDKP.db.profile.attendancedays) and 
+          (event.eventType == "auction" or event.eventType == "bounty"))
+end
+
 local function event_filter_auction(event,eventid)
   return (event.eventType == "auction")
 end
@@ -185,6 +197,10 @@ end
 
 local function event_filter_bounty(event,eventid)
   return (event.eventType == "bounty")
+end
+
+local function group_filter_day(event)
+  return date("%x",event.datetime)
 end
 
 local function group_filter_source_day(event)
@@ -205,12 +221,18 @@ local function label_sort(a,b)
   return b.label > a.label
 end
 
-local function getModeData(what)
-  return EminentDKP:GetModeData()[what]
+local function value_and_label_sort(a,b)
+  if a.value > b.value then return true end
+  if b.value > a.value then return false end
+  return b.label > a.label
+end
+
+local function getModeData(mode)
+  return EminentDKP:GetModeData()[mode]
 end
 
 local function setModeData(mode,data)
-  EminentDKP:GetModeData()[what] = data
+  EminentDKP:GetModeData()[mode] = data
 end
 
 local balanceMode = EminentDKP:NewModule(L["Earnings & Deductions"])
@@ -268,9 +290,7 @@ local classModePrototype = {
   end,
   AddAttributes = function(self)
     -- Called when mode is added
-    if not getModeData(self:GetName()) then
-      setModeData(self:GetName(),{ earnedDKP = 0, currentDKP = 0 })
-  	end
+    setModeData(self:GetName(),{ earnedDKP = 0, currentDKP = 0 })
   end
 }
 
@@ -329,6 +349,10 @@ vanityRollMode.sortnum = 2
 local transferMode = EminentDKP:NewModule(L["Transfers"])
 transferMode.sortnum = 2
 
+local attendanceMode = EminentDKP:NewModule(L["Attendance"])
+local missedEventMode = EminentDKP:NewModule(L["Missed Events"])
+attendanceMode.sortnum = 2
+
 function bountyMode:PopulateData(win)
   local nr = 1
   local max = 0
@@ -370,10 +394,8 @@ function bountyMode:OnEnable()
 end
 
 function bountyMode:AddAttributes()
-  -- Called when a new set is created.
-  if not getModeData(self:GetName()) then
-    setModeData(self:GetName(),{ events = {} })
-	end
+  -- Called when a new mode is created.
+  setModeData(self:GetName(),{ events = {} })
 end
 
 function awardeeMode:Enter(win, id, label)
@@ -441,14 +463,12 @@ function auctionMode:OnEnable()
 end
 
 function auctionMode:AddAttributes()
-  -- Called when a new set is created.
-  if not getModeData(self:GetName()) then
-    setModeData(self:GetName(),{ events = {} })
-	end
+  -- Called when a new mode is created.
+  setModeData(self:GetName(),{ events = {} })
 end
 
 function winnerMode:Enter(win, id, label)
-  self.events = GroupEvents(modedata()[self.parent:GetName()].events,group_filter_source_day)[id]
+  self.events = GroupEvents(getModeData(self.parent:GetName()).events,group_filter_source_day)[id]
 	self.title = label..L["'s Auctions"]
 end
 
@@ -550,6 +570,8 @@ function itemMode:PopulateData(win)
   win.metadata.maxvalue = max
 end
 
+------------------- Activity Mode -------------------
+
 function activityMode:PopulateData(win)
   local nr = 1
   local max = 0
@@ -583,13 +605,15 @@ function activityMode:GetSetSummary()
 end
 
 function activityMode:OnEnable()
-  self.metadata       = {showspots = true, ordersort = true, columns = { Count = true, Date = true }}
+  self.metadata       = {showspots = true, ordersort = true, sortfunc = value_and_label_sort, columns = { Count = true, Date = true }}
   
   EminentDKP:AddMode(self)
 end
 
 function activityMode:AddAttributes()
 end
+
+------------------- Vanity Mode -------------------
 
 function vanityMode:PopulateData(win)
   local nr = 1
@@ -638,10 +662,10 @@ end
 
 function vanityMode:AddAttributes()
   -- Called when mode is added
-  if not getModeData(self:GetName()) then
-    setModeData(self:GetName(),{ currentVanityDKP = 0 })
-  end
+  setModeData(self:GetName(),{ currentVanityDKP = 0 })
 end
+
+------------------- Vanity Roll Mode -------------------
 
 function vanityRollMode:PopulateData(win)
   local nr = 1
@@ -684,10 +708,10 @@ end
 
 function vanityRollMode:AddAttributes()
   -- Called when mode is added
-  if not getModeData(self:GetName()) then
-    setModeData(self:GetName(),{ rolls = {} })
-  end
+  setModeData(self:GetName(),{ rolls = {} })
 end
+
+------------------- Transfer Mode -------------------
 
 function transferMode:PopulateData(win)
   local nr = 1
@@ -729,8 +753,112 @@ function transferMode:OnEnable()
 end
 
 function transferMode:AddAttributes()
-  -- Called when a new set is created.
-  if not getModeData(self:GetName()) then
-    setModeData(self:GetName(),{ events = {} })
+  -- Called when a new mode is created.
+  setModeData(self:GetName(),{ events = {} })
+end
+
+------------------- Attendance Mode -------------------
+
+function attendanceMode:PopulateData(win)
+  local nr = 1
+  local max = 0
+  
+  for pid, count in pairs(getModeData(self:GetName()).totals) do
+    local event = EminentDKP:GetEvent(eid)
+    local d = win.dataset[nr] or {}
+    win.dataset[nr] = d
+    d.id = pid
+    d.label = EminentDKP:GetPlayerNameByID(pid)
+    d.value = count
+    d.class = EminentDKP:GetPlayerClassByID(pid)
+    d.valuetext = FormatValueText(d.value, self.metadata.columns.Count,
+                                   EminentDKP:StdNumber((d.value / getModeData(self:GetName()).count) * 100).."%", self.metadata.columns.Percent)
+  
+    if d.value > max then
+      max = d.value
+    end
+    nr = nr + 1
   end
+  win.metadata.maxvalue = max
+end
+
+function attendanceMode:CalculateData()
+  local events = FilterEvents(event_filter_earnings_period,true)
+  local event_count = #(events)
+  local a = {}
+
+  for pid, pdata in pairs(FilterPlayers(classFilter[L["All Classes"]])) do
+    -- Only show people who have had any activity in the system...
+    if not EminentDKP:IsPlayerFresh(pdata) then
+      a[pid] = 0
+    end
+  end
+
+  for i, eid in ipairs(events) do
+    local event = EminentDKP:GetEvent(eid)
+    for j, pid in ipairs({ strsplit(',',event.beneficiary) }) do
+      if a[pid] then
+        a[pid] = a[pid] + 1
+      end
+    end
+  end
+  wipe(getModeData(self:GetName()).events)
+  MergeTables(getModeData(self:GetName()).events,events)
+  getModeData(self:GetName()).count = event_count
+  getModeData(self:GetName()).totals = a
+end
+
+function attendanceMode:GetSetSummary() 
+  return ""
+end
+
+function attendanceMode:OnEnable()
+  self.metadata            = {showspots = false, ordersort = true, sortfunc = value_and_label_sort, click1 = missedEventMode, columns = { Count = true, Percent = true }}
+  missedEventMode.metadata = {showspots = false, ordersort = true, columns = { Count = true, Percent = true }}
+  missedEventMode.parent   = self
+
+  EminentDKP:AddMode(self)
+end
+
+function attendanceMode:AddAttributes()
+  -- Called when a new mode is created.
+  setModeData(self:GetName(),{ events = {}, count = {}, totals = {} })
+end
+
+function missedEventMode:Enter(win, id, label)
+  self.playerid = id
+  self.title = L["Events missed by"].." "..label
+end
+
+function missedEventMode:PopulateData(win)
+  local nr = 1
+  local max = 0
+  local days = GroupEvents(getModeData(self.parent:GetName()).events,group_filter_day)
+
+  for day, events in pairs(days) do
+    local missed = 0
+    local day_total = 0
+    for j, eid in ipairs(events) do
+      local event = EminentDKP:GetEvent(eid)
+      if not tContains({ strsplit(',',event.beneficiary) },self.playerid) then
+        missed = missed + 1
+      end
+      day_total = day_total + 1
+    end
+    if missed > 0 then
+      local d = win.dataset[nr] or {}
+      win.dataset[nr] = d
+      d.id = day
+      d.label = day
+      d.value = missed
+      d.valuetext = FormatValueText(d.value, self.metadata.columns.Count,
+                                    EminentDKP:StdNumber((missed / day_total) * 100).."%", self.metadata.columns.Percent)
+      
+      if d.value > max then
+        max = d.value
+      end
+      nr = nr + 1
+    end
+  end
+  win.metadata.maxvalue = max
 end
