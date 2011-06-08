@@ -8,7 +8,7 @@ local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
-local VERSION = '2.1.1'
+local VERSION = '2.1.4'
 local newest_version = ''
 local needs_update = false
 local addon_versions = {}
@@ -134,14 +134,14 @@ local function UpdateNewestVersion(newer)
   local compare = CompareVersions(EminentDKP:GetNewestVersion(),newer_version)
   
   if compare.major < 0 or compare.minor < 0 then
-    -- There is a new addon version
+    -- There is a new major/minor addon version
     newest_version = newer_version
     needs_update = true
   elseif compare.major == 0 and compare.minor == 0 then
     if compare.event < 0 or compare.bug < 0 then
       newest_version = newer_version
       if compare.bug < 0 then
-        -- There is a new addon version
+        -- There is a new bug addon version
         needs_update = true
       end
     end
@@ -2231,6 +2231,7 @@ function EminentDKP:CreateEvent(src,etype,extra,t,b,val,dtime)
   if newest_version ~= "" then
     local old_newest_version = self:GetNewestVersion()
     newest_version = ""
+    needs_update = false
     UpdateNewestVersion(old_newest_version)
   end
   
@@ -2263,7 +2264,7 @@ end
 ]]
 
 -- Keep track of any creature deaths
-function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
+function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, hideCaster, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
   if not self:AmOfficer() then return end
   if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
     table.insert(recent_deaths,1,dstName)
@@ -3223,13 +3224,16 @@ function EminentDKP:RebuildDatabase()
     events_cache[eid] = temp
   end
   
-  -- Restore the database to default
-  local old_ver = self:GetVersion()
-  self:ResetDatabase()
-  newest_version = old_ver
-  
-  -- Start replicating cached events
-  self:ReplicateSyncEvent("1",events_cache["1"])
+  -- Only if the database isn't already empty
+  if next(events_cache) then
+    -- Reset the database
+    local old_ver = self:GetVersion()
+    self:ResetDatabase()
+    newest_version = old_ver
+    
+    -- Start replicating cached events
+    self:ReplicateSyncEvent("1",events_cache["1"])
+  end
   
   self:Print(L["Database has been rebuilt."])
 end
