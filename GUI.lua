@@ -524,7 +524,7 @@ local function GetItemFrameBySlot(slot)
       return frame
     end
   end
-  return nil
+  error("Could not find item frame for slot: "..slot)
 end
 
 -- Cancel the auction for a specified slot
