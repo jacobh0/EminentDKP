@@ -270,7 +270,7 @@ L["%s has transferred %.02f DKP to %s."] = "%s has transferred %.02f DKP to %s."
 L["%s just transferred %.02f DKP to you."] = "%s just transferred %.02f DKP to you."
 L["Succesfully transferred %.02f DKP to %s."] = "Succesfully transferred %.02f DKP to %s."
 
-L["%s now up for auction! Auction ends in 30 seconds."] = "%s now up for auction! Auction ends in 30 seconds."
+L["%s now up for auction! Auction ends in %d seconds."] = "%s now up for auction! Auction ends in %d seconds."
 L["Bids for %s"] = "Bids for %s"
 L["Tie won by %s (%d)"] = "Tie won by %s (%d)"
 L["Won by %s (%d)"] = "Won by %s (%d)"

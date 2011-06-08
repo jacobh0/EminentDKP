@@ -940,6 +940,7 @@ function EminentDKP:OnEnable()
   self:RegisterEvent("ACHIEVEMENT_EARNED") -- achievement tracking
   self:RegisterEvent("LOOT_OPENED") -- loot listing
   self:RegisterEvent("LOOT_CLOSED") -- auction cancellation
+  self:RegisterEvent("LOOT_SLOT_CLEARED") -- loot tracking
   self:RegisterEvent("PARTY_LOOT_METHOD_CHANGED") -- masterloot change
   self:RegisterEvent("RAID_ROSTER_UPDATE") -- raid member list update
   self:RegisterEvent("PARTY_MEMBERS_CHANGED") -- party member list update
@@ -1952,7 +1953,8 @@ end
 function EminentDKP:GetEventHash(eventID)
   local data = self:GetEvent(eventID)
   
-  local hash = libC:fcs16init();
+  local hash = libC:fcs16init()
+  hash = libC:fcs16update(hash,eventID)
   for key, value in pairs(data) do
     hash = libC:fcs16update(hash,value)
   end
@@ -2240,10 +2242,11 @@ end
 -- Iterate over the group and determine loot eligibility
 function EminentDKP:UpdateLootEligibility()
   wipe(eligible_looters)
-  local count = (is_in_party() and GetNumPartyMembers() or GetNumRaidMembers())
+  local count = (is_in_party() and (GetNumPartyMembers()+1) or 40)
   for d = 1, count do
-    if GetMasterLootCandidate(d) then
-      eligible_looters[GetMasterLootCandidate(d)] = d
+    local c = GetMasterLootCandidate(d)
+    if c then
+      eligible_looters[c] = d
     end
   end
 end
@@ -2429,7 +2432,7 @@ end
 
 -- Keep track of the last container we opened
 function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
-  --if not self:AmMasterLooter() then return end
+  if not self:AmMasterLooter() then return end
   if spell == "Opening" and unit == "player" then
     lastContainerName = target
   end
@@ -2463,18 +2466,52 @@ function EminentDKP:LOOT_CLOSED()
   end
 end
 
+-- Get the target's GUID and name (otherwise it's a chest)
+function EminentDKP:GetTargetNameAndGUID()
+  local unitName = lastContainerName
+  local guid = 'container'
+  if UnitExists("target") then
+    guid = UnitGUID("target")
+    unitName = UnitName("target")
+  end
+  return unitName, guid
+end
+
+function EminentDKP:FindAvailableItemBySlot(guid,slot)
+  local counter = 1
+  for i, item in ipairs(recent_loots[guid].itemlist) do
+    if not item.removed then
+      if counter == slot then
+        return item
+      end
+      counter = counter + 1
+    end
+  end
+  error("Did not find item for slot '"..slot.."' for GUID: "..guid)
+end
+
+function EminentDKP:GetGUISlot(guid,slot)
+  return self:FindAvailableItemBySlot(guid,slot).slot
+end
+
+-- Keeps track of items in the loot window
+function EminentDKP:LOOT_SLOT_CLEARED(event, slot)
+  -- This only needs to be run by the masterlooter
+  if not self:AmMasterLooter() then return end
+  
+  local unitName, guid = self:GetTargetNameAndGUID()
+  local item = self:FindAvailableItemBySlot(guid,slot)
+  item.removed = true
+  recent_loots[guid].available = recent_loots[guid].available - 1
+end
+
 -- Prints out the loot to the group when looting a corpse
 function EminentDKP:LOOT_OPENED()
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() then return end
   
   -- Query some info about this unit...
-  local unitName = lastContainerName
-  local guid = 'container'
-  if UnitExists("target") then
-    unitName = UnitName("target")
-    guid = UnitGUID("target")
-  end
+  local unitName, guid = self:GetTargetNameAndGUID()
   if GetNumLootItems() > 0 then
     local eligible_items = {}
     local slotlist = {}
@@ -2484,16 +2521,18 @@ function EminentDKP:LOOT_OPENED()
       if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
         local link = GetLootSlotLink(slot)
         table.insert(eligible_items,link)
-        table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), slot=slot })
+        table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), removed=false, slot=slot })
         table.insert(slotlist,1,slot)
       end
     end
     
     if #(eligible_items) > 0 then
-      if not recent_loots[guid] then
-        self:MessageGroup(L["Loot from %s:"]:format(unitName))
-        for i,loot in ipairs(eligible_items) do
-          self:MessageGroup(loot)
+      if not recent_loots[guid] or recent_loots[guid].available > #(eligible_items) then
+        if not recent_loots[guid] then
+          self:MessageGroup(L["Loot from %s:"]:format(unitName))
+          for i,loot in ipairs(eligible_items) do
+            self:MessageGroup(loot)
+          end
         end
         
         -- Share loot list with group
@@ -2502,15 +2541,12 @@ function EminentDKP:LOOT_OPENED()
         recent_loots[guid] = {
           name=unitName,
           slots=slotlist,
+          available=#(itemlist),
           items=itemlist,
-          auctioncount=0,
-          slotoffset=0
         }
       else
         -- Update slot list
         recent_loots[guid].slots = slotlist
-        -- Snapshot our offset, it is the basis for the slot position in the GUI
-        recent_loots[guid].slotoffset = recent_loots[guid].auctioncount
       end
     end
   end
@@ -2651,7 +2687,7 @@ end
 function EminentDKP:AdminStartAuction()
   if not self:EnsureMasterlooter() then return end
   if GetNumLootItems() > 0 then
-    local guid = UnitExists("target") and UnitGUID("target") or 'container'
+    local unitName, guid = self:GetTargetNameAndGUID()
     if #(recent_loots[guid].slots) > 0 then
       if not auction_active then
         -- Fast forward to next eligible slot
@@ -2670,7 +2706,7 @@ function EminentDKP:AdminStartAuction()
         
         -- Gather some info about this item
         local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-        local gui_slot = (recent_loots[guid].slotoffset + slot)
+        local gui_slot = self:GetGUISlot(guid,slot)
         
         -- Update eligibility list
         self:UpdateLootEligibility()
@@ -2697,7 +2733,7 @@ function EminentDKP:AdminStartAuction()
         if not is_in_party() then
           sendchat(L["Bids for %s"]:format(itemLink), "raid_warning", "preset")
         end
-        self:MessageGroup(L["%s now up for auction! Auction ends in 30 seconds."]:format(itemLink))
+        self:MessageGroup(L["%s now up for auction! Auction ends in %d seconds."]:format(itemLink,self.bidItem.window))
       else
         self:DisplayActionResult(L["An auction is already active."])
       end
@@ -2720,8 +2756,7 @@ function EminentDKP:AuctionBidTimer()
     self:MessageGroup(L["Auction has closed. Determining winner..."])
     
     local looter = self.myName
-    local guid = self.bidItem.srcGUID
-    local gui_slot = (recent_loots[guid].slotoffset + self.bidItem.slotNum)
+    local gui_slot = self:GetGUISlot(self.bidItem.srcGUID,self.bidItem.slotNum)
     
     -- Update eligibility list
     self:UpdateLootEligibility()
@@ -2785,15 +2820,13 @@ function EminentDKP:AuctionBidTimer()
       })
     end
     
-    recent_loots[guid].auctioncount = recent_loots[guid].auctioncount + 1
-    
     -- Distribute the loot
     GiveMasterLoot(self.bidItem.slotNum, eligible_looters[looter])
     
     -- Re-run the auction routine...
-    if #(recent_loots[guid].slots) > 0 then
+    if #(recent_loots[self.bidItem.srcGUID].slots) > 0 then
       self.bidItem = nil
-      self:AdminStartAuction()
+      self:ScheduleTimer("AdminStartAuction",1)
     else
       self:MessageGroup(L["No more loot found."])
       self:InformPlayer("lootdone",{ guid = self.bidItem.srcGUID })
