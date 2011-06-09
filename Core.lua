@@ -2074,16 +2074,16 @@ function EminentDKP:CreateDecayEvent(players,amount,srcName,dtime)
   -- Create the event
   local cid = self:CreateEvent(srcName,"decay","","",implode(',',players),amount,dtime)
   
-  local amount = 0
+  local sum = 0
   -- Then create all the necessary deductions for players
   for i,pid in ipairs(players) do
     local decay = (amount / 100) * self:GetPlayerDKPByID(pid)
     self:CreatePlayerDeduction(pid,cid,decay)
-    amount = amount + decay
+    sum = sum + decay
   end
 
   -- Modify the bounty pool
-  self:IncreaseAvailableBounty(amount)
+  self:IncreaseAvailableBounty(sum)
   
   return cid
 end
