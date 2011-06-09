@@ -8,6 +8,11 @@ local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
+--[[
+  bugs:
+    - bids aren't always registering on the loot window
+]]
+
 local VERSION = '2.2.0'
 local newest_version = ''
 local needs_update = false
@@ -975,7 +980,8 @@ function EminentDKP:OnEnable()
 end
 
 local notify_types = { "BOUNTY_RECEIVED", "TRANSFER_RECEIVED", "AUCTION_WON", 
-                       "TRANSFER_MADE", "ADJUSTMENT_RECEIVED", "ADJUSTMENT_MADE" }
+                       "TRANSFER_MADE", "ADJUSTMENT_RECEIVED", "ADJUSTMENT_MADE",
+                       "DECAY_RECEIVED" }
 
 -- Hook the animation step function to change the font size of the flavor text
 function EminentDKP:LevelUpDisplayFinished(frame)
@@ -1009,6 +1015,11 @@ function EminentDKP:LevelUpDisplayShow(frame)
     if frame.type == "BOUNTY_RECEIVED" then
       frame.levelFrame.reachedText:SetFormattedText(L["You have received a bounty of"])
       frame.levelFrame.levelText:SetFormattedText("%.02f DKP",self.notifyDetails.desc)
+    elseif frame.type == "DECAY_RECEIVED" then
+      frame.levelFrame.reachedText:SetFormattedText(L["Your DKP has decayed by"])
+      texcoords.textTint = { 0.92, 0.49, 0.04 }
+      local decayed = self:GetMyCurrentDKP() * (self.notifyDetails.desc / 100)
+      frame.levelFrame.levelText:SetFormattedText("%.02f DKP",decayed)
     elseif frame.type == "ADJUSTMENT_RECEIVED" then
       if self.notifyDetails.extra then
         -- This is a deduction
@@ -1613,6 +1624,8 @@ function EminentDKP:ReplicateSyncEvent(eventID,event)
     self:CreateAuctionEvent({ strsplit(',',event.beneficiary) },tname,event.value,event.source,event.extraInfo,event.datetime)
   elseif event.eventType == 'bounty' then
     self:CreateBountyEvent({ strsplit(',',event.beneficiary) },event.value,event.source,event.datetime)
+  elseif event.eventType == 'decay' then
+    self:CreateDecayEvent({ strsplit(',',event.beneficiary) },event.value,event.source,event.datetime)
   elseif event.eventType == 'addplayer' then
     local classname, dkp, vanitydkp = strsplit(',',event.extraInfo)
     self:CreateAddPlayerEvent(event.value,classname,tonumber(dkp),tonumber(vanitydkp),event.datetime)
@@ -1726,7 +1739,10 @@ function EminentDKP:IsPlayerFresh(name)
 end
 
 function EminentDKP:GetPlayerByID(pid)
-  return self:GetActivePool().players[pid], self:GetPlayerNameByID(pid)
+  if self:GetActivePool().players[pid] then
+    return self:GetActivePool().players[pid], self:GetPlayerNameByID(pid)
+  end
+  error("Player with ID '"..pid.."' was not found.",0)
 end
 
 function EminentDKP:GetPlayerByName(name)
@@ -1782,19 +1798,39 @@ function EminentDKP:PlayerHasDKP(name,amount)
 end
 
 -- Get current DKP for a player
-function EminentDKP:GetCurrentDKP(name)
+function EminentDKP:GetPlayerDKPByID(pid)
+  return select(1,self:GetPlayerByID(pid)).currentDKP
+end
+
+-- Get current DKP for a player
+function EminentDKP:GetPlayerDKPByName(name)
   local player = self:GetPlayerByName(name)
-  return (player ~= nil and player.currentDKP or nil)
+  if player ~= nil then
+    return player.currentDKP
+  end
+  error("Could not get current DKP for player '"..name.."'.",0)
 end
 
 -- Get the your current DKP
 function EminentDKP:GetMyCurrentDKP()
-  return self:GetCurrentDKP(self.myName)
+  return self:GetPlayerDKPByName(self.myName)
 end
 
 -- Get the your class name
 function EminentDKP:GetMyClass()
   return self:GetPlayerClassByName(self.myName)
+end
+
+-- Get the ids of all active and non-fresh players in the pool
+function EminentDKP:GetActiveAndDirtyPlayerIDs()
+  local list = {}
+  for name,pid in pairs(self:GetActivePool().playerIDs) do
+    local player = self:GetPlayerByID(pid)
+    if player.active and not self:IsPlayerFresh(player) then
+      table.insert(list,pid)
+    end
+  end
+  return list
 end
 
 -- Get the names of everybody in the pool
@@ -1976,6 +2012,7 @@ end
 function EminentDKP:CreateAddPlayerSyncEvent(name,className)
   self:SyncEvent(self:CreateAddPlayerEvent(name,className,0,0,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 -- Add a player to the active pool
@@ -2027,9 +2064,34 @@ function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
   return cid
 end
 
+function EminentDKP:CreateDecaySyncEvent(players,amount,srcName)
+  self:SyncEvent(self:CreateDecayEvent(players,amount,srcName,time()))
+  self:UpdateModes(true)
+  self:UpdateStatusBar()
+end
+
+function EminentDKP:CreateDecayEvent(players,amount,srcName,dtime)
+  -- Create the event
+  local cid = self:CreateEvent(srcName,"decay","","",implode(',',players),amount,dtime)
+  
+  local amount = 0
+  -- Then create all the necessary deductions for players
+  for i,pid in ipairs(players) do
+    local decay = (amount / 100) * self:GetPlayerDKPByID(pid)
+    self:CreatePlayerDeduction(pid,cid,decay)
+    amount = amount + decay
+  end
+
+  -- Modify the bounty pool
+  self:IncreaseAvailableBounty(amount)
+  
+  return cid
+end
+
 function EminentDKP:CreateBountySyncEvent(players,amount,srcName)
   self:SyncEvent(self:CreateBountyEvent(players,amount,srcName,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 function EminentDKP:CreateBountyEvent(players,amount,srcName,dtime)
@@ -2052,6 +2114,7 @@ end
 function EminentDKP:CreateAuctionSyncEvent(players,to,amount,srcName,srcExtra)
   self:SyncEvent(self:CreateAuctionEvent(players,to,amount,srcName,srcExtra,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 function EminentDKP:CreateAuctionEvent(players,to,amount,srcName,srcExtra,dtime)
@@ -2078,6 +2141,7 @@ end
 function EminentDKP:CreateTransferSyncEvent(from,to,amount)
   self:SyncEvent(self:CreateTransferEvent(from,to,amount,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 function EminentDKP:CreateTransferEvent(from,to,amount,dtime)
@@ -2100,6 +2164,7 @@ end
 function EminentDKP:CreatePurgeSyncEvent(name)
   self:SyncEvent(self:CreatePurgeEvent(name,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 -- This assumes the player is fresh
@@ -2118,6 +2183,7 @@ end
 function EminentDKP:CreateAdjustmentSyncEvent(name,amount,deduction,reason)
   self:SyncEvent(self:CreateAdjustmentEvent(name,amount,deduction,reason,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 function EminentDKP:CreateAdjustmentEvent(name,amount,deduction,reason,dtime)
@@ -2144,6 +2210,7 @@ end
 function EminentDKP:CreateExpirationSyncEvent(name)
   self:SyncEvent(self:CreateExpirationEvent(name,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 function EminentDKP:CreateExpirationEvent(name,dtime)
@@ -2170,6 +2237,7 @@ end
 function EminentDKP:CreateVanityResetSyncEvent(name)
   self:SyncEvent(self:CreateVanityResetEvent(name,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 function EminentDKP:CreateVanityResetEvent(name,dtime)
@@ -2191,6 +2259,7 @@ end
 function EminentDKP:CreateRenameSyncEvent(from,to)
   self:SyncEvent(self:CreateRenameEvent(from,to,time()))
   self:UpdateModes(true)
+  self:UpdateStatusBar()
 end
 
 function EminentDKP:CreateRenameEvent(from,to,dtime)
@@ -2264,6 +2333,7 @@ end
 ]]
 
 -- Keep track of any creature deaths
+-- function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, hideCaster, srcGUID, srcName, srcFlags, srcRFlags, dstGUID, dstName, dstFlags, dstRFlags, ...)
 function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, hideCaster, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
   if not self:AmOfficer() then return end
   if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
@@ -2853,7 +2923,7 @@ function EminentDKP:AdminIssueAdjustment(who,amount,deduction,reason)
   if not self:EnsureOfficership() then return end
   if not auction_active then
     local p = tonumber(amount) or 0
-    if (deduction and p <= self:GetCurrentDKP(who) and p >= 1) or (not deduction and p <= self:GetAvailableBounty() and p >= 1) then      
+    if (deduction and p <= self:GetPlayerDKPByName(who) and p >= 1) or (not deduction and p <= self:GetAvailableBounty() and p >= 1) then      
       self:CreateAdjustmentSyncEvent(who,p,deduction,reason)
       
       -- Announce adjustment to the other addons
@@ -2866,6 +2936,28 @@ function EminentDKP:AdminIssueAdjustment(who,amount,deduction,reason)
       end
     else
       self:DisplayActionResult(L["ERROR: Invalid adjustment amount given."])
+    end
+  else
+    self:DisplayActionResult(L["ERROR: An auction must not be active."])
+  end
+end
+
+function EminentDKP:AdminPerformDecay(value,manual)
+  if not self:EnsureOfficership() then return end
+  if not auction_active then
+    local p = tonumber(value) or 0
+    if p <= 100 and p > 0 then
+      -- Construct list of players to receive bounty
+      local players = self:GetActiveAndDirtyPlayerIDs()
+      
+      -- Announce decay to the other addons
+      self:InformPlayer("decay",{ amount = value })
+      
+      self:MessageGroup(L["All active DKP has decayed by %d%%."]:format(value))
+
+      self:CreateDecaySyncEvent(players,p,(manual and "Manual" or "Automatic"))
+    else
+      self:DisplayActionResult(L["ERROR: Invalid decay percent given."])
     end
   else
     self:DisplayActionResult(L["ERROR: An auction must not be active."])
@@ -3109,6 +3201,9 @@ function EminentDKP:ActuateNotification(notifyType,data)
       -- Somebody else got adjusted
       self:NotifyOnScreen("ADJUSTMENT_MADE",data.amount,data.receiver,data.deduct)
     end
+  elseif notifyType == "decay" then
+    -- Decay received
+    self:NotifyOnScreen("DECAY_RECEIVED",data.amount)
   elseif notifyType == "bounty" then
     -- Bounty received
     self:NotifyOnScreen("BOUNTY_RECEIVED",data.amount)

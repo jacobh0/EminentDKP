@@ -218,6 +218,7 @@ L["ERROR: %s is not a fresh player."] = "ERROR: %s is not a fresh player."
 L["ERROR: Invalid bounty amount given."] = "ERROR: Invalid bounty amount given."
 L["ERROR: Invalid adjustment amount given."] = "ERROR: Invalid adjustment amount given."
 L["ERROR: An auction must not be active."] = "ERROR: An auction must not be active."
+L["ERROR: Invalid decay percent given."] = "ERROR: Invalid decay percent given."
 
 L["Successfully renamed %s to %s."] = "Successfully renamed %s to %s."
 L["Successfully reset vanity DKP for %s."] = "Successfully reset vanity DKP for %s."
@@ -233,6 +234,7 @@ L["You have been awarded"] = "You have been awarded"
 L["You have been deducted"] = "You have been deducted"
 L["%s has been deducted"] = "%s has been deducted"
 L["%s has been awarded"] = "%s has been awarded"
+L["Your DKP has decayed by"] = "Your DKP has decayed by"
 
 L["You must be the master looter to initiate an auction."] = "You must be the master looter to initiate an auction."
 L["You must be looting a corpse to start an auction."] = "You must be looting a corpse to start an auction."
@@ -258,6 +260,9 @@ L["Each player has received %.02f DKP."] = "Each player has received %.02f DKP."
 L["The bounty pool is now %.02f DKP."] = "The bounty pool is now %.02f DKP."
 L["%s has received a deduction of %.02f DKP."] = "%s has received a deduction of %.02f DKP."
 L["%s has been awarded %.02f DKP."] = "%s has been awarded %.02f DKP."
+-- note: on this one, the %% is just a percent sign, the %d is the variable.
+L["All active DKP has decayed by %d%%."] = "All active DKP has decayed by %d%%."
+
 
 L["There is no loot available to auction."] = "There is no loot available to auction."
 L["There is currently no auction active."] = "There is currently no auction active."

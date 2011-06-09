@@ -851,11 +851,11 @@ local function CreateAdjustmentTab(container)
   who:SetCallback("OnValueChanged",function(i,j,value)
     issue:SetDisabled(false)
     if deduct:GetValue() then
-      if EminentDKP:GetCurrentDKP(value) < 1 then
+      if EminentDKP:GetPlayerDKPByName(value) < 1 then
         issue:SetDisabled(true)
         amount:SetSliderValues(0,0,0)
       else
-        amount:SetSliderValues(1,TNum(EminentDKP:GetCurrentDKP(value)),1)
+        amount:SetSliderValues(1,TNum(EminentDKP:GetPlayerDKPByName(value)),1)
       end
     else
       amount:SetSliderValues(1,math.floor(EminentDKP:GetAvailableBounty()),1)
@@ -872,12 +872,12 @@ local function CreateAdjustmentTab(container)
   deduct:SetValue(true)
   deduct:SetCallback("OnValueChanged",function(i,j,checked)
     if checked and who:GetValue() ~= "" then
-      if EminentDKP:GetCurrentDKP(who:GetValue()) < 1 then
+      if EminentDKP:GetPlayerDKPByName(who:GetValue()) < 1 then
         issue:SetDisabled(true)
         amount:SetSliderValues(0,0,0)
       else
         issue:SetDisabled(false)
-        amount:SetSliderValues(1,TNum(EminentDKP:GetCurrentDKP(who:GetValue())),1)
+        amount:SetSliderValues(1,TNum(EminentDKP:GetPlayerDKPByName(who:GetValue())),1)
       end
     else
       issue:SetDisabled(false)

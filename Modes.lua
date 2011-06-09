@@ -814,7 +814,7 @@ end
 
 function attendanceMode:OnEnable()
   self.metadata            = {showspots = false, ordersort = true, sortfunc = value_and_label_sort, click1 = missedEventMode, columns = { Count = true, Percent = true }}
-  missedEventMode.metadata = {showspots = false, ordersort = true, columns = { Count = true, Percent = true }}
+  missedEventMode.metadata = {showspots = false, ordersort = true, sortfunc = time_sort, columns = { Count = true, Percent = true }}
   missedEventMode.parent   = self
 
   EminentDKP:AddMode(self)
@@ -838,12 +838,14 @@ function missedEventMode:PopulateData(win)
   for day, events in pairs(days) do
     local missed = 0
     local day_total = 0
+    local time
     for j, eid in ipairs(events) do
       local event = EminentDKP:GetEvent(eid)
       if not tContains({ strsplit(',',event.beneficiary) },self.playerid) then
         missed = missed + 1
       end
       day_total = day_total + 1
+      time = event.datetime
     end
     if missed > 0 then
       local d = win.dataset[nr] or {}
@@ -851,6 +853,7 @@ function missedEventMode:PopulateData(win)
       d.id = day
       d.label = day
       d.value = missed
+      d.time = time
       d.valuetext = FormatValueText(d.value, self.metadata.columns.Count,
                                     EminentDKP:StdNumber((missed / day_total) * 100).."%", self.metadata.columns.Percent)
       
