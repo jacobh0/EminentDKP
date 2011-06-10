@@ -11,6 +11,11 @@ local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 --[[
   bugs:
     - bids aren't always registering on the loot window
+  todo:
+    - disable syncing while the reset dialog is pending for officers
+    - investigate ML messages sometimes not being received (especially by the ML)
+    - finish officer option syncing
+    - failsafe for ML loot not being given due to player not being in instance
 ]]
 
 local VERSION = '2.2.0'
@@ -33,7 +38,6 @@ local recent_loots = {}
 local eligible_looters = {}
 
 local events_cache = {}
-local synced_dates = {}
 local syncing = false
 
 local lastContainerName = nil
@@ -1199,7 +1203,7 @@ function EminentDKP:GetNewestEventCount()
 end
 
 function EminentDKP:GetCurrentEventHash()
-  return self:GetEventHash(self:GetEventCount())
+  return self:GetEventHash(tostring(self:GetEventCount()))
 end
 
 function EminentDKP:GetEventCountDifference()
@@ -1975,15 +1979,18 @@ end
 
 -- Provide an FCS16 hash of the event for comparison purposes
 function EminentDKP:GetEventHash(eventID)
+  if eventID == "0" then
+    return "fresh"
+  end
   local data = self:GetEvent(eventID)
   
-  local hash = libC:fcs16init()
-  hash = libC:fcs16update(hash,eventID)
+  local hash = libC:fcs32init()
+  hash = libC:fcs32update(hash,eventID)
   for key, value in pairs(data) do
-    hash = libC:fcs16update(hash,value)
+    hash = libC:fcs32update(hash,value)
   end
   
-  hash = libC:fcs16final(hash)
+  hash = libC:fcs32final(hash)
   return hash
 end
 
@@ -2391,7 +2398,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
       end
     end
     -- Check if a decay is scheduled for today
-    if (self.db.profile.officer.decay.schedule[tonumber(date("%w"))]) then
+    if self.db.profile.officer.decay.schedule[tonumber(date("%w"))] then
       self:Print(L["Performing %d%% decay..."]:format(self.db.profile.officer.decay.percent * 100))
       self:AdminPerformDecay(self.db.profile.officer.decay.percent,false)
     end

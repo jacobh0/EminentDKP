@@ -720,7 +720,6 @@ EminentDKP.options = {
 					end,
 					order= 7,
       	},
-
         decay = {
           type = "group",
           name = L["Decay Options"],
