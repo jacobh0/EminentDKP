@@ -1573,7 +1573,7 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
       -- Start the auction for them
       self:InformPlayer("auction",{ 
         guid=self.bidItem.srcGUID, 
-        slot=self.bidItem.slotNum, 
+        slot=self:GetGUISlot(self.bidItem.srcGUID,self.bidItem.slotNum), 
         timeleft=(self.bidItem.ending - GetTime()),
         window=self.bidItem.window,
       },sender)
@@ -2530,7 +2530,7 @@ function EminentDKP:LOOT_CLOSED()
     self:RemoveMarkedItemSlots(self.bidItem.srcGUID)
     self:InformPlayer("auctioncancel",{
       guid = self.bidItem.srcGUID,
-      slot = (recent_loots[self.bidItem.srcGUID].slotoffset + self.bidItem.slotNum),
+      slot = self:GetGUISlot(self.bidItem.srcGUID,self.bidItem.slotNum),
     })
     self.bidItem = nil
   end
@@ -2795,8 +2795,8 @@ function EminentDKP:AdminStartAuction()
     if #(recent_loots[guid].slots) > 0 then
       if not auction_active then
         -- Fast forward to next eligible slot
-        local slot = tremove(recent_loots[guid].slots)
-        local itemLink = GetLootSlotLink(slot)
+        local slot
+        local itemLink
         
         while (not itemLink or self:IsSlotAuctioned(guid,slot)) and #(recent_loots[guid].slots) > 0 do
           slot = tremove(recent_loots[guid].slots)
