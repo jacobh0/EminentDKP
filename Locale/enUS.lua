@@ -54,8 +54,23 @@ L["Winner"] = "Winner"
 L["Time"] = "Time"
 L["Date"] = "Date"
 
+L["Monday"] = "Monday"
+L["Tuesday"] = "Tuesday"
+L["Wednesday"] = "Wednesday"
+L["Thursday"] = "Thursday"
+L["Friday"] = "Friday"
+L["Saturday"] = "Saturday"
+L["Sunday"] = "Sunday"
+
+L["Manual"] = "Manual"
+L["Automatic"] = "Automatic"
+
 -- Options
 
+L["Decay Options"] = "Decay Options"
+L["Schedule"] = "Schedule"
+L["Select which days of the week a decay will be performed on."] = "Select which days of the week a decay will be performed on."
+L["The percentage of DKP that will decay from each player."] = "The percentage of DKP that will decay from each player."
 L["Rename window"] = "Rename window"
 L["Enter the name for the window."] = "Enter the name for the window."
 L["Display system"] = "Display system"
@@ -263,7 +278,6 @@ L["%s has been awarded %.02f DKP."] = "%s has been awarded %.02f DKP."
 -- note: on this one, the %% is just a percent sign, the %d is the variable.
 L["All active DKP has decayed by %d%%."] = "All active DKP has decayed by %d%%."
 
-
 L["There is no loot available to auction."] = "There is no loot available to auction."
 L["There is currently no auction active."] = "There is currently no auction active."
 L["You are not eligible to receive loot."] = "You are not eligible to receive loot."
@@ -305,6 +319,8 @@ L["These commands can only be sent to the master looter while in a group"] = "Th
 L["Unrecognized command. Whisper %s for a list of valid commands."] = "Unrecognized command. Whisper %s for a list of valid commands."
 
 L["Performing database scan..."] = "Performing database scan..."
+-- note: on this one, the %% is just a percent sign, the %d is the variable.
+L["Performing %d%% decay..."] = "Performing %d%% decay..."
 L["There is more than 50% of the bounty available. You should distribute some."] = "There is more than 50% of the bounty available. You should distribute some."
 L["Database has been rebuilt."] = "Database has been rebuilt."
 L["Are you sure you want to reset the database? This cannot be undone."] = "Are you sure you want to reset the database? This cannot be undone."

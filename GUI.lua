@@ -223,7 +223,7 @@ end
 
 -- Submit a bid and/or clear focus (depending on option)
 local function DecideAction(frame)
-  if EminentDKP.db.profile.bidonenter then
+  if EminentDKP.db.profile.auctionframe.bidonenter then
     SubmitBid(frame)
   end
   ClearFocus(frame)
@@ -809,9 +809,11 @@ local function CreateBountyTab(container)
   percent:SetValue(true)
   percent:SetCallback("OnValueChanged",function(i,j,checked)
     if checked then
-      amount:SetSliderValues(0.5,100,0.5)
-      amount:SetValue(0.5)
+      amount:SetIsPercent(true)
+      amount:SetSliderValues(0.005,1,0.005)
+      amount:SetValue(0.4)
     else
+      amount:SetIsPercent(false)
       amount:SetSliderValues(1,math.floor(EminentDKP:GetAvailableBounty()),1)
       amount:SetValue(1)
     end
@@ -987,7 +989,7 @@ function EminentDKP:CreateActionPanel()
   end
   self.actionpanel = AceGUI:Create("EminentDKPFrame")
   self.actionpanel:SetWidth(400)
-  self.actionpanel:SetHeight(350)
+  self.actionpanel:SetHeight(400)
   self.actionpanel:SetTitle(L["EminentDKP Action Panel"])
   self.actionpanel:SetCallback("OnClose", function(widget)
     AceGUI:Release(widget)

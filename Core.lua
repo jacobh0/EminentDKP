@@ -835,6 +835,7 @@ function EminentDKP:OnInitialize()
   end
   
   self.myName = UnitName("player")
+  self.myGuild = GetGuildInfo("player")
   
   self.auctionItems = {}
   
@@ -1018,7 +1019,7 @@ function EminentDKP:LevelUpDisplayShow(frame)
     elseif frame.type == "DECAY_RECEIVED" then
       frame.levelFrame.reachedText:SetFormattedText(L["Your DKP has decayed by"])
       texcoords.textTint = { 0.92, 0.49, 0.04 }
-      local decayed = self:GetMyCurrentDKP() * (self.notifyDetails.desc / 100)
+      local decayed = self:GetMyCurrentDKP() * self.notifyDetails.desc
       frame.levelFrame.levelText:SetFormattedText("%.02f DKP",decayed)
     elseif frame.type == "ADJUSTMENT_RECEIVED" then
       if self.notifyDetails.extra then
@@ -1885,19 +1886,11 @@ end
 -- Construct list of names for players currently in the group
 function EminentDKP:GetCurrentGroupMembersNames()
   local players = {}
-  if is_in_party() then
-    for spot = 1, 5 do
-      local name = UnitName("party"..spot)
-      if name then
-        table.insert(players,name)
-      end
-    end
-  else
-    for spot = 1, 40 do
-      local name = UnitName("raid"..spot)
-      if name then
-        table.insert(players,name)
-      end
+  local is_party = is_in_party()
+  for spot = 1, (is_party and 5 or 40) do
+    local name = UnitName((is_party and "party" or "raid")..spot)
+    if name then
+      table.insert(players,name)
     end
   end
   return players
@@ -1906,18 +1899,13 @@ end
 -- Construct list of IDs for players currently in the group
 function EminentDKP:GetCurrentGroupMembersIDs()
   local players = {}
-  if is_in_party() then
-    for spot = 1, 5 do
-      local name = UnitName("party"..spot)
-      if name then
-        table.insert(players,self:GetPlayerIDByName(name))
-      end
-    end
-  else
-    for spot = 1, 40 do
-      local name = UnitName("raid"..spot)
-      if name then
-        table.insert(players,self:GetPlayerIDByName(name))
+  local is_party = is_in_party()
+  for spot = 1, (is_party and 5 or 40) do
+    local name = UnitName((is_party and "party" or "raid")..spot)
+    if name then
+      local pid = self:GetPlayerIDByName(name)
+      if pid then
+        table.insert(players,pid)
       end
     end
   end
@@ -2064,20 +2052,20 @@ function EminentDKP:CreateAddPlayerEvent(name,className,dkp,vanitydkp,dtime)
   return cid
 end
 
-function EminentDKP:CreateDecaySyncEvent(players,amount,srcName)
-  self:SyncEvent(self:CreateDecayEvent(players,amount,srcName,time()))
+function EminentDKP:CreateDecaySyncEvent(players,percent,srcName)
+  self:SyncEvent(self:CreateDecayEvent(players,percent,srcName,time()))
   self:UpdateModes(true)
   self:UpdateStatusBar()
 end
 
-function EminentDKP:CreateDecayEvent(players,amount,srcName,dtime)
+function EminentDKP:CreateDecayEvent(players,percent,srcName,dtime)
   -- Create the event
-  local cid = self:CreateEvent(srcName,"decay","","",implode(',',players),amount,dtime)
+  local cid = self:CreateEvent(srcName,"decay","","",implode(',',players),percent,dtime)
   
   local sum = 0
   -- Then create all the necessary deductions for players
   for i,pid in ipairs(players) do
-    local decay = (amount / 100) * self:GetPlayerDKPByID(pid)
+    local decay = percent * self:GetPlayerDKPByID(pid)
     self:CreatePlayerDeduction(pid,cid,decay)
     sum = sum + decay
   end
@@ -2389,6 +2377,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
   
   if self:GetLastScan() == 0 or GetDaysSince(self:GetLastScan()) > 0 then
     self:Print(L["Performing database scan..."])
+    -- Scan database for inactive or purgable players
     for pid,data in pairs(self:GetActivePool().players) do
       if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
         local name = self:GetPlayerNameByID(pid)
@@ -2400,6 +2389,11 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
           self:CreateExpirationSyncEvent(name)
         end
       end
+    end
+    -- Check if a decay is scheduled for today
+    if (self.db.profile.officer.decay.schedule[tonumber(date("%w"))]) then
+      self:Print(L["Performing %d%% decay..."]:format(self.db.profile.officer.decay.percent * 100))
+      self:AdminPerformDecay(self.db.profile.officer.decay.percent,false)
     end
     if self:GetAvailableBountyPercent() > 50 then
       self:Print(L["There is more than 50% of the bounty available. You should distribute some."])
@@ -2415,24 +2409,15 @@ function EminentDKP:CheckGroupPlayers()
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() or not self:IsEnabled() then return end
   
-  if GetNumRaidMembers() > 0 then
-    for d = 1, GetNumRaidMembers() do
-      local name = UnitName("raid"..d)
-      if name and UnitExists(name) and not self:PlayerExistsInPool(name) then
-        local classname = select(2,UnitClass(name))
-        if classname then
-          self:CreateAddPlayerSyncEvent(name,classname)
-        end
-      end
-    end
-  elseif GetNumPartyMembers() > 0 then
-    for d = 1, GetNumPartyMembers() do
-      local name = UnitName("party"..d)
-      if name and UnitExists(name) and not self:PlayerExistsInPool(name) then
-        local classname = select(2,UnitClass(name))
-        if classname then
-          self:CreateAddPlayerSyncEvent(name,classname)
-        end
+  local is_party = is_in_party()
+  for d = 1, (is_party and 5 or 40) do
+    local name = UnitName((is_party and "party" or "raid")..d)
+    if name and UnitExists(name) and not self:PlayerExistsInPool(name) then
+      local classname = select(2,UnitClass(name))
+      local guildName = GetGuildInfo(name)
+      -- Only people from the same guild can get added
+      if classname and guildName == self.myGuild then
+        self:CreateAddPlayerSyncEvent(name,classname)
       end
     end
   end
@@ -2946,16 +2931,16 @@ function EminentDKP:AdminPerformDecay(value,manual)
   if not self:EnsureOfficership() then return end
   if not auction_active then
     local p = tonumber(value) or 0
-    if p <= 100 and p > 0 then
+    if p <= 1 and p > 0 then
       -- Construct list of players to receive bounty
       local players = self:GetActiveAndDirtyPlayerIDs()
       
       -- Announce decay to the other addons
-      self:InformPlayer("decay",{ amount = value })
+      self:InformPlayer("decay",{ amount = p })
       
-      self:MessageGroup(L["All active DKP has decayed by %d%%."]:format(value))
+      self:MessageGroup(L["All active DKP has decayed by %d%%."]:format(p * 100))
 
-      self:CreateDecaySyncEvent(players,p,(manual and "Manual" or "Automatic"))
+      self:CreateDecaySyncEvent(players,p,(manual and L["Manual"] or L["Automatic"]))
     else
       self:DisplayActionResult(L["ERROR: Invalid decay percent given."])
     end
@@ -2968,11 +2953,11 @@ function EminentDKP:AdminDistributeBounty(percent,value,reason)
   if not self:EnsureOfficership() then return end
   if not auction_active then
     local p = tonumber(value) or 0
-    if (percent and p <= 100 and p > 0) or (not percent and p <= self:GetAvailableBounty() and p > 0) then
+    if (percent and p <= 1 and p > 0) or (not percent and p <= self:GetAvailableBounty() and p > 0) then
       -- Construct list of players to receive bounty
       local players = self:GetCurrentGroupMembersIDs()
       
-      local amount = (percent and (self:GetAvailableBounty() * (p/100)) or p)
+      local amount = (percent and (self:GetAvailableBounty() * p) or p)
       local dividend = (amount/#(players))
       
       self:CreateBountySyncEvent(players,amount,reason)

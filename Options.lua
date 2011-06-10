@@ -32,7 +32,6 @@ EminentDKP.windowdefaults = {
 	enablestatus = true,
 	enablebackground = false,
 	
-	set = nil,
 	mode = nil,
 	
 	display = "meter",
@@ -62,26 +61,33 @@ EminentDKP.defaults = {
   },
   profile = {
     activepool = "Default",
-    disenchanter = "",
-    itemrarity = 3,
-    expiretime = 30,
-    auctionlength = 30,
     hidesolo = false,
     hideparty = false,
     hidepvp = true,
     hidecombat = true,
-    bidonenter = false,
     maxplayerevents = 30,
     maxmodeevents = 30,
     numberformat = 2,
     showranks = true,
     attendancedays = 30,
     hideraidmessages = true,
-    guildgroup = true,
-    disablepvp = true,
-    disableparty = true,
     windows = { default_window },
+    officer = {
+      disenchanter = "",
+      itemrarity = 3,
+      expiretime = 30,
+      auctionlength = 30,
+      guildgroup = true,
+      disablepvp = true,
+      disableparty = true,
+      decay = {
+        schedule = { [0] = false, [1] = false, [2] = false, 
+                     [3] = false, [4] = false, [5] = false, [6] = false },
+        percent = 0.025,
+      }
+    },
     auctionframe = {
+      bidonenter = false,
       itemfontsize = 14,
     	itemheight = 28,
     	itemwidth = 350,
@@ -96,7 +102,7 @@ EminentDKP.defaults = {
     },
     tooltips = true,
     informativetooltips = true,
-    tooltiprows = 3,
+    tooltiprows = 5,
     tooltippos = "default",
     columns = {},
   }
@@ -205,6 +211,16 @@ EminentDKP.options = {
           set= function(win)
             EminentDKP.db.profile.auctionframe.locked = not EminentDKP.db.profile.auctionframe.locked
             EminentDKP:ApplyAuctionFrameSettings()
+          end,
+        },
+        bidonenter = {
+          type= "toggle",
+          name= L["Bid on Enter"],
+          desc= L["Send bid for an auction when pressing enter in the bid amount box."],
+          order= 2,
+          get= function() return EminentDKP.db.profile.auctionframe.bidonenter end,
+          set= function(win)
+            EminentDKP.db.profile.auctionframe.bidonenter = not EminentDKP.db.profile.auctionframe.bidonenter
           end,
         },
         titleoptions = {
@@ -623,16 +639,6 @@ EminentDKP.options = {
           end,
           order= 12,
 				},
-        bidonenter = {
-          type= "toggle",
-          name= L["Bid on Enter"],
-          desc= L["Send bid for an auction when pressing enter in the bid amount box."],
-          order= 13,
-          get= function() return EminentDKP.db.profile.bidonenter end,
-          set= function(win)
-            EminentDKP.db.profile.bidonenter = not EminentDKP.db.profile.bidonenter
-          end,
-        },
       },
     },
     officer = {
@@ -714,6 +720,41 @@ EminentDKP.options = {
 					end,
 					order= 7,
       	},
+
+        decay = {
+          type = "group",
+          name = L["Decay Options"],
+          order = 20,
+          args = {
+            days = {
+              type= "multiselect",
+              name= L["Schedule"],
+              desc= L["Select which days of the week a decay will be performed on."],
+              values= { [0] = L["Sunday"], [1] = L["Monday"], [2] = L["Tuesday"], [3] = L["Wednesday"],
+                        [4] = L["Thursday"], [5] = L["Friday"], [6] = L["Saturday"] },
+              get= function(self,key) return EminentDKP.db.profile.officer.decay.schedule[key] end,
+              set= function(self,key,val)
+                EminentDKP.db.profile.officer.decay.schedule[key] = val
+              end,
+              order= 1,
+            },
+            percent = {
+              type= "range",
+              name= L["Percent"],
+              desc= L["The percentage of DKP that will decay from each player."],
+              min=0.005,
+              max=1,
+              step=0.005,
+              bigStep=0.01,
+              isPercent=true,
+              get= function() return EminentDKP.db.profile.officer.decay.percent end,
+              set= function(self,val)
+                EminentDKP.db.profile.officer.decay.percent = val
+              end,
+              order= 2,
+            },
+          },
+        },
       },
     },
     tooltips = {
