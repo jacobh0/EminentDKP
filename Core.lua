@@ -14,7 +14,6 @@ local canuse = LibStub:GetLibrary("LibCanUse-1.0")
   todo:
     - investigate ML messages sometimes not being received (especially by the ML)
     - finish officer option syncing
-    - failsafe for ML loot not being given due to player not being in instance
 ]]
 
 local VERSION = '2.2.0'
@@ -2492,11 +2491,7 @@ function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self.lootMethod, self.masterLooterPartyID, self.masterLooterRaidID = GetLootMethod()
   self.amMasterLooter = (self.lootMethod == 'master' and self.masterLooterPartyID == 0)
   if not self.amMasterLooter then
-    if is_in_party() then 
-      self.masterLooterName = UnitName("party"..tostring(self.masterLooterPartyID))
-    else
-      self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
-    end
+    self.masterLooterName = UnitName((is_in_party() and "party" or "raid")..tostring(self.masterLooterPartyID))
   else
     self.masterLooterName = self.myName
   end
@@ -2532,6 +2527,7 @@ function EminentDKP:LOOT_CLOSED()
     auction_active = false
     self:CancelTimer(self.bidTimer,true)
     self:MessageGroup(L["Auction cancelled. All bids have been voided."])
+    self:RemoveMarkedItemSlots(self.bidItem.srcGUID)
     self:InformPlayer("auctioncancel",{
       guid = self.bidItem.srcGUID,
       slot = (recent_loots[self.bidItem.srcGUID].slotoffset + self.bidItem.slotNum),
@@ -2552,31 +2548,60 @@ function EminentDKP:GetTargetNameAndGUID()
 end
 
 function EminentDKP:FindAvailableItemBySlot(guid,slot)
+  local adjusted_slot = slot - recent_loots[guid].slotOffset
   local counter = 1
   for i, item in ipairs(recent_loots[guid].itemlist) do
     if not item.removed then
-      if counter == slot then
+      if counter == adjusted_slot then
         return item
       end
       counter = counter + 1
     end
   end
-  error("Did not find item for slot '"..slot.."' for GUID: "..guid)
+  error("No item for slot "..slot.."("..adjusted_slot..") with GUID: "..guid)
 end
 
+-- Find the auctionframe slot for the slot in the loot window
 function EminentDKP:GetGUISlot(guid,slot)
   return self:FindAvailableItemBySlot(guid,slot).slot
+end
+
+function EminentDKP:IsSlotAuctioned(guid,slot)
+  return self:FindAvailableItemBySlot(guid,slot).auctioned
+end
+
+-- Mark a slot on the loot as removed
+function EminentDKP:MarkItemSlotAsRemoved(guid,slot)
+  recent_loots[guid].removed[slot] = true
+end
+
+-- Mark a slot on the loot as auctioned
+function EminentDKP:MarkItemSlotAsAuctioned(guid,slot)
+  self:FindAvailableItemBySlot(guid,slot).auctioned = true
+end
+
+-- All item slots that have been marked as removed are made permanent
+function EminentDKP:RemoveMarkedItemSlots(guid)
+  local items = {}
+  
+  -- Have to find them all before marking as removed, since they are relative
+  for slot, v in pairs(recent_loots[guid].removed) do
+    table.insert(items,self:FindAvailableItemBySlot(guid,slot))
+  end
+  
+  -- Mark them as removed
+  for i, item in ipairs(items) do
+    item.removed = true
+    recent_loots[guid].available = recent_loots[guid].available - 1
+  end
 end
 
 -- Keeps track of items in the loot window
 function EminentDKP:LOOT_SLOT_CLEARED(event, slot)
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() then return end
-  
-  local unitName, guid = self:GetTargetNameAndGUID()
-  local item = self:FindAvailableItemBySlot(guid,slot)
-  item.removed = true
-  recent_loots[guid].available = recent_loots[guid].available - 1
+  local guid = select(2,self:GetTargetNameAndGUID())
+  self:MarkItemSlotAsRemoved(guid,slot)
 end
 
 -- Prints out the loot to the group when looting a corpse
@@ -2595,7 +2620,7 @@ function EminentDKP:LOOT_OPENED()
       if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
         local link = GetLootSlotLink(slot)
         table.insert(eligible_items,link)
-        table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), removed=false, slot=slot })
+        table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), auctioned = false, removed=false, slot=slot })
         table.insert(slotlist,1,slot)
       end
     end
@@ -2615,12 +2640,17 @@ function EminentDKP:LOOT_OPENED()
         recent_loots[guid] = {
           name=unitName,
           slots=slotlist,
-          available=#(itemlist),
+          slotOffset=(slotlist[#(slotlist)] - 1),
+          available=#(slotlist),
           items=itemlist,
+          removed={},
         }
       else
-        -- Update slot list
+        -- Update tracked loot information
+        wipe(recent_loots[guid].removed)
         recent_loots[guid].slots = slotlist
+        recent_loots[guid].available = #(slotlist)
+        recent_loots[guid].slotOffset = slotlist[recent_loots[guid].available] - 1
       end
     end
   end
@@ -2765,10 +2795,10 @@ function EminentDKP:AdminStartAuction()
     if #(recent_loots[guid].slots) > 0 then
       if not auction_active then
         -- Fast forward to next eligible slot
-        local slot
-        local itemLink
+        local slot = tremove(recent_loots[guid].slots)
+        local itemLink = GetLootSlotLink(slot)
         
-        while not itemLink and #(recent_loots[guid].slots) > 0 do
+        while (not itemLink or self:IsSlotAuctioned(guid,slot)) and #(recent_loots[guid].slots) > 0 do
           slot = tremove(recent_loots[guid].slots)
           itemLink = GetLootSlotLink(slot)
         end
@@ -2777,6 +2807,7 @@ function EminentDKP:AdminStartAuction()
           self:DisplayActionResult(L["There is no loot available to auction."])
           return
         end
+        auction_active = true
         
         -- Gather some info about this item
         local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
@@ -2785,7 +2816,6 @@ function EminentDKP:AdminStartAuction()
         -- Update eligibility list
         self:UpdateLootEligibility()
         
-        auction_active = true
         self.bidItem = {
           itemLink=itemLink,
           itemString=string.match(itemLink, "item[%-?%d:]+"), 
@@ -2894,13 +2924,16 @@ function EminentDKP:AuctionBidTimer()
       })
     end
     
+    -- Mark the item as auctioned
+    self:MarkItemSlotAsAuctioned(self.bidItem.srcGUID,self.bidItem.slotNum)
+    
     -- Distribute the loot
     GiveMasterLoot(self.bidItem.slotNum, eligible_looters[looter])
     
     -- Re-run the auction routine...
     if #(recent_loots[self.bidItem.srcGUID].slots) > 0 then
       self.bidItem = nil
-      self:ScheduleTimer("AdminStartAuction",1)
+      self:AdminStartAuction()
     else
       self:MessageGroup(L["No more loot found."])
       self:InformPlayer("lootdone",{ guid = self.bidItem.srcGUID })
