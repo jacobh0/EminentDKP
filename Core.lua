@@ -1585,6 +1585,7 @@ end
 -- Process an incoming synced event
 function EminentDKP:ProcessSyncEvent(prefix, message, distribution, sender)
   if sender == self.myName then return end
+  if not self:IsSyncEnabled() then return end
   if not self:IsAnOfficer(sender) then return end
   
   -- Decode the compressed data
