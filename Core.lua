@@ -12,7 +12,6 @@ local canuse = LibStub:GetLibrary("LibCanUse-1.0")
   bugs:
     - bids aren't always registering on the loot window
   todo:
-    - disable syncing while the reset dialog is pending for officers
     - investigate ML messages sometimes not being received (especially by the ML)
     - finish officer option syncing
     - failsafe for ML loot not being given due to player not being in instance
@@ -50,6 +49,9 @@ local enabled = true
 
 -- When logging in, officer functionality is disabled temporarily
 local tempdisabled = true
+
+-- Disable any sync functionality
+local syncdisabled = false
 
 local function convertToTimestamp(datetime)
   local t, d = strsplit(' ',datetime)
@@ -867,6 +869,7 @@ end
 -- Restore officer functionality, we should know sync status by now
 function EminentDKP:UndoTempDisable()
   tempdisabled = false
+  syncdisabled = false
   self:PARTY_LOOT_METHOD_CHANGED()
 end
 
@@ -1512,6 +1515,7 @@ end
 -- Process an incoming request for missing events
 function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   if sender == self.myName then return end
+  if not self:IsSyncEnabled() then return end
   local version, ranges, hash = strsplit('_',message,3)
   if not CheckVersionCompatability(version) then return end
   local needed_ranges = { strsplit(',',ranges) }
@@ -1546,18 +1550,20 @@ function EminentDKP:ProcessSyncVersion(prefix, message, distribution, sender)
   
   UpdateNewestVersion(version)
   self:UpdateStatusBar()
-  if compare.major > 0 or compare.minor > 0 then
-    -- Broadcast our newer version
-    self:BroadcastVersion()
-  elseif compare.major == 0 and compare.minor == 0 then
-    if compare.bug > 0 or compare.event > 0 then
+  if self:IsSyncEnabled() then
+    if compare.major > 0 or compare.minor > 0 then
       -- Broadcast our newer version
       self:BroadcastVersion()
-    end
-    if compare.event < 0 or compare.bug < 0 then
-      if compare.event < 0 then
-        -- Event data is out of date
-        self:ScheduleEventsRequest(math.random(3,8))
+    elseif compare.major == 0 and compare.minor == 0 then
+      if compare.bug > 0 or compare.event > 0 then
+        -- Broadcast our newer version
+        self:BroadcastVersion()
+      end
+      if compare.event < 0 or compare.bug < 0 then
+        if compare.event < 0 then
+          -- Event data is out of date
+          self:ScheduleEventsRequest(math.random(3,8))
+        end
       end
     end
   end
@@ -2318,6 +2324,10 @@ end
 
 function EminentDKP:IsEnabled()
   return enabled and not self:NeedSync() and not tempdisabled
+end
+
+function EminentDKP:IsSyncEnabled()
+  return not syncdisabled
 end
 
 --[[
@@ -3248,7 +3258,7 @@ function EminentDKP:ActuateNotification(notifyType,data)
       if data.sender == self.myName then return end
       -- If an officer, give the option of complying, for security purposes
       tempdisabled = true
-      -- todo: temporarily disable syncing
+      syncdisabled = true
       EminentDKP:ConfirmAction("EminentDKPReset",
                                L["%s has issued a database reset. Do you wish to comply? This cannot be undone."]:format(data.sender),
                                function()
