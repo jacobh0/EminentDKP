@@ -2551,7 +2551,7 @@ function EminentDKP:LOOT_SLOT_CLEARED(event, slot)
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() then return end
   local guid = select(2,self:GetTargetNameAndGUID())
-  if recent_loots[guid] then
+  if recent_loots[guid] and slot > recent_loots[guid].slotOffset then
     self:MarkItemSlotAsRemoved(guid,slot)
   end
 end
