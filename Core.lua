@@ -2500,7 +2500,7 @@ end
 function EminentDKP:FindAvailableItemBySlot(guid,slot)
   local adjusted_slot = slot - recent_loots[guid].slotOffset
   local counter = 1
-  for i, item in ipairs(recent_loots[guid].itemlist) do
+  for i, item in ipairs(recent_loots[guid].items) do
     if not item.removed then
       if counter == adjusted_slot then
         return item
