@@ -2863,7 +2863,7 @@ function EminentDKP:AuctionBidTimer()
       local players = self:GetCurrentGroupMembersIDs()
       local dividend = (secondHighestBid/#(players))
       
-      self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[guid].name,self.bidItem.itemString)
+      self:CreateAuctionSyncEvent(players,looter,secondHighestBid,recent_loots[self.bidItem.srcGUID].name,self.bidItem.itemString)
       self:MessageGroup(L["%s has won %s for %d DKP!"]:format(looter,GetLootSlotLink(self.bidItem.slotNum),secondHighestBid))
       self:MessageGroup(L["Each player has received %.02f DKP."]:format(dividend))
       self:InformPlayer("auctionwon",{

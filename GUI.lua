@@ -213,9 +213,9 @@ end
 local function SubmitBid(frame)
   PlaySound("LOOTWINDOWCOINSOUND")
   last_bid_frame = frame:GetParent()
-  frame.bidamt:ClearFocus()
+  last_bid_frame.bid.bidamt:ClearFocus()
   EminentDKP:ScheduleBidTimeout()
-  EminentDKP:SendCommand("bid",frame.bidamt:GetText())
+  EminentDKP:SendCommand("bid",last_bid_frame.bid.bidamt:GetText())
 end
 
 -- This clears the focus of a frame (editbox)
