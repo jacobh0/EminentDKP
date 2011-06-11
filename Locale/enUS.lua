@@ -329,6 +329,7 @@ L["Please note that it can take up to 5 minutes to record the versions of all ot
 L["%s has issued a database reset."] = "%s has issued a database reset."
 L["%s has issued a database reset. Do you wish to comply? This cannot be undone."] = "%s has issued a database reset. Do you wish to comply? This cannot be undone."
 L["Are you sure you want to reset the database for ALL users? This cannot be undone."] = "Are you sure you want to reset the database for ALL users? This cannot be undone."
+L["Syncing officer options from %s..."] = "Syncing officer options from %s..."
 
 -- Statusbar
 L["Syncing..."] = "Syncing..."

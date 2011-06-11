@@ -13,7 +13,7 @@ local canuse = LibStub:GetLibrary("LibCanUse-1.0")
     - bids aren't always registering on the loot window
   todo:
     - investigate ML messages sometimes not being received (especially by the ML)
-    - finish officer option syncing
+    - cleanup meter display leftovers
 ]]
 
 local VERSION = '2.2.0'
@@ -882,13 +882,24 @@ function EminentDKP:GlobalApplySettings()
   self:SendCommMessage("EminentDKP-SV",self:GetVersion()..":Hello",'GUILD')
   
   -- Broadcast officer version
-  --self:BroadcastOfficerTimestamp()
+  self:BroadcastOfficerTimestamp()
 end
 
---[[
+function EminentDKP:BroadcastOfficerSettings()
+  if self:AmOfficer() then
+    -- Serialize and compress the data
+    local data = self.db.profile.officer
+    local one = self:GetVersion() .. '_' .. self:GetActivePool().officerSettingsTime .. '_'.. libS:Serialize(data)
+    local two = libC:CompressHuffman(one)
+    local final = libCE:Encode(two)
+    
+    self:SendCommMessage("EminentDKP-SOS",final,'OFFICER',nil,'BULK')
+  end
+end
+
 function EminentDKP:BroadcastOfficerTimestamp()
   if self:AmOfficer() then
-    self:SendCommMessage("EminentDKP-SOV",self:GetVersion()..":Hello",'OFFICER')
+    self:SendCommMessage("EminentDKP-SOV",self:GetVersion() .. '_' .. self:GetActivePool().officerSettingsTime,'OFFICER')
   end
 end
 
@@ -896,43 +907,61 @@ function EminentDKP:ProcessOfficerSyncVersion(prefix, message, distribution, sen
   if sender == self.myName then return end
   if not self:AmOfficer() then return end
   if not self:IsAnOfficer(sender) then return end
-  
-  -- check timestamp vs our own
-  
-  -- if ours is newer >, broadcast settings in next 2-6 seconds
-  -- if ours is older <, broadcast our version
-end
 
+  local version, timestamp = strsplit('_',message,2)
+  timestamp = tonumber(timestamp)
+  -- Ignore sync from incompatible versions
+  if not CheckVersionCompatability(version) then return end
+
+  if self:GetActivePool().officerSettingsTime < timestamp then
+    -- Our settings are older
+    self:BroadcastOfficerTimestamp()
+  else
+    -- Our settings are newer
+    self:CancelTimer(self.officerSettingsTimer,true)
+    self.officerSettingsTimer = self:ScheduleTimer('BroadcastOfficerSettings',math.random(2,6))
+  end
+end
 
 function EminentDKP:ProcessOfficerSyncSettings(prefix, message, distribution, sender)
   if sender == self.myName then return end
   if not self:AmOfficer() then return end
   if not self:IsAnOfficer(sender) then return end
   
-  -- if our timestamp <= timestamp of these settings, cancel any pending broadcast
-  
   -- Decode the compressed data
   local one = libCE:Decode(message)
 
   -- Decompress the decoded data
-  local two, message = libC:Decompress(one)
+  local two, message = libC:DecompressHuffman(one)
   if not two then
     self:Print("Error occured while decoding a sync event:" .. message)
     return
   end
   
-  local version, lastModified, data = strsplit('_',two,3)
+  local version, timestamp, data = strsplit('_',two,3)
+  timestamp = tonumber(timestamp)
   -- Ignore sync from incompatible versions
   if not CheckVersionCompatability(version) then return end
   
   -- Deserialize the decompressed data
-  local success, event = libS:Deserialize(data)
+  local success, settings = libS:Deserialize(data)
   if not success then
     self:Print("Error occured while deserializing a sync event.")
     return
   end
+
+  if self:GetActivePool().officerSettingsTime <= timestamp then
+    -- Our settings are older/same, so cancel any potential outgoing broadcast
+    self:CancelTimer(self.officerSettingsTimer,true)
+  else
+    -- Save these settings
+    self:Print(L["Syncing officer options from %s..."]:format(sender))
+    self.db.profile.officer = settings
+    self:GetActivePool().officerSettingsTime = timestamp
+    self:DisableCheck()
+  end
 end
-]]
+
 -- DATABASE UPDATES
 function EminentDKP:DatabaseUpdate()
   if self:GetActivePool().sets then
@@ -970,8 +999,8 @@ function EminentDKP:OnEnable()
   self:RegisterComm("EminentDKP-SE", "ProcessSyncEvent")
   self:RegisterComm("EminentDKP-CMD", "ProcessCommand")
   self:RegisterComm("EminentDKP-INF", "ProcessInformation")
-  --self:RegisterComm("EminentDKP-SOV", "ProcessOfficerSyncVersion")
-  --self:RegisterComm("EminentDKP-SOS", "ProcessOfficerSyncSettings")
+  self:RegisterComm("EminentDKP-SOV", "ProcessOfficerSyncVersion")
+  self:RegisterComm("EminentDKP-SOS", "ProcessOfficerSyncSettings")
   -- Custom event notifications
   self:RawHookScript(LevelUpDisplay, "OnShow", "LevelUpDisplayShow")
   self:RawHookScript(LevelUpDisplay, "OnHide", "LevelUpDisplayHide")
