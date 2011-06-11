@@ -672,14 +672,14 @@ function vanityRollMode:PopulateData(win)
   local max = 0
   
   for pid, roll in pairs(getModeData(self:GetName()).rolls) do
-    local pdata = EminentDKP:GetPlayerById(pid)
+    local pdata = EminentDKP:GetPlayerByID(pid)
     local d = win.dataset[nr] or {}
     win.dataset[nr] = d
     d.id = pid
     d.label = EminentDKP:GetPlayerNameByID(d.id)
-    d.value = roll
+    d.value = tonumber(roll)
     d.class = pdata.class
-    d.valuetext = FormatValueText(d.value, self.metadata.columns.Roll)
+    d.valuetext = FormatValueText(EminentDKP:FormatNumber(d.value), self.metadata.columns.Roll)
 
     if d.value > max then
       max = d.value
