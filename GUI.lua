@@ -24,6 +24,8 @@ EminentDKP.displays["meter"] = meter
 ---------------------------------------------------------------------]]
 
 local auction_frame = nil
+local auction_guid = ""
+local last_bid_frame
 
 local backdrop_default = {
   bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -225,8 +227,9 @@ end
 local function DecideAction(frame)
   if EminentDKP:GetSetting('auctionframe').bidonenter then
     SubmitBid(frame)
+  else
+    ClearFocus(frame)
   end
-  ClearFocus(frame)
 end
 
 -- This updates the timer bar on an item auction
@@ -244,9 +247,6 @@ local function TimerUpdate(frame)
     frame:GetParent().bid:Hide()
   end
 end
-
-local auction_guid = ""
-local last_bid_frame
 
 function EminentDKP:AdjustAuctionFrameBackgroundHeight()
   if auction_frame.bgframe then

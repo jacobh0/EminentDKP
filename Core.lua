@@ -2477,11 +2477,11 @@ function EminentDKP:LOOT_CLOSED()
     auction_active = false
     self:CancelTimer(self.bidTimer,true)
     self:MessageGroup(L["Auction cancelled. All bids have been voided."])
-    self:RemoveMarkedItemSlots(self.bidItem.srcGUID)
     self:InformPlayer("auctioncancel",{
       guid = self.bidItem.srcGUID,
       slot = self:GetGUISlot(self.bidItem.srcGUID,self.bidItem.slotNum),
     })
+    self:RemoveMarkedItemSlots(self.bidItem.srcGUID)
     self.bidItem = nil
   end
 end
