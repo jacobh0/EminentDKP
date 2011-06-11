@@ -2551,7 +2551,9 @@ function EminentDKP:LOOT_SLOT_CLEARED(event, slot)
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() then return end
   local guid = select(2,self:GetTargetNameAndGUID())
-  self:MarkItemSlotAsRemoved(guid,slot)
+  if recent_loots[guid] then
+    self:MarkItemSlotAsRemoved(guid,slot)
+  end
 end
 
 -- Prints out the loot to the group when looting a corpse
