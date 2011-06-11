@@ -2,12 +2,8 @@ local L = LibStub("AceLocale-3.0"):NewLocale("EminentDKP", "enUS", true)
 
 if not L then return end
 
-L["EminentDKP: Days"] = "EminentDKP: Days"
 L["EminentDKP: Modes"] = "EminentDKP: Modes"
 L["EminentDKP: %s Items"] = "EminentDKP: %s Items"
-
-L["All-time"] = "All-time"
-L["Today"] = "Today"
 
 L["Earnings & Deductions"] = "Earnings & Deductions"
 L["'s Earnings & Deductions"] = "'s Earnings & Deductions"

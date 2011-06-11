@@ -64,7 +64,7 @@ end
 
 -- Create the base auction frame for items
 function EminentDKP:CreateAuctionFrame()
-  local settings = self.db.profile.auctionframe
+  local settings = self:GetSetting('auctionframe')
   auction_frame = CreateFrame("Frame", "EminentDKPAuctionFrameWindow", UIParent)
   auction_frame:SetPoint("TOPLEFT", UIParent, "CENTER")
   auction_frame:SetMovable(true)
@@ -91,7 +91,7 @@ local auction_windowbackdrop = {}
 
 -- Apply profile settings to the auction frame (and item frames)
 function EminentDKP:ApplyAuctionFrameSettings()
-  local p = self.db.profile.auctionframe
+  local p = self:GetSetting('auctionframe')
   auction_frame:SetWidth(p.itemwidth)
   auction_frame:SetHeight(p.itemheight * .75)
   
@@ -223,7 +223,7 @@ end
 
 -- Submit a bid and/or clear focus (depending on option)
 local function DecideAction(frame)
-  if EminentDKP.db.profile.auctionframe.bidonenter then
+  if EminentDKP:GetSetting('auctionframe').bidonenter then
     SubmitBid(frame)
   end
   ClearFocus(frame)
@@ -250,11 +250,11 @@ local last_bid_frame
 
 function EminentDKP:AdjustAuctionFrameBackgroundHeight()
   if auction_frame.bgframe then
-    local settings = self.db.profile.auctionframe
+    local settings = self:GetSetting('auctionframe')
     local height = (#(item_frames) * (settings.itemheight + settings.itemspacing)) + settings.background.borderthickness + settings.itemspacing
     auction_frame.bgframe:SetHeight(height)
     
-    if self.db.profile.auctionframe.enablebackground and auction_frame:IsShown() then
+    if settings.enablebackground and auction_frame:IsShown() then
       auction_frame.bgframe:Show()
     end
   end
@@ -262,7 +262,7 @@ end
 
 -- Apply the profile settings to an item frame
 local function ApplyItemFrameSettings(frame)
-  local p = EminentDKP.db.profile.auctionframe
+  local p = EminentDKP:GetSetting('auctionframe')
   
   frame:SetWidth(p.itemwidth)
   frame:SetHeight(p.itemheight)
@@ -397,7 +397,7 @@ local function GetItemFrame()
     frame = CreateNewItemFrame()
   end
   
-  frame:SetPoint("TOPLEFT", #(item_frames) > 0 and item_frames[#(item_frames)] or auction_frame.title, "BOTTOMLEFT", 0, -(EminentDKP.db.profile.auctionframe.itemspacing))
+  frame:SetPoint("TOPLEFT", #(item_frames) > 0 and item_frames[#(item_frames)] or auction_frame.title, "BOTTOMLEFT", 0, -(EminentDKP:GetSetting('auctionframe').itemspacing))
   table.insert(item_frames, frame)
   return frame
 end
@@ -444,7 +444,7 @@ end
 function EminentDKP:ReApplyItemFrameSettings()
   for i, frame in ipairs(item_frames) do
     ApplyItemFrameSettings(frame)
-    frame:SetPoint("TOPLEFT", i > 1 and item_frames[i-1] or auction_frame.title, "BOTTOMLEFT", 0, -(self.db.profile.auctionframe.itemspacing))
+    frame:SetPoint("TOPLEFT", i > 1 and item_frames[i-1] or auction_frame.title, "BOTTOMLEFT", 0, -(self:GetSetting('auctionframe').itemspacing))
   end
   -- Don't forget about recycled frames
   for i, frame in ipairs(recycled_item_frames) do
@@ -498,7 +498,7 @@ function EminentDKP:ShowAuctionItems(guid)
     self:RecycleAuctionItems(false)
   end
   auction_frame:Show()
-  if self.db.profile.auctionframe.enabletitle then
+  if self:GetSetting('auctionframe').enabletitle then
     auction_frame.title:Show()
   end
   auction_frame.title:SetText(L["EminentDKP: %s Items"]:format(self.auctionItems[guid].name))
@@ -1128,7 +1128,7 @@ local ttactive = false
 
 local function BarEnter(win, id, label)
   local t = GameTooltip
-  if EminentDKP.db.profile.tooltips and (win.metadata.click1 or win.metadata.click2 or win.metadata.click3 or win.metadata.tooltip) then
+  if EminentDKP:GetSetting('tooltips') and (win.metadata.click1 or win.metadata.click2 or win.metadata.click3 or win.metadata.tooltip) then
     ttactive = true
     EminentDKP:SetTooltipPosition(t, win.bargroup)
     t:ClearLines()
@@ -1144,7 +1144,7 @@ local function BarEnter(win, id, label)
     end
     
     -- Generic informative tooltips.
-    if EminentDKP.db.profile.informativetooltips then
+    if EminentDKP:GetSetting('informativetooltips') then
       if win.metadata.click1 then
         EminentDKP:AddSubviewToTooltip(t, win, win.metadata.click1, id, label)
       end
@@ -1179,7 +1179,7 @@ end
 
 function StatusEnter(win, button)
   local t = GameTooltip
-  if EminentDKP.db.profile.tooltips then
+  if EminentDKP:GetSetting('tooltips') then
     ttactive = true
     EminentDKP:SetTooltipPosition(t, win.bargroup)
     t:ClearLines()
@@ -1520,7 +1520,7 @@ function meter:Update(window)
         bar.order = i
       end
       
-      if window.metadata.showspots and EminentDKP.db.profile.showranks then
+      if window.metadata.showspots and EminentDKP:GetSetting('showranks') then
         bar:SetLabel(("%2u. %s"):format(i, data.label))
       else
         bar:SetLabel(data.label)

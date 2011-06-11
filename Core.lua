@@ -8,14 +8,6 @@ local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
---[[
-  bugs:
-    - bids aren't always registering on the loot window
-  todo:
-    - investigate ML messages sometimes not being received (especially by the ML)
-    - cleanup meter display leftovers
-]]
-
 local VERSION = '2.2.0'
 local newest_version = ''
 local needs_update = false
@@ -373,7 +365,6 @@ function Window:DisplayModes()
   self.history = {}
   self:Wipe()
 
-  self.selectedsubmode = nil
   self.selectedmode = nil
 
   self.metadata = {}
@@ -381,20 +372,11 @@ function Window:DisplayModes()
   
   -- Save for remembrance
   self.settings.mode = nil
-  self.settings.submode = nil
   
   self.metadata.click = click_on_mode
   self.metadata.maxvalue = 1
 
   EminentDKP:UpdateDisplay(self)
-end
-
-local function click_on_set(win, id, label, button)
-  if button == "LeftButton" then
-    win:DisplayModes(id)
-  elseif button == "RightButton" then
-    win:RightClick() 
-  end
 end
 
 -- Default "right-click" behaviour in case no special click function is defined:
@@ -408,36 +390,6 @@ function Window:RightClick(group, button)
     self:DisplayModes()
   end
 end
---[[
--- Sets up the set list.
-function Window:DisplaySets()
-  self.history = {}
-  self:Wipe()
-  
-  self.metadata = {}
-  
-  self.selectedmode = nil
-  self.selectedsubmode = nil
-  --self.selectedset = nil
-  
-  self.settings.mode = nil
-  self.settings.submode = nil
-  --self.settings.set = nil
-
-  self.metadata.title = L["EminentDKP: Days"]
-
-  self.metadata.click = click_on_set
-  self.metadata.maxvalue = 1
-  self.metadata.sortfunc = function(a,b)
-    if a.sortnum < b.sortnum then return true end
-    if b.sortnum < a.sortnum then return false end
-    return a.starttime > b.starttime
-  end
-  
-  EminentDKP:UpdateDisplay(self)
-end
-
-]]
 
 function EminentDKP:GetWindows()
   return windows
@@ -475,15 +427,13 @@ function EminentDKP:CreateWindow(name, settings)
   if not settings then
     settings = {}
     self:tcopy(settings, EminentDKP.windowdefaults)
-    table.insert(self.db.profile.windows, settings)
+    table.insert(self:GetSetting('windows'), settings)
   end
 
   local window = Window:new()
   window.settings = settings
   window.settings.name = name
   
-  --window.selectedset = window.settings.set
-  window.selectedsubmode = window.settings.submode
   if window.settings.mode then
     window.selectedmode = find_mode(window.settings.mode)
   end
@@ -513,9 +463,9 @@ function EminentDKP:DeleteWindow(name)
       wipe(table.remove(windows, i))
     end
   end
-  for i, win in ipairs(self.db.profile.windows) do
+  for i, win in ipairs(self:GetSetting('windows')) do
     if win.name == name then
-      table.remove(self.db.profile.windows, i)
+      table.remove(self:GetSetting('windows'), i)
     end
   end
   self.options.args.windows.args[name] = nil
@@ -533,7 +483,7 @@ function EminentDKP:ReloadWindows()
   self:UpdateModes(false)
 
   -- Re-create windows
-  for i, win in ipairs(self.db.profile.windows) do
+  for i, win in ipairs(self:GetSetting('windows')) do
     self:CreateWindow(win.name, win)
   end
 end
@@ -564,10 +514,10 @@ function EminentDKP:ApplySettings(win)
 
   -- Don't show window if we are solo, option.
   -- Don't show window in a PvP instance, option.
-  if (self.db.profile.hidesolo and is_solo()) or 
-     (self.db.profile.hidepvp and is_in_pvp()) or 
-     (self.db.profile.hideparty and is_in_party()) or 
-     (self.db.profile.hidecombat and in_combat) then
+  if (self:GetSetting('hidesolo') and is_solo()) or 
+     (self:GetSetting('hidepvp') and is_in_pvp()) or 
+     (self:GetSetting('hideparty') and is_in_party()) or 
+     (self:GetSetting('hidecombat') and in_combat) then
     win:Hide()
   else
     win:Show()
@@ -597,19 +547,7 @@ end
 
 -- Update a given window's display
 function EminentDKP:UpdateDisplay(win)
-  if win.selectedsubmode then
-    -- Inform window that a data update will take place.
-    win:UpdateInProgress()
-  
-    -- Let mode update data.
-    if win.selectedsubmode.PopulateData then
-      win.selectedsubmode:PopulateData(win)
-    else
-      self:Print("Mode "..win.selectedsubmode:GetName().." does not have a PopulateData function!")
-    end
-    -- Let window display the data.
-    win:UpdateDisplay()
-  elseif win.selectedmode then
+  if win.selectedmode then
     -- Inform window that a data update will take place.
     win:UpdateInProgress()
   
@@ -619,8 +557,6 @@ function EminentDKP:UpdateDisplay(win)
     else
       self:Print("Mode "..win.selectedmode:GetName().." does not have a PopulateData function!")
     end
-    -- Let window display the data.
-    win:UpdateDisplay()
   else
     win:Wipe()
     
@@ -635,32 +571,9 @@ function EminentDKP:UpdateDisplay(win)
     end
     -- Tell window to sort by our data order.
     win.metadata.ordersort = true
-    -- Let window display the data.
-    win:UpdateDisplay()
---[[
-  else
-    win:Wipe()
-    
-    -- View available sets.
-    local nr = 0
-    
-    for setid, set in pairs(sets) do
-      nr = nr + 1
-      local d = win.dataset[nr] or {}
-      win.dataset[nr] = d
-      d.id, d.label, d.value, d.sortnum, d.starttime = setid, set.name, 1, set.sortnum, set.starttime
-      if set.starttime > 0 then
-        d.valuetext = date("%H:%M",set.starttime).." - "..date("%H:%M",set.endtime)
-      else
-        d.valuetext = nil
-      end
-    end
-    -- Tell window to sort by our data order.
-    win.metadata.ordersort = true
-    -- Let window display the data.
-    win:UpdateDisplay()
-    ]]
   end
+  -- Let window display the data.
+  win:UpdateDisplay()
 end
 
 local function scan_for_columns(mode)
@@ -718,7 +631,7 @@ function EminentDKP:RemoveMode(mode)
 end
 
 function EminentDKP:SetTooltipPosition(tooltip, frame)
-  local p = self.db.profile.tooltippos
+  local p = self:GetSetting('tooltippos')
   if p == "default" then
     tooltip:SetOwner(UIParent, "ANCHOR_NONE")
     tooltip:SetPoint("BOTTOMRIGHT", "UIParent", "BOTTOMRIGHT", -40, 40)
@@ -1200,6 +1113,14 @@ function EminentDKP:EnsureMasterlooter()
     return false
   end
   return true
+end
+
+function EminentDKP:GetSetting(setting)
+  return self.db.profile[setting]
+end
+
+function EminentDKP:GetOfficerSetting(setting)
+  return self.db.profile.officer[setting]
 end
 
 function EminentDKP:OnDisable()
@@ -1717,7 +1638,7 @@ end
 -- Formats a number into human readable form.
 function EminentDKP:FormatNumber(number)
   if number then
-    if self.db.profile.numberformat == 1 then
+    if self:GetSetting('numberformat') == 1 then
       if number > 1000000 then
         return ("%02.2fM"):format(number / 1000000)
       else
@@ -1751,7 +1672,7 @@ function EminentDKP:AmOfficer()
 end
 
 function EminentDKP:GetActivePool()
-  return self.db.factionrealm.pools[self.db.profile.activepool]
+  return self.db.factionrealm.pools[self:GetSetting('activepool')]
 end
 
 function EminentDKP:GetLastScan()
@@ -2406,7 +2327,7 @@ end
 
 -- Possibility we are out of combat
 function EminentDKP:PLAYER_REGEN_ENABLED()
-  if self.db.profile.hidecombat then
+  if self:GetSetting('hidecombat') then
     self.combatCheckTimer = self:ScheduleRepeatingTimer("CheckCombatStatus",1)
   end
 end
@@ -2414,7 +2335,7 @@ end
 -- Announcements, prunes, and expirations occur at the first entry of combat
 function EminentDKP:PLAYER_REGEN_DISABLED()
   -- Hide meters if we're in combat and want it hidden
-  if self.db.profile.hidecombat then
+  if self:GetSetting('hidecombat') then
     in_combat = true
     self:CancelTimer(self.combatCheckTimer,true)
     self:HideMeterCheck()
@@ -2425,7 +2346,7 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
     self:Print(L["Performing database scan..."])
     -- Scan database for inactive or purgable players
     for pid,data in pairs(self:GetActivePool().players) do
-      if GetDaysSince(data.lastRaid) >= self.db.profile.expiretime then
+      if GetDaysSince(data.lastRaid) >= self:GetOfficerSetting('expiretime') then
         local name = self:GetPlayerNameByID(pid)
         if self:IsPlayerFresh(name) then
           -- The player has been inactive for a while, purge them if they're fresh
@@ -2437,9 +2358,9 @@ function EminentDKP:PLAYER_REGEN_DISABLED()
       end
     end
     -- Check if a decay is scheduled for today
-    if self.db.profile.officer.decay.schedule[tonumber(date("%w"))] then
-      self:Print(L["Performing %d%% decay..."]:format(self.db.profile.officer.decay.percent * 100))
-      self:AdminPerformDecay(self.db.profile.officer.decay.percent,false)
+    if self:GetOfficerSetting('decay').schedule[tonumber(date("%w"))] then
+      self:Print(L["Performing %d%% decay..."]:format(self:GetOfficerSetting('decay').percent * 100))
+      self:AdminPerformDecay(self:GetOfficerSetting('decay').percent,false)
     end
     if self:GetAvailableBountyPercent() > 50 then
       self:Print(L["There is more than 50% of the bounty available. You should distribute some."])
@@ -2480,10 +2401,10 @@ function EminentDKP:ScheduleGroupCheck()
 end
 
 function EminentDKP:HideMeterCheck()
-  if (self.db.profile.hideparty and is_in_party()) or 
-     (self.db.profile.hidepvp and is_in_pvp()) or 
-     (self.db.profile.hidesolo and is_solo()) or 
-     (self.db.profile.hidecombat and in_combat) then
+  if (self:GetSetting('hideparty') and is_in_party()) or 
+     (self:GetSetting('hidepvp') and is_in_pvp()) or 
+     (self:GetSetting('hidesolo') and is_solo()) or 
+     (self:GetSetting('hidecombat') and in_combat) then
     self:ToggleMeters(false)
     return
   end
@@ -2492,10 +2413,10 @@ end
 
 function EminentDKP:DisableCheck()
   --[[
-  (self.db.profile.guildgroup and not in_guild_group)
+  (self:GetOfficerSetting('guildgroup') and not in_guild_group)
   ]]
-  if (self.db.profile.disableparty and is_in_party()) or
-     (self.db.profile.disablepvp and is_in_pvp()) then
+  if (self:GetOfficerSetting('disableparty') and is_in_party()) or
+     (self:GetOfficerSetting('disablepvp') and is_in_pvp()) then
     enabled = false
     return
   end
@@ -2646,7 +2567,7 @@ function EminentDKP:LOOT_OPENED()
     local itemlist = {}
     for slot = 1, GetNumLootItems() do 
       local lootIcon, lootName, lootQuantity, rarity = GetLootSlotInfo(slot)
-      if lootQuantity > 0 and rarity >= self.db.profile.itemrarity then
+      if lootQuantity > 0 and rarity >= self:GetOfficerSetting('itemrarity') then
         local link = GetLootSlotLink(slot)
         table.insert(eligible_items,link)
         table.insert(itemlist,{ info=string.match(link, "item[%-?%d:]+"), auctioned = false, removed=false, slot=slot })
@@ -2848,12 +2769,12 @@ function EminentDKP:AdminStartAuction()
         self.bidItem = {
           itemLink=itemLink,
           itemString=string.match(itemLink, "item[%-?%d:]+"), 
-          remaining=self.db.profile.auctionlength, 
+          remaining=self:GetOfficerSetting('auctionlength'), 
           bids={}, 
           slotNum=slot,
           srcGUID=guid,
-          ending=(GetTime() + self.db.profile.auctionlength),
-          window=self.db.profile.auctionlength,
+          ending=(GetTime() + self:GetOfficerSetting('auctionlength')),
+          window=self:GetOfficerSetting('auctionlength'),
         }
         self.bidTimer = self:ScheduleRepeatingTimer("AuctionBidTimer", 5)
         self:InformPlayer("auction",{
@@ -2897,11 +2818,11 @@ function EminentDKP:AuctionBidTimer()
     if next(self.bidItem.bids) == nil then
       -- No bids received, so disenchant
       self:MessageGroup(L["No bids received. Disenchanting."])
-      if self.db.profile.disenchanter ~= "" then
-        if eligible_looters[self.db.profile.disenchanter] then
-          looter = self.db.profile.disenchanter
+      if self:GetOfficerSetting('disenchanter') ~= "" then
+        if eligible_looters[self:GetOfficerSetting('disenchanter')] then
+          looter = self:GetOfficerSetting('disenchanter')
         else
-          self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self.db.profile.disenchanter))
+          self:Print(L["%s was not eligible to receive loot to disenchant."]:format(self:GetOfficerSetting('disenchanter')))
         end
       else
         self:Print(L["There is no disenchanter assigned."])
@@ -3124,7 +3045,7 @@ end
 
 function EminentDKP:FILTER_EMINENTDKP_MESSAGES(eventController, message)
   -- Ensure all correspondence from the addon is hidden (option)
-  if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
+  if self:GetSetting('hideraidmessages') and string.find(message, "[EminentDKP]", 1, true) then
     eventController:BlockFromChatFrame()
   end
 end
@@ -3151,7 +3072,7 @@ end
 
 function EminentDKP:HideRaidWarning(frame, event, message)
   -- Ensure all correspondence from the addon is hidden (option)
-  if self.db.profile.hideraidmessages and string.find(message, "[EminentDKP]", 1, true) then
+  if self:GetSetting('hideraidmessages') and string.find(message, "[EminentDKP]", 1, true) then
     return
   end
   self.hooks[frame].OnEvent(frame, event, message)
@@ -3342,7 +3263,10 @@ end
 
 -- Send a command to the ML
 function EminentDKP:SendCommand(...)
-  if not self:GetMasterLooterName() then return end
+  if not self:GetMasterLooterName() then
+    self:Print('Could not find the masterlooter...')
+    return
+  end
   local cmd, arg1, arg2 = ...
   local tbl = {}
   table.insert(tbl,cmd)

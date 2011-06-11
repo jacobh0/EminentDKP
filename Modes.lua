@@ -100,7 +100,7 @@ local function FilterEvents(typefilter,skipcounter)
   local filtered = {}
   local eventcount = 0
   local eventid = EminentDKP:GetEventCount()
-  while eventid > 0 and eventcount < EminentDKP.db.profile.maxmodeevents do
+  while eventid > 0 and eventcount < EminentDKP:GetSetting('maxmodeevents') do
     local eid = tostring(eventid)
     local e = EminentDKP:GetEvent(eid)
     if typefilter(e,eid) then
@@ -120,7 +120,7 @@ local function FilterGroupedEvents(groupfilter, eventfilter)
   local group_list = {}
   local groupcount = 0
   local eventid = EminentDKP:GetEventCount()
-  while eventid > 0 and groupcount < EminentDKP.db.profile.maxmodeevents do
+  while eventid > 0 and groupcount < EminentDKP:GetSetting('maxmodeevents') do
     local eid = tostring(eventid)
     local e = EminentDKP:GetEvent(eid)
     if eventfilter(e,eid) then
@@ -157,7 +157,7 @@ local function GetPlayerEvents(playerid, filter)
   local event_list = {}
   local eventcount = 0
   local eventid = EminentDKP:GetEventCount()
-  while eventid > 0 and eventcount < EminentDKP.db.profile.maxplayerevents do
+  while eventid > 0 and eventcount < EminentDKP:GetSetting('maxplayerevents') do
     local eid = tostring(eventid)
     local e = EminentDKP:GetEvent(eid)
     if filter(e,eid,player,playerid) then
@@ -183,7 +183,7 @@ local function player_event_filter_auction_target(event,eventid,player,playerid)
 end
 
 local function event_filter_earnings_period(event,eventid)
-  return (event.datetime >= GetDaysAgoTimestamp(EminentDKP.db.profile.attendancedays) and 
+  return (event.datetime >= GetDaysAgoTimestamp(EminentDKP:GetSetting('attendancedays')) and 
           (event.eventType == "auction" or event.eventType == "bounty"))
 end
 
