@@ -1941,9 +1941,13 @@ function EminentDKP:GetEventHash(eventID)
   
   local hash = libC:fcs32init()
   hash = libC:fcs32update(hash,eventID)
-  for key, value in pairs(data) do
-    hash = libC:fcs32update(hash,value)
-  end
+  hash = libC:fcs32update(hash,data.source)
+  hash = libC:fcs32update(hash,data.eventType)
+  hash = libC:fcs32update(hash,data.extraInfo)
+  hash = libC:fcs32update(hash,data.target)
+  hash = libC:fcs32update(hash,data.beneficiary)
+  hash = libC:fcs32update(hash,data.value)
+  hash = libC:fcs32update(hash,data.datetime)
   
   hash = libC:fcs32final(hash)
   return hash
