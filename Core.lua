@@ -864,9 +864,8 @@ function EminentDKP:ProcessOfficerSyncSettings(prefix, message, distribution, se
   end
 
   if self:GetActivePool().officerSettingsTime <= timestamp then
-    -- Our settings are older/same, so cancel any potential outgoing broadcast
+    -- Our settings are older/same
     self:CancelTimer(self.officerSettingsTimer,true)
-  else
     -- Save these settings
     self:Print(L["Syncing officer options from %s..."]:format(sender))
     self.db.profile.officer = settings
