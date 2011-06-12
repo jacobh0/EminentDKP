@@ -1457,7 +1457,7 @@ end
 -- Compare their event hash with our own
 function EminentDKP:MatchingEventHash(version,hash)
   local major,minor,bug,eventID = strsplit('.',version)
-  return (hash == tostring(self:GetEventHash(eventID)))
+  return (hash == self:GetEventHash(eventID))
 end
 
 -- Process an incoming request for missing events
@@ -1471,7 +1471,7 @@ function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   -- If an officer and can fulfill the needed ranges...
   if self:AmOfficer() and self:CanFulfillRanges(needed_ranges) then
     -- Ensure their database is on the same timeline as our own
-    if self:MatchingEventHash(version,hash) then
+    if self:MatchingEventHash(version,tonumber(hash)) then
       -- Create a proposal to fulfill this request
       local numbers = { math.random(1000), math.random(1000), math.random(1000) }
       self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
@@ -1934,9 +1934,7 @@ end
 
 -- Provide an FCS16 hash of the event for comparison purposes
 function EminentDKP:GetEventHash(eventID)
-  if eventID == "0" then
-    return "fresh"
-  end
+  if eventID == "0" then return 0 end
   local data = self:GetEvent(eventID)
   
   local hash = libC:fcs32init()
@@ -3337,9 +3335,11 @@ end
 function EminentDKP:ResetDatabase()
   local db = self:GetActivePool()
   local rev = db.revision
+  local modes = self:tcopy({},db.modes)
   wipe(db)
   self:tcopy(db,self.defaults.factionrealm.pools["Default"])
   db.revision = rev
+  db.modes = modes
   
   newest_version = ""
   
