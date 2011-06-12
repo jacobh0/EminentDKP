@@ -271,8 +271,8 @@ L["Each player has received %.02f DKP."] = "Each player has received %.02f DKP."
 L["The bounty pool is now %.02f DKP."] = "The bounty pool is now %.02f DKP."
 L["%s has received a deduction of %.02f DKP."] = "%s has received a deduction of %.02f DKP."
 L["%s has been awarded %.02f DKP."] = "%s has been awarded %.02f DKP."
--- note: on this one, the %% is just a percent sign, the %d is the variable.
-L["All active DKP has decayed by %d%%."] = "All active DKP has decayed by %d%%."
+-- note: on this one, the %% is just a percent sign, the %.02f is the variable.
+L["All active DKP has decayed by %.02f%%."] = "All active DKP has decayed by %.02f%%."
 
 L["There is no loot available to auction."] = "There is no loot available to auction."
 L["There is currently no auction active."] = "There is currently no auction active."

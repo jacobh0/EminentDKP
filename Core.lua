@@ -2944,7 +2944,7 @@ function EminentDKP:AdminPerformDecay(value,manual)
       -- Announce decay to the other addons
       self:InformPlayer("decay",{ amount = p })
       
-      self:MessageGroup(L["All active DKP has decayed by %d%%."]:format(p * 100))
+      self:MessageGroup(L["All active DKP has decayed by %.02f%%."]:format(p * 100))
 
       self:CreateDecaySyncEvent(players,p,(manual and L["Manual"] or L["Automatic"]))
     else
@@ -3101,6 +3101,10 @@ function EminentDKP:InformPlayer(...)
   local notifyType, rawdata, target, channel = ...
   local data = notifyType .. "_" .. libS:Serialize(rawdata)
   local tosync = libCE:Encode(libC:CompressHuffman(data))
+
+  -- Skip reading from the channel and just process it directly
+  self:ActuateNotification(notifyType,rawdata)
+
   if not target then
     if not channel then
       channel = (is_in_party() and "PARTY" or "RAID")
@@ -3114,6 +3118,7 @@ end
 local cached_notifications = {}
 
 function EminentDKP:ProcessInformation(prefix, message, distribution, sender)
+  if sender == self.myName then return end
   if not self:IsAnOfficer(sender) then return end
   -- Decode the compressed data
   local one = libCE:Decode(message)
