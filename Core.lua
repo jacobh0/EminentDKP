@@ -3366,7 +3366,7 @@ function EminentDKP:ProcessSlashCmd(input)
       EminentDKP:ConfirmAction("EminentDKPReset",
                                L["Are you sure you want to reset the database for ALL users? This cannot be undone."],
                                function()
-                                 EminentDKP:InformPlayer("reset",{ sender = EminentDKP.myName },"","GUILD")
+                                 EminentDKP:InformPlayer("reset",{ sender = EminentDKP.myName },nil,"GUILD")
                                  EminentDKP:ResetDatabase()
                                end)
     else
