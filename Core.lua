@@ -137,7 +137,6 @@ local function UpdateNewestVersion(newer)
   
   if compare.major < 0 or compare.minor < 0 then
     -- There is a new major/minor addon version
-    newest_version = newer_version
     needs_update = true
   elseif compare.major == 0 and compare.minor == 0 then
     if compare.event < 0 or compare.bug < 0 then
@@ -2252,7 +2251,6 @@ function EminentDKP:CreateEvent(src,etype,extra,t,b,val,dtime)
   if newest_version ~= "" then
     local old_newest_version = self:GetNewestVersion()
     newest_version = ""
-    needs_update = false
     UpdateNewestVersion(old_newest_version)
   end
   
@@ -3326,6 +3324,10 @@ function EminentDKP:RebuildDatabase()
     -- Start replicating cached events
     self:ReplicateSyncEvent("1",events_cache["1"])
   end
+
+  -- Force reload the meter display
+  self:UpdateModes(true)
+  self:UpdateStatusBar()
   
   self:Print(L["Database has been rebuilt."])
 end
@@ -3353,7 +3355,7 @@ end
 -- Handle slash commands
 function EminentDKP:ProcessSlashCmd(input)
   local command, arg1, arg2, e = self:GetArgs(input, 3)
-
+  
   if command == 'auction' then
     self:AdminStartAuction()
   elseif command == 'rebuild' then

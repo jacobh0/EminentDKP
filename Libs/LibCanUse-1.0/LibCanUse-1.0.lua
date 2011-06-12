@@ -39,47 +39,65 @@ local ENGLISH_CLASSES = {
   [L["Warrior"]] = "WARRIOR",
 }
 
+--[[
+  1: Armor type
+  2: Primary stats
+  3: Weapons
+  4: Only 1h weapons
+  5: Relics, shields, etc
+]]
+
 local CLASS_REQUIREMENTS = {
   ["DEATHKNIGHT"] = { [1] = L["Plate"], 
                       [2] = { L["Strength"] }, 
-                      [3] = { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"], L["Relic"] },
-                      [4] = false },
+                      [3] = { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"] },
+                      [4] = false,
+                      [5] = { L["Relic"] } },
   ["DRUID"] = { [1] = L["Leather"], 
                 [2] = { L["Agility"], L["Intellect"] }, 
-                [3] = { L["Dagger"], L["Staff"], L["Mace"], L["Pole Arm"], L["Fist"], L["Relic"] }, 
-                [4] = false },
+                [3] = { L["Dagger"], L["Staff"], L["Mace"], L["Pole Arm"], L["Fist"] }, 
+                [4] = false,
+                [5] = { L["Relic"] } },
   ["HUNTER"] = { [1] = L["Mail"], 
                  [2] = { L["Agility"] }, 
                  [3] = { L["Axe"], L["Sword"], L["Staff"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"] },
-                 [4] = false },
+                 [4] = false,
+                 [5] = {} },
   ["MAGE"] = { [1] = L["Cloth"], 
                [2] = { L["Intellect"] }, 
                [3] = { L["Sword"], L["Staff"], L["Dagger"], L["Wand"] },
-               [4] = true },
+               [4] = true,
+               [5] = {} },
   ["PALADIN"] = { [1] = L["Plate"], 
                   [2] = { L["Strength"], L["Intellect"] }, 
-                  [3] = { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"], L["Relic"] },
-                  [4] = false },
+                  [3] = { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"] },
+                  [4] = false,
+                  [5] = { L["Relic"], L["Shield"] } },
   ["PRIEST"] = { [1] = L["Cloth"], 
                  [2] = { L["Intellect"] }, 
                  [3] = { L["Mace"], L["Staff"], L["Dagger"], L["Wand"] },
-                 [4] = true },
+                 [4] = true,
+                 [5] = {} },
   ["ROGUE"] = { [1] = L["Leather"], 
                 [2] = { L["Agility"] }, 
                 [3] = { L["Axe"], L["Sword"], L["Mace"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"], L["Thrown"] },
-                [4] = false },
+                [4] = false,
+                [5] = {} },
   ["SHAMAN"] = { [1] = L["Mail"], 
                  [2] = { L["Agility"], L["Intellect"] }, 
-                 [3] = { L["Axe"], L["Staff"], L["Mace"], L["Pole Arm"], L["Relic"], L["Dagger"], L["Fist"] },
-                 [4] = false },
+                 [3] = { L["Axe"], L["Staff"], L["Mace"], L["Pole Arm"], L["Dagger"], L["Fist"] },
+                 [4] = false,
+                 [5] = { L["Relic"], L["Shield"] } },
   ["WARLOCK"] = { [1] = L["Cloth"], 
                   [2] = { L["Intellect"] }, 
                   [3] = { L["Sword"], L["Staff"], L["Dagger"], L["Wand"] },
-                  [4] = true },
+                  [4] = true,
+                  [5] = {} },
   ["WARRIOR"] = { [1] = L["Plate"], 
                   [2] = { L["Strength"] }, 
                   [3] = { L["Axe"], L["Sword"], L["Mace"], L["Staff"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"], L["Thrown"] },
-                  [4] = false },
+                  [4] = false,
+                  [5] = { L["Shield"] } },
 }
 
 local PRIMARY_STATS = { L["Agility"], L["Strength"], L["Intellect"] }
@@ -170,6 +188,7 @@ function LibCanUse:CanUseItem(classname,link)
   
   if item_type then
     if is_weapon then
+      -- Weapon we can use?
       if tContains(CLASS_REQUIREMENTS[classname][3],item_type) then
         -- Can we use only 1h?
         if item_slot == L["Two-Hand"] and CLASS_REQUIREMENTS[classname][4] and item_type ~= L["Staff"] then
@@ -180,9 +199,15 @@ function LibCanUse:CanUseItem(classname,link)
         -- Cannot equip this weapon
         return false
       end
-    elseif item_slot ~= L["Back"] and item_type ~= CLASS_REQUIREMENTS[classname][1] then
-      -- Should not (or cannot) equip this armor type
-      return false
+    else
+      -- This a special slot (Shield, Relic)?
+      if not tContains(CLASS_REQUIREMENTS[classname][5],item_type) then
+        -- Must be some type of armor then
+        if item_slot ~= L["Back"] and item_type ~= CLASS_REQUIREMENTS[classname][1] then
+          -- Should not (or cannot) equip this armor type
+          return false
+        end
+      end
     end
   end
   
