@@ -1471,7 +1471,7 @@ function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   -- If an officer and can fulfill the needed ranges...
   if self:AmOfficer() and self:CanFulfillRanges(needed_ranges) then
     -- Ensure their database is on the same timeline as our own
-    if self:MatchingEventHash(version,hash) then
+    if self:MatchingEventHash(version,tonumber(hash)) then
       -- Create a proposal to fulfill this request
       local numbers = { math.random(1000), math.random(1000), math.random(1000) }
       self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
