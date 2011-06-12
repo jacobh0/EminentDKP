@@ -2376,7 +2376,6 @@ end
 function EminentDKP:CheckGroupPlayers()
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() or not self:IsEnabled() then return end
-  print('got here.,,,,')
   
   local is_party = is_in_party()
   for d = 1, (is_party and 5 or 40) do
@@ -3335,7 +3334,8 @@ end
 function EminentDKP:ResetDatabase()
   local db = self:GetActivePool()
   local rev = db.revision
-  local modes = self:tcopy({},db.modes)
+  local modes = {}
+  self:tcopy(modes,db.modes)
   wipe(db)
   self:tcopy(db,self.defaults.factionrealm.pools["Default"])
   db.revision = rev
