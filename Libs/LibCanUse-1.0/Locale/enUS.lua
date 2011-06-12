@@ -64,9 +64,9 @@ L["Relic"] = "Relic"
 L["Wand"] = "Wand"
 L["Two-Hand"] = "Two-Hand"
 L["One-Hand"] = "One-Hand"
+L["Off Hand"] = "Off Hand"
 L["Main Hand"] = "Main Hand"
 L["Held In Off-hand"] = "Held In Off-hand"
-L["Shield"] = "Shield"
 
 -- Other
 
