@@ -66,6 +66,7 @@ L["Two-Hand"] = "Two-Hand"
 L["One-Hand"] = "One-Hand"
 L["Main Hand"] = "Main Hand"
 L["Held In Off-hand"] = "Held In Off-hand"
+L["Shield"] = "Shield"
 
 -- Other
 

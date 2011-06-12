@@ -58,7 +58,7 @@ local CLASS_REQUIREMENTS = {
                [4] = true },
   ["PALADIN"] = { [1] = L["Plate"], 
                   [2] = { L["Strength"], L["Intellect"] }, 
-                  [3] = { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"], L["Relic"] },
+                  [3] = { L["Axe"], L["Sword"], L["Mace"], L["Pole Arm"], L["Relic"], L["Shield"] },
                   [4] = false },
   ["PRIEST"] = { [1] = L["Cloth"], 
                  [2] = { L["Intellect"] }, 
@@ -70,7 +70,7 @@ local CLASS_REQUIREMENTS = {
                 [4] = false },
   ["SHAMAN"] = { [1] = L["Mail"], 
                  [2] = { L["Agility"], L["Intellect"] }, 
-                 [3] = { L["Axe"], L["Staff"], L["Mace"], L["Pole Arm"], L["Relic"], L["Dagger"], L["Fist"] },
+                 [3] = { L["Axe"], L["Staff"], L["Mace"], L["Pole Arm"], L["Relic"], L["Dagger"], L["Fist"], L["Shield"] },
                  [4] = false },
   ["WARLOCK"] = { [1] = L["Cloth"], 
                   [2] = { L["Intellect"] }, 
@@ -78,7 +78,7 @@ local CLASS_REQUIREMENTS = {
                   [4] = true },
   ["WARRIOR"] = { [1] = L["Plate"], 
                   [2] = { L["Strength"] }, 
-                  [3] = { L["Axe"], L["Sword"], L["Mace"], L["Staff"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"], L["Thrown"] },
+                  [3] = { L["Axe"], L["Sword"], L["Mace"], L["Staff"], L["Dagger"], L["Fist"], L["Pole Arm"], L["Bow"], L["Crossbow"], L["Gun"], L["Thrown"], L["Shield"] },
                   [4] = false },
 }
 
@@ -89,7 +89,7 @@ local ITEM_SLOTS = { L["Head"], L["Neck"], L["Shoulder"], L["Back"],
                      L["Hands"], L["Waist"], L["Legs"], L["Feet"],
                      L["Finger"], L["Trinket"], L["Relic"], L["Wand"],
                      L["Two-Hand"], L["One-Hand"], L["Main Hand"],
-                     L["Held In Off-hand"] }
+                     L["Held In Off-hand"], L["Shield"] }
 
 local scan_tip
 local enable_stat_check = true

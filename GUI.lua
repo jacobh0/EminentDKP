@@ -471,11 +471,6 @@ function EminentDKP:FillOutItemFrame(f)
     
     color = ITEM_QUALITY_COLORS[iQuality]
     f.loot:SetText(iName)
-    
-    -- This frame has a live auction
-    if f.status:GetValue() > 0 and self:CanIUseItem(iLink) then
-      ShowBidApparatus(f)
-    end
   end
   
   f.loot:SetVertexColor(color.r, color.g, color.b)
