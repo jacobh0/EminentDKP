@@ -1457,7 +1457,7 @@ end
 -- Compare their event hash with our own
 function EminentDKP:MatchingEventHash(version,hash)
   local major,minor,bug,eventID = strsplit('.',version)
-  return (hash == self:GetEventHash(eventID))
+  return (hash == tostring(self:GetEventHash(eventID)))
 end
 
 -- Process an incoming request for missing events
@@ -1471,7 +1471,7 @@ function EminentDKP:ProcessSyncRequest(prefix, message, distribution, sender)
   -- If an officer and can fulfill the needed ranges...
   if self:AmOfficer() and self:CanFulfillRanges(needed_ranges) then
     -- Ensure their database is on the same timeline as our own
-    if self:MatchingEventHash(version,tonumber(hash)) then
+    if self:MatchingEventHash(version,hash) then
       -- Create a proposal to fulfill this request
       local numbers = { math.random(1000), math.random(1000), math.random(1000) }
       self.syncRequests[sender] = { ranges = needed_ranges, timer = nil }
@@ -2378,6 +2378,7 @@ end
 function EminentDKP:CheckGroupPlayers()
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() or not self:IsEnabled() then return end
+  print('got here.,,,,')
   
   local is_party = is_in_party()
   for d = 1, (is_party and 5 or 40) do

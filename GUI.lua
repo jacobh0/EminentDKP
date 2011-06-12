@@ -796,8 +796,9 @@ local function CreateBountyTab(container)
   
   local amount = AceGUI:Create("Slider")
   amount:SetLabel(L["Amount"])
-  amount:SetSliderValues(0.5,100,0.5)
-  amount:SetValue(0.5)
+  amount:SetIsPercent(true)
+  amount:SetSliderValues(0.005,1,0.005)
+  amount:SetValue(0.4)
   
   local percent = AceGUI:Create("CheckBox")
   percent:SetLabel(L["Percent"])
@@ -937,6 +938,9 @@ local function CreateVersionsTab(container)
     end
     local lbl_name = AceGUI:Create("Label")
     local lbl_version = AceGUI:Create("Label")
+    if data.name == EminentDKP.myName then
+      data.version = EminentDKP:GetVersion()
+    end
     lbl_name:SetText(data.name)
     lbl_name:SetWidth(85)
     lbl_version:SetText(data.version)
