@@ -875,8 +875,13 @@ end
 
 -- DATABASE UPDATES
 function EminentDKP:DatabaseUpdate()
+  -- Clear out old set data
   if self:GetActivePool().sets then
     self:GetActivePool().sets = nil
+  end
+  -- Reset revision counter
+  if self:GetActivePool().revision ~= 0 then
+    self:GetActivePool().revision = 0
   end
 end
 
@@ -2439,12 +2444,15 @@ end
 function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self.lootMethod, self.masterLooterPartyID, self.masterLooterRaidID = GetLootMethod()
   self.amMasterLooter = (self.lootMethod == 'master' and self.masterLooterPartyID == 0)
-  if not self.amMasterLooter then
-    self.masterLooterName = UnitName((is_in_party() and "party" or "raid")..tostring(self.masterLooterPartyID))
-  else
+  if self.amMasterLooter then
     self.masterLooterName = self.myName
+  else
+    if is_in_party() then
+      self.masterLooterName = UnitName("party"..tostring(self.masterLooterPartyID))
+    else
+      self.masterLooterName = UnitName("raid"..tostring(self.masterLooterRaidID))
+    end
   end
-  
   self:ScheduleGroupCheck()
 end
 
@@ -2462,7 +2470,7 @@ end
 
 function EminentDKP:GetMasterLooterName()
   if self.lootMethod == 'master' then
-    if not UnitExists(self.masterLooterName) then
+    if self.masterLooterName == nil then
       self:PARTY_LOOT_METHOD_CHANGED()
     end
     return self.masterLooterName
@@ -3264,15 +3272,12 @@ function EminentDKP:ActuateNotification(notifyType,data)
 end
 
 function EminentDKP:InQualifiedRaid()
-  return (self:GetMasterLooterName() and self:IsAnOfficer(self:GetMasterLooterName()))
+  return (self:GetMasterLooterName() ~= nil and self:IsAnOfficer(self:GetMasterLooterName()))
 end
 
 -- Send a command to the ML
 function EminentDKP:SendCommand(...)
-  if not self:GetMasterLooterName() then
-    self:Print('Could not find the masterlooter...')
-    return
-  end
+  if self:GetMasterLooterName() == nil then return end
   local cmd, arg1, arg2 = ...
   local tbl = {}
   table.insert(tbl,cmd)
@@ -3355,7 +3360,7 @@ end
 -- Handle slash commands
 function EminentDKP:ProcessSlashCmd(input)
   local command, arg1, arg2, e = self:GetArgs(input, 3)
-  
+
   if command == 'auction' then
     self:AdminStartAuction()
   elseif command == 'rebuild' then
