@@ -164,10 +164,10 @@ function LibCanUse:CanUseItem(classname,link)
     local left_text = getglobal("LibCanUseScanTipTextLeft" .. i)
     if string.find(left_text:GetText(), L["Classes"], 1, true) then
       -- There is a class restriction line (this is a token)
-      class_restrictions = { strsplit(",",string.gsub(string.sub(left_text:GetText(), strlen(L["Classes"]) + 2),'%s*','')) }
+      class_restrictions = { strsplit(",",string.sub(left_text:GetText(), strlen(L["Classes"]) + 2)) }
       -- Convert the localized class names into general english class names
       for i,name in ipairs(class_restrictions) do
-        class_restrictions[i] = self:GetEnglishClass(name)
+        class_restrictions[i] = self:GetEnglishClass(strtrim(name))
       end
     elseif tContains(ITEM_SLOTS,left_text:GetText()) then
       -- We found the slot type

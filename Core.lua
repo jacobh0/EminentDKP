@@ -3105,17 +3105,23 @@ function EminentDKP:InformPlayer(...)
   local notifyType, rawdata, target, channel = ...
   local data = notifyType .. "_" .. libS:Serialize(rawdata)
   local tosync = libCE:Encode(libC:CompressHuffman(data))
-
-  -- Skip reading from the channel and just process it directly
-  self:ActuateNotification(notifyType,rawdata)
-
+  
   if not target then
+    -- Skip reading from the channel and just process it directly
+    self:ActuateNotification(notifyType,rawdata)
+    
     if not channel then
       channel = (is_in_party() and "PARTY" or "RAID")
     end
     self:SendCommMessage('EminentDKP-INF',tosync,channel)
   else
-    self:SendCommMessage('EminentDKP-INF',tosync,'WHISPER',target)
+    -- If directed to ourself, just bypass the addon channel
+    if target == self.myName then
+      self:ActuateNotification(notifyType,rawdata)
+    else
+      -- Otherwise inform the person as usual
+      self:SendCommMessage('EminentDKP-INF',tosync,'WHISPER',target)
+    end
   end
 end
 
