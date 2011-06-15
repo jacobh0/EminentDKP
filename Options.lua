@@ -654,9 +654,7 @@ EminentDKP.options = {
       		get= function() return EminentDKP.db.profile.officer.disenchanter end,
       		set= function(self, val)
             EminentDKP.db.profile.officer.disenchanter = val
-            EminentDKP:GetActivePool().officerSettingsTime = time()
-            EminentDKP:CancelTimer(EminentDKP.setOfficerBroadcastTimer, true)
-            EminentDKP.setOfficerBroadcastTimer = EminentDKP:ScheduleTimer("BroadcastOfficerTimestamp",2)
+            EminentDKP:UpdateOfficerSettings()
           end,
       		order= 1,
       	},
@@ -668,9 +666,7 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.officer.itemrarity end,
 					set= function(self, val)
             EminentDKP.db.profile.officer.itemrarity = val
-            EminentDKP:GetActivePool().officerSettingsTime = time()
-            EminentDKP:CancelTimer(EminentDKP.setOfficerBroadcastTimer, true)
-            EminentDKP.setOfficerBroadcastTimer = EminentDKP:ScheduleTimer("BroadcastOfficerTimestamp",2)
+            EminentDKP:UpdateOfficerSettings()
           end,
 					order= 2,
       	},
@@ -684,9 +680,7 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.officer.expiretime end,
 					set= function(self, val)
             EminentDKP.db.profile.officer.expiretime = val
-            EminentDKP:GetActivePool().officerSettingsTime = time()
-            EminentDKP:CancelTimer(EminentDKP.setOfficerBroadcastTimer, true)
-            EminentDKP.setOfficerBroadcastTimer = EminentDKP:ScheduleTimer("BroadcastOfficerTimestamp",2)
+            EminentDKP:UpdateOfficerSettings()
           end,
 					order= 3,
       	},
@@ -700,9 +694,7 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.officer.auctionlength end,
 					set= function(self, val)
             EminentDKP.db.profile.officer.auctionlength = val
-            EminentDKP:GetActivePool().officerSettingsTime = time()
-            EminentDKP:CancelTimer(EminentDKP.setOfficerBroadcastTimer, true)
-            EminentDKP.setOfficerBroadcastTimer = EminentDKP:ScheduleTimer("BroadcastOfficerTimestamp",2)
+            EminentDKP:UpdateOfficerSettings()
           end,
 					order= 4,
       	},
@@ -726,10 +718,8 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.officer.disablepvp end,
 					set= function(self, val)
 					  EminentDKP.db.profile.officer.disablepvp = not EminentDKP.db.profile.officer.disablepvp
-					  EminentDKP:GetActivePool().officerSettingsTime = time()
             EminentDKP:DisableCheck()
-            EminentDKP:CancelTimer(EminentDKP.setOfficerBroadcastTimer, true)
-            EminentDKP.setOfficerBroadcastTimer = EminentDKP:ScheduleTimer("BroadcastOfficerTimestamp",2)
+            EminentDKP:UpdateOfficerSettings()
 					end,
 					order= 6,
       	},
@@ -740,10 +730,8 @@ EminentDKP.options = {
 					get= function() return EminentDKP.db.profile.officer.disableparty end,
 					set= function(self, val)
 					  EminentDKP.db.profile.officer.disableparty = not EminentDKP.db.profile.officer.disableparty
-					  EminentDKP:GetActivePool().officerSettingsTime = time()
             EminentDKP:DisableCheck()
-            EminentDKP:CancelTimer(EminentDKP.setOfficerBroadcastTimer, true)
-            EminentDKP.setOfficerBroadcastTimer = EminentDKP:ScheduleTimer("BroadcastOfficerTimestamp",2)
+            EminentDKP:UpdateOfficerSettings()
 					end,
 					order= 7,
       	},
@@ -761,9 +749,7 @@ EminentDKP.options = {
               get= function(self,key) return EminentDKP.db.profile.officer.decay.schedule[key] end,
               set= function(self,key,val)
                 EminentDKP.db.profile.officer.decay.schedule[key] = val
-                EminentDKP:GetActivePool().officerSettingsTime = time()
-                EminentDKP:CancelTimer(EminentDKP.setOfficerBroadcastTimer, true)
-                EminentDKP.setOfficerBroadcastTimer = EminentDKP:ScheduleTimer("BroadcastOfficerTimestamp",2)
+                EminentDKP:UpdateOfficerSettings()
               end,
               order= 1,
             },
@@ -779,9 +765,7 @@ EminentDKP.options = {
               get= function() return EminentDKP.db.profile.officer.decay.percent end,
               set= function(self,val)
                 EminentDKP.db.profile.officer.decay.percent = val
-                EminentDKP:GetActivePool().officerSettingsTime = time()
-                EminentDKP:CancelTimer(EminentDKP.setOfficerBroadcastTimer, true)
-                EminentDKP.setOfficerBroadcastTimer = EminentDKP:ScheduleTimer("BroadcastOfficerTimestamp",2)
+                EminentDKP:UpdateOfficerSettings()
               end,
               order= 2,
             },

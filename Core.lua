@@ -30,6 +30,7 @@ local eligible_looters = {}
 local events_cache = {}
 local syncing = false
 
+local openingContainer = nil
 local lastContainerName = nil
 
 local in_combat = false
@@ -797,6 +798,14 @@ function EminentDKP:GlobalApplySettings()
   self:BroadcastOfficerTimestamp()
 end
 
+function EminentDKP:UpdateOfficerSettings()
+  if self:AmOfficer() then
+    self:GetActivePool().officerSettingsTime = time()
+    self:CancelTimer(self.setOfficerBroadcastTimer, true)
+    self.setOfficerBroadcastTimer = self:ScheduleTimer("BroadcastOfficerTimestamp",2)
+  end
+end
+
 function EminentDKP:BroadcastOfficerSettings()
   if self:AmOfficer() then
     -- Serialize and compress the data
@@ -867,7 +876,7 @@ function EminentDKP:ProcessOfficerSyncSettings(prefix, message, distribution, se
     self:CancelTimer(self.officerSettingsTimer,true)
     -- Save these settings
     self:Print(L["Syncing officer options from %s..."]:format(sender))
-    self.db.profile.officer = settings
+    self:tcopy(self.db.profile.officer,settings)
     self:GetActivePool().officerSettingsTime = timestamp
     self:DisableCheck()
   end
@@ -905,6 +914,7 @@ function EminentDKP:OnEnable()
   self:RegisterEvent("PLAYER_REGEN_ENABLED") -- combat checking
   self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- death tracking
   self:RegisterEvent("UNIT_SPELLCAST_SENT") -- loot container tracking
+  self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED") -- loot container tracking
   --self:RegisterEvent("GUILD_PARTY_STATE_UPDATED") -- guild group tracking
   self:RegisterChatCommand("edkp", "ProcessSlashCmd") -- admin commands
   -- Addon messages
@@ -2456,11 +2466,19 @@ function EminentDKP:PARTY_LOOT_METHOD_CHANGED()
   self:ScheduleGroupCheck()
 end
 
--- Keep track of the last container we opened
+-- Make a note of the name of the container we are opening
 function EminentDKP:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
   if not self:AmMasterLooter() then return end
   if spell == "Opening" and unit == "player" then
-    lastContainerName = target
+    openingContainer = target
+  end
+end
+
+-- Keep track of the last container we successfully opened
+function EminentDKP:UNIT_SPELLCAST_SUCCEEDED(event, unit, spell, rank, lineID, spellID)
+  if not self:AmMasterLooter() then return end
+  if spell == "Opening" and unit == "player" then
+    lastContainerName = openingContainer
   end
 end
 
@@ -2480,16 +2498,19 @@ end
 
 -- Loot window closing means cancel auction
 function EminentDKP:LOOT_CLOSED()
-  if self:AmMasterLooter() and auction_active then
-    auction_active = false
-    self:CancelTimer(self.bidTimer,true)
-    self:MessageGroup(L["Auction cancelled. All bids have been voided."])
-    self:InformPlayer("auctioncancel",{
-      guid = self.bidItem.srcGUID,
-      slot = self:GetGUISlot(self.bidItem.srcGUID,self.bidItem.slotNum),
-    })
-    self:RemoveMarkedItemSlots(self.bidItem.srcGUID)
-    self.bidItem = nil
+  if self:AmMasterLooter() then
+    lastContainerName = nil
+    if auction_active then
+      auction_active = false
+      self:CancelTimer(self.bidTimer,true)
+      self:MessageGroup(L["Auction cancelled. All bids have been voided."])
+      self:InformPlayer("auctioncancel",{
+        guid = self.bidItem.srcGUID,
+        slot = self:GetGUISlot(self.bidItem.srcGUID,self.bidItem.slotNum),
+      })
+      self:RemoveMarkedItemSlots(self.bidItem.srcGUID)
+      self.bidItem = nil
+    end
   end
 end
 
@@ -2497,7 +2518,7 @@ end
 function EminentDKP:GetTargetNameAndGUID()
   local unitName = lastContainerName
   local guid = 'container'
-  if UnitExists("target") then
+  if unitName == nil then
     guid = UnitGUID("target")
     unitName = UnitName("target")
   end
@@ -2565,6 +2586,7 @@ end
 
 -- Prints out the loot to the group when looting a corpse
 function EminentDKP:LOOT_OPENED()
+  print('here')
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() then return end
   
