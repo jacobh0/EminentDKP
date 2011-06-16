@@ -100,8 +100,6 @@ local CLASS_REQUIREMENTS = {
                   [5] = { L["Shield"] } },
 }
 
-local PRIMARY_STATS = { L["Agility"], L["Strength"], L["Intellect"] }
-
 local ITEM_SLOTS = { L["Head"], L["Neck"], L["Shoulder"], L["Back"],
                      L["Chest"], L["Shirt"], L["Tabard"], L["Wrists"],
                      L["Hands"], L["Waist"], L["Legs"], L["Feet"],
@@ -111,6 +109,12 @@ local ITEM_SLOTS = { L["Head"], L["Neck"], L["Shoulder"], L["Back"],
 
 local scan_tip
 local enable_stat_check = true
+
+-- Strip any color codes from a string
+local function removeColor(str)
+  if not str then return nil end
+  return string.gsub(string.gsub(str,"|c%a%a%a%a%a%a%a%a",""),"|%a","")
+end
 
 -- Disable the primary stat check
 function LibCanUse:UseStatCheck(bool)
@@ -130,7 +134,7 @@ function LibCanUse:CanUseItem(classname,link)
   if ENGLISH_CLASSES[classname] ~= nil then
     classname = ENGLISH_CLASSES[classname]
   end
-  
+
   -- Scanning tooltip created yet?
   if not scan_tip then
     scan_tip = CreateFrame('GameTooltip', 'LibCanUseScanTip', UIParent, 'GameTooltipTemplate')
@@ -150,32 +154,34 @@ function LibCanUse:CanUseItem(classname,link)
   
   for i = 1, math.min(8,LibCanUseScanTip:NumLines()) do
     -- Right text is only ever the item type
-    local right_text = getglobal("LibCanUseScanTipTextRight" .. i)
-    if right_text:GetText() then
+    local right_text_obj = getglobal("LibCanUseScanTipTextRight" .. i)
+    local right_text = removeColor(right_text_obj:GetText())
+    if right_text then
       if not item_type then
-        item_type = right_text:GetText()
+        item_type = right_text
       else
         -- We found a 2nd right text, this must be a weapon of some sort
         is_weapon = true
       end
     end
-    
+
     -- Scan the left text
-    local left_text = getglobal("LibCanUseScanTipTextLeft" .. i)
-    if string.find(left_text:GetText(), L["Classes"], 1, true) then
+    local left_text_obj = getglobal("LibCanUseScanTipTextLeft" .. i)
+    local left_text = removeColor(left_text_obj:GetText())
+    if string.find(left_text, L["Classes"], 1, true) then
       -- There is a class restriction line (this is a token)
-      class_restrictions = { strsplit(",",string.sub(left_text:GetText(), strlen(L["Classes"]) + 2)) }
+      class_restrictions = { strsplit(",",string.sub(left_text, strlen(L["Classes"]) + 2)) }
       -- Convert the localized class names into general english class names
       for i,name in ipairs(class_restrictions) do
         class_restrictions[i] = self:GetEnglishClass(strtrim(name))
       end
-    elseif tContains(ITEM_SLOTS,left_text:GetText()) then
+    elseif tContains(ITEM_SLOTS,left_text) then
       -- We found the slot type
-      item_slot = left_text:GetText()
+      item_slot = left_text
     else
       -- Search for a primary stat
-      local stat = string.gsub(left_text:GetText(),"%s*+%d*%s*","")
-      if tContains(PRIMARY_STATS,stat) then
+      local stat = string.gsub(left_text,"%s*+%d*%s*","")
+      if stat == L["Strength"] or stat == L["Agility"] or stat == L["Intellect"] then
         primary_attrib = stat
       end
     end  

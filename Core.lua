@@ -2586,7 +2586,6 @@ end
 
 -- Prints out the loot to the group when looting a corpse
 function EminentDKP:LOOT_OPENED()
-  print('here')
   -- This only needs to be run by the masterlooter
   if not self:AmMasterLooter() then return end
   
