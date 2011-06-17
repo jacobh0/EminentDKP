@@ -2488,7 +2488,7 @@ end
 
 function EminentDKP:GetMasterLooterName()
   if self.lootMethod == 'master' then
-    if self.masterLooterName == nil then
+    if not UnitExists(self.masterLooterName) then
       self:PARTY_LOOT_METHOD_CHANGED()
     end
     return self.masterLooterName
