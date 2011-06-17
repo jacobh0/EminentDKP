@@ -8,7 +8,7 @@ local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
-local VERSION = '2.2.1'
+local VERSION = '2.2.2'
 local newest_version = ''
 local needs_update = false
 local addon_versions = {}
@@ -837,7 +837,7 @@ function EminentDKP:ProcessOfficerSyncVersion(prefix, message, distribution, sen
   if self:GetActivePool().officerSettingsTime < timestamp then
     -- Our settings are older
     self:BroadcastOfficerTimestamp()
-  else
+  elseif self:GetActivePool().officerSettingsTime > timestamp then
     -- Our settings are newer
     self:CancelTimer(self.officerSettingsTimer,true)
     self.officerSettingsTimer = self:ScheduleTimer('BroadcastOfficerSettings',math.random(2,6))
