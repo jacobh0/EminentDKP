@@ -12,7 +12,7 @@ embeds.xml
 
 Libs\SpecializedLibBars-1.1\SpecializedLibBars-1.1.lua
 
-Locale\enUS.lua
+Locale\locale.xml
 
 Core.lua
 Options.lua

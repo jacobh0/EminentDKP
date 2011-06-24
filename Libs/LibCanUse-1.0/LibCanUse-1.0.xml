@@ -2,6 +2,6 @@
 ..\FrameXML\UI.xsd">
 	<Script file="Libs\LibStub\LibStub.lua" />
 	<Include file="Libs\AceLocale-3.0\AceLocale-3.0.xml"/>
-	<Script file="Locale\enUS.lua"/>
+	<Include file="Locale\locale.xml"/>
 	<Script file="LibCanUse-1.0.lua"/>
 </Ui>
