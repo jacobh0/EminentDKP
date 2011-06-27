@@ -1,8 +1,8 @@
-## Interface: 40100
+## Interface: 40200
 ## Title: EminentDKP
 ## Notes: DKP used by Eminent of Crushridge-US
 ## Author: Grioja
-## Version: 2.2.2
+## Version: 2.2.3
 ## SavedVariables: EminentDKPDB
 ## OptionalDeps: Ace3
 ## X-Embeds: Ace3

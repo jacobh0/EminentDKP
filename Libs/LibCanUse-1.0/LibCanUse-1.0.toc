@@ -1,0 +1,10 @@
+## Interface: 40200
+## Title: LibCanUse-1.0
+## Notes: Tooltip scanning library created by Grioja
+## Author: Grioja
+## Version: 1.0
+## OptionalDeps: Ace3
+## X-Embeds: Ace3
+## X-Category: Library
+
+LibCanUse-1.0.xml

@@ -37,7 +37,7 @@ local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
-local VERSION = '2.2.2'
+local VERSION = '2.2.3'
 local newest_version = ''
 local needs_update = false
 local addon_versions = {}
@@ -2331,8 +2331,7 @@ end
 ]]
 
 -- Keep track of any creature deaths
--- function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, hideCaster, srcGUID, srcName, srcFlags, srcRFlags, dstGUID, dstName, dstFlags, dstRFlags, ...)
-function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, hideCaster, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
+function EminentDKP:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventtype, hideCaster, srcGUID, srcName, srcFlags, srcRFlags, dstGUID, dstName, dstFlags, dstRFlags, ...)
   if not self:AmOfficer() then return end
   if eventtype == "UNIT_DIED" and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) ~= 0 then
     table.insert(recent_deaths,1,dstName)
