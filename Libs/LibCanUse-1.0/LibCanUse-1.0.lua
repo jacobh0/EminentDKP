@@ -14,7 +14,7 @@
   Created by Grioja of Crushridge-US
 ]]
 
-local MAJOR, MINOR = "LibCanUse-1.0", 0
+local MAJOR, MINOR = "LibCanUse-1.0", 1
 local LibCanUse, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 local L = LibStub("AceLocale-3.0"):GetLocale("LibCanUse-1.0", false)
 
@@ -153,9 +153,18 @@ function LibCanUse:CanUseItem(classname,link)
   local class_restrictions
   
   for i = 1, math.min(8,LibCanUseScanTip:NumLines()) do
-    -- Right text is only ever the item type
+    -- Grab the left text
+    local left_text_obj = getglobal("LibCanUseScanTipTextLeft" .. i)
+    local left_text = removeColor(left_text_obj:GetText())
+
+    -- Stop when we reach a gap
+    if string.find(left_text, "\n") then break end
+
+    -- Grab the right text
     local right_text_obj = getglobal("LibCanUseScanTipTextRight" .. i)
     local right_text = removeColor(right_text_obj:GetText())
+
+    -- Right text is only ever the item type
     if right_text then
       if not item_type then
         item_type = right_text
@@ -165,9 +174,6 @@ function LibCanUse:CanUseItem(classname,link)
       end
     end
 
-    -- Scan the left text
-    local left_text_obj = getglobal("LibCanUseScanTipTextLeft" .. i)
-    local left_text = removeColor(left_text_obj:GetText())
     if string.find(left_text, L["Classes"], 1, true) then
       -- There is a class restriction line (this is a token)
       class_restrictions = { strsplit(",",string.sub(left_text, strlen(L["Classes"]) + 2)) }

@@ -37,7 +37,7 @@ local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
 local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
-local VERSION = '2.2.3'
+local VERSION = '2.2.4'
 local newest_version = ''
 local needs_update = false
 local addon_versions = {}
