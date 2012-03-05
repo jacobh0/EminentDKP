@@ -35,9 +35,9 @@ libCH:Embed(EminentDKP)
 local libS = LibStub:GetLibrary("AceSerializer-3.0")
 local libC = LibStub:GetLibrary("LibCompress")
 local libCE = libC:GetAddonEncodeTable()
-local canuse = LibStub:GetLibrary("LibCanUse-1.0")
+--local canuse = LibStub:GetLibrary("LibCanUse-1.0")
 
-local VERSION = '2.2.4'
+local VERSION = '2.2.5'
 local newest_version = ''
 local needs_update = false
 local addon_versions = {}
@@ -1188,7 +1188,8 @@ end
 
 -- Check if you can use an item
 function EminentDKP:CanIUseItem(link)
-  return canuse:CanUseItem(self:GetMyClass(),link)
+  --return canuse:CanUseItem(self:GetMyClass(),link)
+  return true
 end
 
 function EminentDKP:GetNewestEventCount()
@@ -2681,12 +2682,12 @@ function EminentDKP:Bid(addon,from,amount)
       local bid = math.floor(tonumber(amount) or 0)
       if bid >= 1 then
         if self:PlayerHasDKP(from,bid) then
-          if canuse:CanUseItem(self:GetPlayerClassByName(from),self.bidItem.itemLink) then
+          --if canuse:CanUseItem(self:GetPlayerClassByName(from),self.bidItem.itemLink) then
             self.bidItem.bids[from] = bid
             self:WhisperPlayer(addon,"bid",L["Your bid of %d has been accepted."]:format(bid), from, true)
-          else
-            self:WhisperPlayer(addon,"bid",L["You cannot utilize this item."], from)
-          end
+          --else
+          --  self:WhisperPlayer(addon,"bid",L["You cannot utilize this item."], from)
+          --end
         else
           self:WhisperPlayer(addon,"bid",L["The DKP amount must not exceed your current DKP."], from)
         end
